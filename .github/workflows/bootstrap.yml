@@ -18,6 +18,7 @@ jobs:
   bootstrap:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,7 +26,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cat _bootstrap/chunk-* > /tmp/cm-source.b64
+          cat _bootstrap/bundle-* > /tmp/cm-source.b64
           base64 --decode /tmp/cm-source.b64 > /tmp/cm-source.tar.gz
           tar -xzf /tmp/cm-source.tar.gz -C .
       - name: Install browser test dependencies
