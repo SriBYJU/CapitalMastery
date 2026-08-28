@@ -3,6 +3,7 @@
 
   const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV3:';
   const STATE_KEY = 'capitalMasteryLocalStateV1';
+  const PENDING_ROUTE_KEY = 'cmPendingLearningRouteV1';
 
   function isEstablishedAccount(user) {
     const creation = Date.parse(user?.metadata?.creationTime || 0);
@@ -54,8 +55,8 @@
       return;
     }
 
-    // Migration only: an established account that already has a real first + last
-    // display name can be treated as having completed the old setup. Brand-new
+    // Migration only: established accounts that already have a real first + last
+    // display name can be treated as having completed the older setup. Brand-new
     // Google/email accounts still go through the required one-time name screen.
     if (isEstablishedAccount(user) && looksLikeFullName(user.displayName)) {
       migrateProfileName(user);
@@ -63,7 +64,49 @@
     }
   }
 
-  document.addEventListener('cm-auth-changed', event => migrate(event.detail?.user || null));
+  function clearPendingLearningRoute() {
+    sessionStorage.removeItem(PENDING_ROUTE_KEY);
+  }
 
-  if (window.CM_AUTH?.ready && window.CM_AUTH.user) migrate(window.CM_AUTH.user);
+  async function resumePendingRouteIfReady(user) {
+    if (!user) return;
+    const pending = sessionStorage.getItem(PENDING_ROUTE_KEY) || '';
+    if (!pending || pending === '#/login') return;
+    if (!location.hash.startsWith('#/login')) return;
+
+    try {
+      const confirmed = window.CM_CERT_NAME?.check
+        ? await window.CM_CERT_NAME.check()
+        : localProfileConfirmed() || localStorage.getItem(`${ONBOARD_PREFIX}${user.uid}`) === 'true';
+      if (!confirmed) return;
+      clearPendingLearningRoute();
+      location.hash = pending;
+    } catch (_) {}
+  }
+
+  document.addEventListener('click', event => {
+    if (event.target.closest('[data-cm-gate-close]')) {
+      clearPendingLearningRoute();
+      return;
+    }
+    const backdrop = event.target.closest('#cm-learning-gate');
+    if (backdrop && event.target === backdrop) clearPendingLearningRoute();
+  }, true);
+
+  document.addEventListener('cm-auth-changed', event => {
+    const user = event.detail?.user || null;
+    migrate(user);
+    if (user) setTimeout(() => resumePendingRouteIfReady(user), 260);
+    else clearPendingLearningRoute();
+  });
+
+  document.addEventListener('cm-certificate-name-changed', event => {
+    const user = event.detail?.user || window.CM_AUTH?.user || null;
+    if (user) setTimeout(() => resumePendingRouteIfReady(user), 80);
+  });
+
+  if (window.CM_AUTH?.ready && window.CM_AUTH.user) {
+    migrate(window.CM_AUTH.user);
+    setTimeout(() => resumePendingRouteIfReady(window.CM_AUTH.user), 260);
+  }
 })();
