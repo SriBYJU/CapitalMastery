@@ -3,6 +3,8 @@
 
   const SDK = '12.18.0';
   const STATE_KEY = 'capitalMasteryLocalStateV1';
+  const USER_STATE_PREFIX = 'capitalMasteryUserStateV1:';
+  const ACTIVE_UID_KEY = 'capitalMasteryActiveUidV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
   const DEFAULT_NAME = 'Jordan Smith';
 
@@ -33,13 +35,25 @@
     }));
   }
 
-  function readLocalState() {
+  function parseState(raw) {
     try {
-      const parsed = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+      const parsed = JSON.parse(raw || 'null');
       return parsed && parsed.version === 1 ? parsed : null;
     } catch (_) {
       return null;
     }
+  }
+
+  function readLocalState() {
+    return parseState(localStorage.getItem(STATE_KEY));
+  }
+
+  function userStateKey(uid) {
+    return `${USER_STATE_PREFIX}${uid}`;
+  }
+
+  function readCachedUserState(uid) {
+    return uid ? parseState(localStorage.getItem(userStateKey(uid))) : null;
   }
 
   function qaMode() {
@@ -68,6 +82,119 @@
       .filter(Number.isFinite))].sort((x, y) => x - y);
   }
 
+  function looksLikeFullName(value) {
+    const cleaned = String(value || '').replace(/\s+/g, ' ').trim();
+    return cleaned.split(' ').filter(Boolean).length >= 2;
+  }
+
+  function blankState(firebaseUser = null) {
+    const now = new Date().toISOString();
+    const displayName = String(firebaseUser?.displayName || '').replace(/\s+/g, ' ').trim();
+    return {
+      version: 1,
+      profile: {
+        accountUid: firebaseUser?.uid || null,
+        name: displayName || DEFAULT_NAME,
+        ...(displayName ? { certificateName: displayName } : {})
+      },
+      careers: {},
+      credentials: [],
+      preferences: {},
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
+  function directWriteState(state) {
+    suppressLocalHook = true;
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify(state));
+      const uid = state?.profile?.accountUid;
+      if (uid) localStorage.setItem(userStateKey(uid), JSON.stringify(state));
+    } finally {
+      suppressLocalHook = false;
+    }
+  }
+
+  function snapshotUserState(uid) {
+    if (!uid) return;
+    const current = readLocalState();
+    if (!current) return;
+    const owner = current.profile?.accountUid;
+    const activeUid = localStorage.getItem(ACTIVE_UID_KEY);
+    if (owner === uid || (!owner && activeUid === uid)) {
+      current.profile ||= {};
+      current.profile.accountUid = uid;
+      localStorage.setItem(userStateKey(uid), JSON.stringify(current));
+    }
+  }
+
+  function activateUserState(firebaseUser) {
+    const uid = firebaseUser.uid;
+    const previousUid = localStorage.getItem(ACTIVE_UID_KEY);
+    const switched = !!previousUid && previousUid !== uid;
+
+    if (previousUid && previousUid !== uid) snapshotUserState(previousUid);
+
+    // QA Preview Mode is intentionally session/account-specific. Never allow an
+    // admin's local QA bypass to follow them into another learner account.
+    if (previousUid !== uid) localStorage.removeItem(QA_KEY);
+
+    let next = readCachedUserState(uid);
+    if (!next || next.profile?.accountUid !== uid) next = blankState(firebaseUser);
+    next.profile ||= {};
+    next.profile.accountUid = uid;
+
+    directWriteState(next);
+    localStorage.setItem(ACTIVE_UID_KEY, uid);
+    return switched || previousUid !== uid;
+  }
+
+  function deactivateUserState(previousUid) {
+    if (previousUid) snapshotUserState(previousUid);
+    localStorage.removeItem(ACTIVE_UID_KEY);
+    localStorage.removeItem(QA_KEY);
+    directWriteState(blankState(null));
+  }
+
+  function normalizeState(state, firebaseUser, source = 'local') {
+    const copy = JSON.parse(JSON.stringify(state || blankState(firebaseUser)));
+    copy.version = 1;
+    copy.profile = copy.profile || {};
+
+    const uid = firebaseUser?.uid || null;
+    const firebaseName = String(firebaseUser?.displayName || '').replace(/\s+/g, ' ').trim();
+    const owner = copy.profile.accountUid || null;
+
+    // A state explicitly owned by a different Firebase account is never merged.
+    if (uid && owner && owner !== uid) return blankState(firebaseUser);
+
+    copy.profile.accountUid = uid;
+
+    const profileName = String(copy.profile.certificateName || copy.profile.name || '').replace(/\s+/g, ' ').trim();
+
+    // Legacy records did not have accountUid. Firebase displayName is safe as the
+    // repair source because saving a credential name also updates that account's
+    // Firebase displayName. This prevents a name copied from another browser user
+    // from becoming canonical for the current account.
+    if (uid && !owner && firebaseName && profileName && profileName !== firebaseName) {
+      copy.profile.name = firebaseName;
+      copy.profile.certificateName = firebaseName;
+      copy.profile.certificateNameConfirmed = looksLikeFullName(firebaseName) && copy.profile.certificateNameConfirmed === true;
+    } else if (!copy.profile.name || copy.profile.name === DEFAULT_NAME) {
+      copy.profile.name = firebaseName || copy.profile.name || DEFAULT_NAME;
+    }
+
+    if (source === 'local' && uid && copy.profile.accountUid !== uid) return blankState(firebaseUser);
+
+    copy.careers = copy.careers || {};
+    copy.preferences = copy.preferences || {};
+    copy.credentials = Array.isArray(copy.credentials) ? copy.credentials : [];
+    copy.createdAt = copy.createdAt || new Date().toISOString();
+    copy.updatedAt = copy.updatedAt || copy.createdAt || new Date().toISOString();
+    return copy;
+  }
+
   function mergeCareer(remote = {}, local = {}, preferLocal = true) {
     const quizScores = {};
     const keys = new Set([
@@ -89,10 +216,12 @@
     };
   }
 
-  function mergeStates(remote, local, firebaseUser) {
-    if (!remote && !local) return null;
-    if (!remote) return normalizeState(local, firebaseUser);
-    if (!local) return normalizeState(remote, firebaseUser);
+  function mergeStates(remoteRaw, localRaw, firebaseUser) {
+    const remote = remoteRaw ? normalizeState(remoteRaw, firebaseUser, 'remote') : null;
+    const local = localRaw ? normalizeState(localRaw, firebaseUser, 'local') : null;
+    if (!remote && !local) return blankState(firebaseUser);
+    if (!remote) return local;
+    if (!local) return remote;
 
     const remoteUpdated = stateUpdatedAt(remote);
     const localUpdated = stateUpdatedAt(local);
@@ -104,17 +233,22 @@
     const careers = {};
     for (const id of careerIds) careers[id] = mergeCareer(remote.careers?.[id], local.careers?.[id], preferLocal);
 
-    const firebaseName = firebaseUser?.displayName?.trim();
-    const localName = local.profile?.name?.trim();
-    const remoteName = remote.profile?.name?.trim();
+    const firebaseName = String(firebaseUser?.displayName || '').replace(/\s+/g, ' ').trim();
+    const localName = String(local.profile?.certificateName || local.profile?.name || '').trim();
+    const remoteName = String(remote.profile?.certificateName || remote.profile?.name || '').trim();
     let name = preferLocal ? (localName || remoteName) : (remoteName || localName);
     if (!name || name === DEFAULT_NAME) name = firebaseName || name || DEFAULT_NAME;
 
+    const profile = preferLocal
+      ? { ...(remote.profile || {}), ...(local.profile || {}) }
+      : { ...(local.profile || {}), ...(remote.profile || {}) };
+    profile.accountUid = firebaseUser.uid;
+    profile.name = name;
+    if (profile.certificateNameConfirmed === true) profile.certificateName = name;
+
     return {
       version: 1,
-      profile: preferLocal
-        ? { ...(remote.profile || {}), ...(local.profile || {}), name }
-        : { ...(local.profile || {}), ...(remote.profile || {}), name },
+      profile,
       careers,
       credentials: [],
       preferences: preferLocal ? { ...(remote.preferences || {}), ...(local.preferences || {}) } : { ...(local.preferences || {}), ...(remote.preferences || {}) },
@@ -123,23 +257,8 @@
     };
   }
 
-  function normalizeState(state, firebaseUser) {
-    const copy = JSON.parse(JSON.stringify(state || {}));
-    copy.version = 1;
-    copy.profile = copy.profile || {};
-    if (!copy.profile.name || copy.profile.name === DEFAULT_NAME) {
-      copy.profile.name = firebaseUser?.displayName?.trim() || copy.profile.name || DEFAULT_NAME;
-    }
-    copy.careers = copy.careers || {};
-    copy.preferences = copy.preferences || {};
-    copy.credentials = [];
-    copy.createdAt = copy.createdAt || new Date().toISOString();
-    copy.updatedAt = copy.updatedAt || copy.createdAt || new Date().toISOString();
-    return copy;
-  }
-
   function cloudPayload(state) {
-    const clean = normalizeState(state, user);
+    const clean = normalizeState(state, user, 'local');
     delete clean.credentials;
     return {
       version: 1,
@@ -157,7 +276,7 @@
     const uid = user.uid;
     const ref = fs.doc(db, 'users', uid);
     const base = {
-      displayName: user.displayName || state.profile?.name || null,
+      displayName: state.profile?.certificateName || user.displayName || state.profile?.name || null,
       email: user.email || null,
       lastSeenAt: fs.serverTimestamp()
     };
@@ -178,11 +297,17 @@
       return false;
     }
 
+    const clean = normalizeState(state, user, 'local');
+    if (clean.profile?.accountUid !== user.uid) {
+      console.warn('Blocked cross-account Capital Mastery state sync.');
+      return false;
+    }
+
     try {
       setStatus('syncing');
-      const uid = user.uid;
-      await writeRootProfile(state);
-      await fs.setDoc(fs.doc(db, 'users', uid, 'progress', 'state'), cloudPayload(state), { merge: false });
+      await writeRootProfile(clean);
+      await fs.setDoc(fs.doc(db, 'users', user.uid, 'progress', 'state'), cloudPayload(clean), { merge: false });
+      localStorage.setItem(userStateKey(user.uid), JSON.stringify(clean));
       CM_SYNC.lastSyncedAt = new Date().toISOString();
       setStatus('synced');
       return true;
@@ -193,34 +318,32 @@
     }
   }
 
-  async function hydrateFromCloud(firebaseUser) {
+  async function hydrateFromCloud(firebaseUser, { forceReload = false } = {}) {
     if (!db || !fs || !firebaseUser || qaMode()) return;
     try {
       setStatus('loading');
       const ref = fs.doc(db, 'users', firebaseUser.uid, 'progress', 'state');
       const snap = await fs.getDoc(ref);
-      const local = readLocalState();
+      const localRaw = readLocalState();
+      const local = localRaw?.profile?.accountUid === firebaseUser.uid ? localRaw : blankState(firebaseUser);
       const remote = snap.exists() ? snap.data() : null;
       const merged = mergeStates(remote, local, firebaseUser);
-      if (!merged) return;
 
-      const currentComparable = local ? JSON.stringify({ ...local, credentials: [] }) : '';
-      const mergedComparable = JSON.stringify(merged);
+      const currentComparable = JSON.stringify({ ...(local || {}), credentials: [] });
+      const mergedComparable = JSON.stringify({ ...merged, credentials: [] });
       const changed = currentComparable !== mergedComparable;
 
-      if (changed) {
-        suppressLocalHook = true;
-        const currentCredentials = Array.isArray(local?.credentials) ? local.credentials : [];
-        localStorage.setItem(STATE_KEY, JSON.stringify({ ...merged, credentials: currentCredentials }));
-        suppressLocalHook = false;
-      }
+      const currentCredentials = Array.isArray(local?.credentials) ? local.credentials : [];
+      directWriteState({ ...merged, credentials: currentCredentials });
+      localStorage.setItem(userStateKey(firebaseUser.uid), JSON.stringify({ ...merged, credentials: currentCredentials }));
 
       await syncLocalToCloud({ ...merged, credentials: [] });
 
-      // app.js keeps state inside its closure. Reload only when cloud hydration
-      // actually changed learner-visible state, avoiding unnecessary reloads.
+      // app.js keeps state inside its closure. Reload whenever the active account
+      // changes or cloud hydration materially changes state, so another account's
+      // in-memory profile/progress cannot remain on screen.
       const hydrationKey = `cmCloudHydrated:${firebaseUser.uid}`;
-      if (changed && sessionStorage.getItem(hydrationKey) !== '1') {
+      if ((forceReload || changed) && sessionStorage.getItem(hydrationKey) !== '1') {
         sessionStorage.setItem(hydrationKey, '1');
         location.reload();
       }
@@ -246,17 +369,19 @@
         try {
           const parsed = JSON.parse(value);
           if (parsed && parsed.version === 1) {
+            parsed.profile ||= {};
+            if (user?.uid) parsed.profile.accountUid = user.uid;
             parsed.updatedAt = new Date().toISOString();
             value = JSON.stringify(parsed);
             const result = original.call(this, key, value);
+            if (user?.uid) original.call(this, userStateKey(user.uid), value);
             queueSync(parsed);
             return result;
           }
         } catch (_) {}
       }
 
-      const result = original.call(this, key, value);
-      return result;
+      return original.call(this, key, value);
     };
   }
 
@@ -275,7 +400,8 @@
       if (window.CM_AUTH?.ready && window.CM_AUTH.user) {
         user = window.CM_AUTH.user;
         rootProfileInitializedForUid = null;
-        await hydrateFromCloud(user);
+        const switched = activateUserState(user);
+        await hydrateFromCloud(user, { forceReload: switched });
       }
     } catch (error) {
       console.error('Capital Mastery Firestore failed to initialize:', error);
@@ -284,14 +410,23 @@
   }
 
   document.addEventListener('cm-auth-changed', async event => {
-    user = event.detail?.user || null;
+    const previousUid = user?.uid || localStorage.getItem(ACTIVE_UID_KEY) || null;
+    const nextUser = event.detail?.user || null;
+
+    if (previousUid && (!nextUser || previousUid !== nextUser.uid)) snapshotUserState(previousUid);
+    user = nextUser;
     rootProfileInitializedForUid = null;
+
     if (!CM_SYNC.ready) return;
+
     if (!user) {
+      deactivateUserState(previousUid);
       setStatus('signed-out');
       return;
     }
-    await hydrateFromCloud(user);
+
+    const switched = activateUserState(user);
+    await hydrateFromCloud(user, { forceReload: switched });
   });
 
   initFirestore();
