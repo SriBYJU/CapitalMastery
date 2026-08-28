@@ -1,0 +1,54 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Account metadata used only for the signed-in learner's own account.
+    match /users/{uid} {
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'email',
+          'createdAt',
+          'lastSeenAt'
+        ]);
+      allow delete: if owns(uid);
+
+      // Cross-device learning state. This is convenience/progress data only.
+      // Official credential eligibility and credential issuance are NOT trusted
+      // from Firestore; those records are handled by the secure Worker + D1.
+      match /progress/{docId} {
+        allow read: if owns(uid);
+        allow create, update: if owns(uid)
+          && docId == 'state'
+          && request.resource.data.version == 1
+          && request.resource.data.syncVersion == 1
+          && request.resource.data.keys().hasOnly([
+            'version',
+            'profile',
+            'careers',
+            'preferences',
+            'createdAt',
+            'updatedAt',
+            'syncVersion',
+            'serverUpdatedAt'
+          ]);
+        allow delete: if owns(uid) && docId == 'state';
+      }
+    }
+
+    // Everything else is denied by default. Official assessment results,
+    // credentials, revocations and admin audit records live in D1 and are
+    // changed only through the authenticated Capital Mastery Worker API.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
