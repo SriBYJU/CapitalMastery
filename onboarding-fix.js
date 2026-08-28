@@ -1,65 +1,69 @@
 (() => {
   'use strict';
 
-  const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV2:';
+  const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV3:';
   const STATE_KEY = 'capitalMasteryLocalStateV1';
-  const CREATE_INTENT_KEY = 'cmAccountCreateIntentV1';
-  const GOOGLE_INTENT_KEY = 'cmGoogleAuthIntentV1';
 
-  function accountWasJustCreatedInThisSession(user) {
+  function isEstablishedAccount(user) {
     const creation = Date.parse(user?.metadata?.creationTime || 0);
     const lastSignIn = Date.parse(user?.metadata?.lastSignInTime || 0);
-    const recentCreation = Number.isFinite(creation) && Number.isFinite(lastSignIn) && Math.abs(lastSignIn - creation) < 120000;
-    const createIntent = sessionStorage.getItem(CREATE_INTENT_KEY) === '1';
-    const googleIntent = sessionStorage.getItem(GOOGLE_INTENT_KEY) === '1';
-    return recentCreation && (createIntent || googleIntent);
+    if (!Number.isFinite(creation) || !Number.isFinite(lastSignIn)) return false;
+    return Math.abs(lastSignIn - creation) > 120000;
   }
 
-  function cloudOrLocalNameAlreadyConfirmed() {
+  function looksLikeFullName(value) {
+    const cleaned = String(value || '').replace(/\s+/g, ' ').trim();
+    const pieces = cleaned.split(' ').filter(Boolean);
+    return cleaned.length >= 3 && pieces.length >= 2 && pieces.every(piece => /[\p{L}]/u.test(piece));
+  }
+
+  function localProfileConfirmed() {
     try {
       const state = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
       const profile = state?.profile || {};
-      return profile.certificateNameConfirmed === true && !!String(profile.certificateName || profile.name || '').trim();
+      const name = String(profile.certificateName || profile.name || '').replace(/\s+/g, ' ').trim();
+      return profile.certificateNameConfirmed === true && looksLikeFullName(name);
     } catch (_) {
       return false;
     }
   }
 
-  document.addEventListener('submit', event => {
-    if (event.target?.id === 'cm-create-form') {
-      sessionStorage.setItem(CREATE_INTENT_KEY, '1');
+  function migrateProfileName(user) {
+    if (!user || !looksLikeFullName(user.displayName)) return false;
+    try {
+      const state = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+      if (!state || state.version !== 1) return false;
+      state.profile ||= {};
+      state.profile.name = user.displayName.trim();
+      state.profile.certificateName = user.displayName.trim();
+      state.profile.certificateNameConfirmed = true;
+      state.updatedAt = new Date().toISOString();
+      localStorage.setItem(STATE_KEY, JSON.stringify(state));
+      window.CM_SYNC?.flush?.().catch(() => {});
+      return true;
+    } catch (_) {
+      return false;
     }
-  }, true);
+  }
 
-  document.addEventListener('click', event => {
-    const button = event.target.closest('[data-cm-auth-action="google"]');
-    if (button) sessionStorage.setItem(GOOGLE_INTENT_KEY, '1');
-  }, true);
-
-  document.addEventListener('cm-auth-changed', event => {
-    const user = event.detail?.user || null;
-    if (!user) {
-      sessionStorage.removeItem(CREATE_INTENT_KEY);
-      sessionStorage.removeItem(GOOGLE_INTENT_KEY);
-      return;
-    }
-
+  function migrate(user) {
+    if (!user) return;
     const key = `${ONBOARD_PREFIX}${user.uid}`;
-    if (localStorage.getItem(key) === 'true' || cloudOrLocalNameAlreadyConfirmed()) {
+    if (localStorage.getItem(key) === 'true' || localProfileConfirmed()) {
       localStorage.setItem(key, 'true');
-      sessionStorage.removeItem(CREATE_INTENT_KEY);
-      sessionStorage.removeItem(GOOGLE_INTENT_KEY);
       return;
     }
 
-    // Existing accounts should never be forced through certificate-name setup again
-    // merely because they signed in on a new browser/device. The required modal is
-    // reserved for the account-creation session only.
-    if (!accountWasJustCreatedInThisSession(user)) {
+    // Migration only: an established account that already has a real first + last
+    // display name can be treated as having completed the old setup. Brand-new
+    // Google/email accounts still go through the required one-time name screen.
+    if (isEstablishedAccount(user) && looksLikeFullName(user.displayName)) {
+      migrateProfileName(user);
       localStorage.setItem(key, 'true');
     }
+  }
 
-    sessionStorage.removeItem(CREATE_INTENT_KEY);
-    sessionStorage.removeItem(GOOGLE_INTENT_KEY);
-  }, true);
+  document.addEventListener('cm-auth-changed', event => migrate(event.detail?.user || null));
+
+  if (window.CM_AUTH?.ready && window.CM_AUTH.user) migrate(window.CM_AUTH.user);
 })();
