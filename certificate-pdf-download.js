@@ -1,21 +1,22 @@
 (() => {
   'use strict';
 
-  let html2canvasPromise = null;
   let jsPdfPromise = null;
+  let qrLoader = null;
   let bindingScheduled = false;
+  const imageCache = new Map();
 
-  const EXPORT_W = 1100;
-  const EXPORT_H = 778;
+  const LOGICAL_W = 842;
+  const LOGICAL_H = 595;
+  const SCALE = 2;
 
   function loadScript(src, test, marker) {
     if (test()) return Promise.resolve();
     const existing = document.querySelector(`script[data-${marker}]`);
     if (existing) {
-      if (test()) return Promise.resolve();
       return new Promise((resolve, reject) => {
-        existing.addEventListener('load', resolve, { once:true });
-        existing.addEventListener('error', reject, { once:true });
+        existing.addEventListener('load', resolve, { once: true });
+        existing.addEventListener('error', reject, { once: true });
       });
     }
     return new Promise((resolve, reject) => {
@@ -24,20 +25,9 @@
       script.async = true;
       script.dataset[marker] = 'true';
       script.onload = resolve;
-      script.onerror = () => reject(new Error('Could not load the certificate export library.'));
+      script.onerror = () => reject(new Error('Could not load the PDF library.'));
       document.head.appendChild(script);
     });
-  }
-
-  function loadHtml2Canvas() {
-    if (!html2canvasPromise) {
-      html2canvasPromise = loadScript(
-        'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js',
-        () => typeof window.html2canvas === 'function',
-        'cmHtml2canvas'
-      );
-    }
-    return html2canvasPromise;
   }
 
   function loadJsPdf() {
@@ -51,7 +41,19 @@
     return jsPdfPromise;
   }
 
-  function safeFileName(ext = 'pdf') {
+  function loadQrLibrary() {
+    if (window.QRCode) return Promise.resolve(window.QRCode);
+    if (!qrLoader) {
+      qrLoader = loadScript(
+        'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
+        () => !!window.QRCode,
+        'cmQrcodePdf'
+      ).then(() => window.QRCode);
+    }
+    return qrLoader;
+  }
+
+  function safeFileName(ext) {
     const title = document.querySelector('#certificate .cert-title')?.textContent || 'Capital Mastery Certificate';
     const name = document.querySelector('#certificate .cert-name')?.textContent || '';
     return `${title} - ${name}`
@@ -61,148 +63,361 @@
       .slice(0, 140) + `.${ext}`;
   }
 
-  async function waitForImages(root) {
-    const images = [...root.querySelectorAll('img')];
-    await Promise.all(images.map(img => {
-      if (img.complete && img.naturalWidth) return Promise.resolve();
-      return new Promise(resolve => {
-        img.addEventListener('load', resolve, { once:true });
-        img.addEventListener('error', resolve, { once:true });
-      });
-    }));
-    if (document.fonts?.ready) await document.fonts.ready.catch(() => {});
-  }
-
-  function qrDataUrl(original) {
-    const qr = original.querySelector('.cert-qr');
-    const canvas = qr?.querySelector('canvas');
-    const img = qr?.querySelector('img');
-    if (canvas) {
-      try { return canvas.toDataURL('image/png'); } catch (_) {}
-    }
-    return img?.src || '';
-  }
-
-  function tier(original) {
-    if (original.classList.contains('simple')) return 'foundations';
-    if (original.classList.contains('applied')) return 'applied';
+  function tier(cert) {
+    if (cert.classList.contains('simple')) return 'foundations';
+    if (cert.classList.contains('applied')) return 'applied';
     return 'career';
   }
 
-  function tierDesign(original) {
-    const t = tier(original);
-    if (t === 'foundations') {
-      return {
-        border: '4px solid #244c78',
-        background: '#ffffff',
-        nameNormal: '4rem', nameLong: '3.2rem', nameVeryLong: '2.65rem'
-      };
-    }
-    if (t === 'applied') {
-      return {
-        border: '6px solid #147d83',
-        background: 'linear-gradient(135deg,#fff 0%,#fbffff 60%,#f2faf9 100%)',
-        nameNormal: '4rem', nameLong: '3.2rem', nameVeryLong: '2.65rem'
-      };
-    }
+  function text(root, selector, fallback = '') {
+    return root.querySelector(selector)?.textContent?.trim() || fallback;
+  }
+
+  function certificateData() {
+    const cert = document.getElementById('certificate');
+    if (!cert) throw new Error('Certificate is not ready yet.');
+    const meta = [...cert.querySelectorAll('.cert-meta strong')].map(el => el.textContent.trim());
     return {
-      border: '14px solid #071a33',
-      background: 'radial-gradient(circle at 15% 18%,rgba(193,145,65,.06),transparent 22%),radial-gradient(circle at 85% 82%,rgba(7,26,51,.045),transparent 22%),#fffdf8',
-      nameNormal: '4.85rem', nameLong: '3.9rem', nameVeryLong: '3.05rem'
+      cert,
+      tier: tier(cert),
+      type: text(cert, '.cert-type', 'Certificate'),
+      awarded: text(cert, '.cert-awarded', 'This certificate is awarded to'),
+      name: text(cert, '.cert-name', ''),
+      forText: text(cert, '.cert-for', 'for successfully completing the requirements of'),
+      title: text(cert, '.cert-title', 'Capital Mastery'),
+      description: text(cert, '.cert-description', ''),
+      issued: meta[0] || '',
+      credentialId: meta[meta.length - 1] || '',
+      verifyUrl: text(cert, '.cm-cert-verify-url', '').replace(/^Verify:\s*/i, '')
     };
   }
 
-  function prepareClone(cloneDoc, original, qrUrl) {
-    const clone = cloneDoc.getElementById('certificate');
-    if (!clone) return;
-    const design = tierDesign(original);
-
-    const frame = clone.closest('.cm-cert-responsive-frame');
-    if (frame) {
-      Object.assign(frame.style, {
-        position: 'relative',
-        width: `${EXPORT_W}px`,
-        height: `${EXPORT_H}px`,
-        margin: '0',
-        overflow: 'visible'
-      });
-    }
-
-    Object.assign(clone.style, {
-      position: 'relative',
-      left: '0', top: '0',
-      width: `${EXPORT_W}px`, maxWidth: 'none',
-      height: `${EXPORT_H}px`, aspectRatio: 'auto',
-      margin: '0', transform: 'none', transformOrigin: 'top left',
-      boxSizing: 'border-box', overflow: 'hidden',
-      background: design.background,
-      border: design.border,
-      boxShadow: 'none'
+  function loadImage(src) {
+    if (imageCache.has(src)) return imageCache.get(src);
+    const promise = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error(`Could not load ${src}`));
+      img.src = src;
     });
-    clone.classList.add('cm-export-render');
+    imageCache.set(src, promise);
+    return promise;
+  }
 
-    const name = clone.querySelector('.cert-name');
-    if (name) {
-      const len = name.textContent.trim().length;
-      name.style.fontSize = len > 34 ? design.nameVeryLong : len > 22 ? design.nameLong : design.nameNormal;
-      name.style.lineHeight = tier(original) === 'career' ? '.98' : '1';
-      name.style.maxWidth = '90%';
-    }
-
-    const qr = clone.querySelector('.cert-qr');
-    if (qr && qrUrl) {
-      qr.innerHTML = '';
-      qr.removeAttribute('style');
-      const img = cloneDoc.createElement('img');
-      img.src = qrUrl;
-      img.alt = 'QR code for public credential verification';
-      Object.assign(img.style, { display:'block', width:'100%', height:'100%', objectFit:'contain' });
-      qr.appendChild(img);
+  async function optionalImage(src, fallback = null) {
+    try { return await loadImage(src); }
+    catch (_) {
+      if (!fallback) return null;
+      try { return await loadImage(fallback); } catch (_) { return null; }
     }
   }
 
-  async function captureCertificate() {
-    const original = document.getElementById('certificate');
-    if (!original) throw new Error('Certificate is not ready yet.');
-    await waitForImages(original);
-    const qrUrl = qrDataUrl(original);
+  async function getQrCanvas(data) {
+    const existing = data.cert.querySelector('.cert-qr canvas');
+    if (existing) return existing;
 
-    const canvas = await window.html2canvas(original, {
-      backgroundColor: tier(original) === 'foundations' ? '#ffffff' : '#fffdf8',
-      scale: 2,
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      width: EXPORT_W,
-      height: EXPORT_H,
-      windowWidth: 1440,
-      windowHeight: 1000,
-      scrollX: 0,
-      scrollY: 0,
-      onclone: cloneDoc => prepareClone(cloneDoc, original, qrUrl)
-    });
+    try {
+      const QRCode = await loadQrLibrary();
+      const holder = document.createElement('div');
+      holder.style.cssText = 'position:fixed;left:-9999px;top:0;width:256px;height:256px;background:#fff;';
+      document.body.appendChild(holder);
+      const payload = data.verifyUrl || data.credentialId || data.title;
+      new QRCode(holder, {
+        text: payload,
+        width: 256,
+        height: 256,
+        colorDark: '#071a33',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const canvas = holder.querySelector('canvas');
+      if (!canvas) {
+        holder.remove();
+        return null;
+      }
+      const copy = document.createElement('canvas');
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      copy.getContext('2d').drawImage(canvas, 0, 0);
+      holder.remove();
+      return copy;
+    } catch (_) {
+      return null;
+    }
+  }
 
-    if (!canvas.width || !canvas.height) throw new Error('The certificate image was empty.');
+  function setFont(ctx, size, family = 'Arial', weight = '400', style = 'normal') {
+    ctx.font = `${style} ${weight} ${size}px ${family}`;
+  }
+
+  function fitFont(ctx, value, start, min, maxWidth, family = 'Georgia', weight = '700') {
+    let size = start;
+    while (size > min) {
+      setFont(ctx, size, family, weight);
+      if (ctx.measureText(value).width <= maxWidth) break;
+      size -= 1;
+    }
+    return size;
+  }
+
+  function wrapText(ctx, value, maxWidth) {
+    const words = String(value || '').split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+      if (line && ctx.measureText(test).width > maxWidth) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function drawCenteredLines(ctx, lines, x, y, lineHeight) {
+    lines.forEach((line, i) => ctx.fillText(line, x, y + i * lineHeight));
+  }
+
+  function drawSpaced(ctx, value, centerX, y, spacing) {
+    const chars = [...String(value)];
+    const widths = chars.map(ch => ctx.measureText(ch).width);
+    const total = widths.reduce((a, b) => a + b, 0) + Math.max(0, chars.length - 1) * spacing;
+    let x = centerX - total / 2;
+    for (let i = 0; i < chars.length; i++) {
+      ctx.fillText(chars[i], x, y);
+      x += widths[i] + spacing;
+    }
+  }
+
+  function drawCorner(ctx, x, y, size, horiz, vert, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.beginPath();
+    ctx.moveTo(x, y + vert * size);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x + horiz * size, y);
+    ctx.stroke();
+  }
+
+  function drawBackground(ctx, t) {
+    if (t === 'foundations') {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+      ctx.strokeStyle = '#244c78';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(8, 8, LOGICAL_W - 16, LOGICAL_H - 16);
+      ctx.strokeStyle = '#9db1c7';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(21, 21, LOGICAL_W - 42, LOGICAL_H - 42);
+      drawCorner(ctx, 35, 35, 40, 1, 1, '#7d8792', 2.2);
+      drawCorner(ctx, LOGICAL_W - 35, 35, 40, -1, 1, '#7d8792', 2.2);
+      drawCorner(ctx, 35, LOGICAL_H - 35, 40, 1, -1, '#7d8792', 2.2);
+      drawCorner(ctx, LOGICAL_W - 35, LOGICAL_H - 35, 40, -1, -1, '#7d8792', 2.2);
+      return;
+    }
+
+    if (t === 'applied') {
+      const grad = ctx.createLinearGradient(0, 0, LOGICAL_W, LOGICAL_H);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(.62, '#fbffff');
+      grad.addColorStop(1, '#f2faf9');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+      ctx.strokeStyle = '#147d83';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(9, 9, LOGICAL_W - 18, LOGICAL_H - 18);
+      ctx.strokeStyle = '#75b9bc';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(22, 22, LOGICAL_W - 44, LOGICAL_H - 44);
+      drawCorner(ctx, 36, 36, 42, 1, 1, '#147d83', 2.5);
+      drawCorner(ctx, LOGICAL_W - 36, 36, 42, -1, 1, '#147d83', 2.5);
+      drawCorner(ctx, 36, LOGICAL_H - 36, 42, 1, -1, '#147d83', 2.5);
+      drawCorner(ctx, LOGICAL_W - 36, LOGICAL_H - 36, 42, -1, -1, '#147d83', 2.5);
+      return;
+    }
+
+    ctx.fillStyle = '#fffdf8';
+    ctx.fillRect(0, 0, LOGICAL_W, LOGICAL_H);
+    const glow1 = ctx.createRadialGradient(120, 110, 0, 120, 110, 180);
+    glow1.addColorStop(0, 'rgba(193,145,65,.10)');
+    glow1.addColorStop(1, 'rgba(193,145,65,0)');
+    ctx.fillStyle = glow1;
+    ctx.fillRect(0, 0, 300, 300);
+    const glow2 = ctx.createRadialGradient(720, 500, 0, 720, 500, 180);
+    glow2.addColorStop(0, 'rgba(7,26,51,.06)');
+    glow2.addColorStop(1, 'rgba(7,26,51,0)');
+    ctx.fillStyle = glow2;
+    ctx.fillRect(540, 320, 302, 275);
+
+    ctx.strokeStyle = '#071a33';
+    ctx.lineWidth = 12;
+    ctx.strokeRect(9, 9, LOGICAL_W - 18, LOGICAL_H - 18);
+    ctx.strokeStyle = '#caa45e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(24, 24, LOGICAL_W - 48, LOGICAL_H - 48);
+    ctx.strokeStyle = '#b6bdc6';
+    ctx.lineWidth = .8;
+    ctx.strokeRect(34, 34, LOGICAL_W - 68, LOGICAL_H - 68);
+    drawCorner(ctx, 42, 42, 54, 1, 1, '#071a33', 3);
+    drawCorner(ctx, LOGICAL_W - 42, 42, 54, -1, 1, '#071a33', 3);
+    drawCorner(ctx, 42, LOGICAL_H - 42, 54, 1, -1, '#071a33', 3);
+    drawCorner(ctx, LOGICAL_W - 42, LOGICAL_H - 42, 54, -1, -1, '#071a33', 3);
+  }
+
+  function drawBrand(ctx, logo, t) {
+    const logoSize = t === 'career' ? 31 : 27;
+    const textSize = t === 'career' ? 14 : 13;
+    const y = t === 'career' ? 82 : 76;
+    const label = 'CAPITAL MASTERY';
+    setFont(ctx, textSize, 'Arial', '700');
+    const labelWidth = ctx.measureText(label).width + (label.length - 1) * 2.1;
+    const groupWidth = (logo ? logoSize + 16 : 0) + labelWidth;
+    let left = LOGICAL_W / 2 - groupWidth / 2;
+    if (logo) {
+      ctx.drawImage(logo, left, y - logoSize + 8, logoSize, logoSize);
+      left += logoSize + 16;
+    }
+    ctx.fillStyle = '#071a33';
+    ctx.textAlign = 'left';
+    drawSpaced(ctx, label, left + labelWidth / 2, y, 2.1);
+    ctx.textAlign = 'center';
+  }
+
+  function drawMainText(ctx, data) {
+    const t = data.tier;
+    const typeColor = t === 'foundations' ? '#244c78' : t === 'applied' ? '#147d83' : '#ae7b2d';
+    const dark = '#071a33';
+    const muted = '#65707c';
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+
+    ctx.fillStyle = typeColor;
+    setFont(ctx, t === 'career' ? 14 : 12.5, 'Arial', '700');
+    drawSpaced(ctx, data.type.toUpperCase(), LOGICAL_W / 2, t === 'career' ? 112 : 106, t === 'career' ? 2.5 : 2.2);
+
+    ctx.fillStyle = muted;
+    setFont(ctx, 9.5, 'Arial', '400');
+    drawSpaced(ctx, data.awarded.toUpperCase(), LOGICAL_W / 2, 143, 1.35);
+
+    ctx.fillStyle = '#111d2d';
+    const nameSize = fitFont(ctx, data.name, t === 'career' ? 48 : 42, 24, 650, 'Georgia', '700');
+    setFont(ctx, nameSize, 'Georgia', '700');
+    ctx.fillText(data.name, LOGICAL_W / 2, 190);
+
+    ctx.fillStyle = '#5d6874';
+    setFont(ctx, 10.5, 'Arial', '400');
+    ctx.fillText(data.forText, LOGICAL_W / 2, 220);
+
+    ctx.fillStyle = dark;
+    const titleSize = fitFont(ctx, data.title, t === 'career' ? 31 : t === 'applied' ? 27 : 26, 18, 650, 'Georgia', '700');
+    setFont(ctx, titleSize, 'Georgia', '700');
+    const titleLines = wrapText(ctx, data.title, 660).slice(0, 2);
+    drawCenteredLines(ctx, titleLines, LOGICAL_W / 2, 256, titleSize * 1.08);
+
+    if (data.description) {
+      ctx.fillStyle = '#616a75';
+      setFont(ctx, t === 'career' ? 9.6 : 9.2, 'Arial', '400');
+      const descLines = wrapText(ctx, data.description, t === 'career' ? 650 : 610).slice(0, 3);
+      const titleBottom = 256 + (titleLines.length - 1) * titleSize * 1.08;
+      drawCenteredLines(ctx, descLines, LOGICAL_W / 2, titleBottom + 28, 13.5);
+    }
+  }
+
+  function drawFooter(ctx, data, signature, qr) {
+    const dark = '#071a33';
+    const muted = '#66717d';
+    const leftX = 150;
+    const centerX = LOGICAL_W / 2;
+    const rightX = 690;
+    const baseline = 548;
+
+    ctx.textAlign = 'center';
+    ctx.fillStyle = muted;
+    setFont(ctx, 8.5, 'Arial', '400');
+    drawSpaced(ctx, 'ISSUED', leftX, baseline - 19, .9);
+    ctx.fillStyle = dark;
+    setFont(ctx, 9.5, 'Arial', '700');
+    ctx.fillText(data.issued, leftX, baseline - 5);
+
+    if (signature) {
+      const w = data.tier === 'career' ? 170 : 150;
+      const h = data.tier === 'career' ? 58 : 50;
+      ctx.drawImage(signature, centerX - w / 2, baseline - 82, w, h);
+    }
+    ctx.strokeStyle = '#66717d';
+    ctx.lineWidth = .8;
+    ctx.beginPath();
+    ctx.moveTo(centerX - 76, baseline - 27);
+    ctx.lineTo(centerX + 76, baseline - 27);
+    ctx.stroke();
+    ctx.fillStyle = dark;
+    setFont(ctx, 9, 'Arial', '700');
+    ctx.fillText('Shriyan Avadhanula', centerX, baseline - 12);
+    ctx.fillStyle = muted;
+    setFont(ctx, 8, 'Arial', '400');
+    ctx.fillText('Founder, Capital Mastery', centerX, baseline + 3);
+
+    if (qr) {
+      const q = data.tier === 'career' ? 56 : 50;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(rightX - q / 2 - 3, baseline - 94, q + 6, q + 6);
+      ctx.drawImage(qr, rightX - q / 2, baseline - 91, q, q);
+    }
+    ctx.fillStyle = muted;
+    setFont(ctx, 8.5, 'Arial', '400');
+    drawSpaced(ctx, 'CREDENTIAL ID', rightX, baseline - 19, .55);
+    ctx.fillStyle = dark;
+    const idSize = fitFont(ctx, data.credentialId, 9, 6.5, 175, 'Arial', '700');
+    setFont(ctx, idSize, 'Arial', '700');
+    ctx.fillText(data.credentialId, rightX, baseline - 5);
+  }
+
+  async function renderCertificateCanvas() {
+    const data = certificateData();
+    const [logo, signature, seal, qr] = await Promise.all([
+      optionalImage('assets/logo-mark.svg', 'assets/icon-192.png'),
+      optionalImage('assets/founder-signature.png'),
+      data.tier === 'career' ? optionalImage('assets/seal.svg') : Promise.resolve(null),
+      getQrCanvas(data)
+    ]);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = LOGICAL_W * SCALE;
+    canvas.height = LOGICAL_H * SCALE;
+    const ctx = canvas.getContext('2d', { alpha: false });
+    ctx.scale(SCALE, SCALE);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+
+    drawBackground(ctx, data.tier);
+    drawBrand(ctx, logo, data.tier);
+    if (seal) ctx.drawImage(seal, LOGICAL_W - 145, 102, 82, 82);
+    drawMainText(ctx, data);
+    drawFooter(ctx, data, signature, qr);
+
     return canvas;
   }
 
   async function downloadPdf(button) {
-    const oldText = button.textContent;
     try {
       button.disabled = true;
       button.textContent = 'Preparing PDF…';
-      await Promise.all([loadHtml2Canvas(), loadJsPdf()]);
-      if (typeof window.html2canvas !== 'function' || !window.jspdf?.jsPDF) throw new Error('PDF export could not initialize.');
+      await loadJsPdf();
+      if (!window.jspdf?.jsPDF) throw new Error('PDF export could not initialize.');
 
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const canvas = await captureCertificate();
+      const canvas = await renderCertificateCanvas();
       const image = canvas.toDataURL('image/png');
-
       const { jsPDF } = window.jspdf;
-      const pdf = new jsPDF({ orientation:'landscape', unit:'pt', format:'a4', compress:true });
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4', compress: true });
       const pageW = pdf.internal.pageSize.getWidth();
       const pageH = pdf.internal.pageSize.getHeight();
       pdf.addImage(image, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST');
+      pdf.setProperties({ title: safeFileName('pdf').replace(/\.pdf$/i, ''), subject: 'Capital Mastery verified credential certificate', creator: 'Capital Mastery' });
       pdf.save(safeFileName('pdf'));
     } catch (error) {
       console.error('Capital Mastery PDF download failed:', error);
@@ -214,15 +429,10 @@
   }
 
   async function downloadPng(button) {
-    const oldText = button.textContent;
     try {
       button.disabled = true;
       button.textContent = 'Preparing PNG…';
-      await loadHtml2Canvas();
-      if (typeof window.html2canvas !== 'function') throw new Error('PNG export could not initialize.');
-
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const canvas = await captureCertificate();
+      const canvas = await renderCertificateCanvas();
       const link = document.createElement('a');
       link.download = safeFileName('png');
       link.href = canvas.toDataURL('image/png');
@@ -234,18 +444,15 @@
       alert(`Could not download the PNG yet. ${error.message || 'Please try again.'}`);
     } finally {
       button.disabled = false;
-      button.textContent = oldText || 'Download PNG';
+      button.textContent = 'Download PNG';
     }
   }
 
   function bindPdfButton() {
-    const oldPrint = document.querySelector('[data-cm-live-print]');
-    const currentPdf = document.querySelector('[data-cm-live-pdf]');
-    const button = currentPdf || oldPrint;
-    if (!button || button.dataset.cmPdfV4Bound === '1') return;
-
+    const button = document.querySelector('[data-cm-live-pdf], [data-cm-live-print]');
+    if (!button || button.dataset.cmCanvasPdfBound === '1') return;
     const clean = button.cloneNode(true);
-    clean.dataset.cmPdfV4Bound = '1';
+    clean.dataset.cmCanvasPdfBound = '1';
     clean.setAttribute('data-cm-live-pdf', 'true');
     clean.removeAttribute('data-cm-live-print');
     clean.textContent = 'Download PDF';
@@ -255,11 +462,10 @@
 
   function bindPngButton() {
     const button = document.querySelector('[data-cm-live-png]');
-    if (!button || button.dataset.cmPngV4Bound === '1') return;
-
+    if (!button || button.dataset.cmCanvasPngBound === '1') return;
     const clean = button.cloneNode(true);
-    clean.dataset.cmPngV4Bound = '1';
-    clean.setAttribute('data-cm-live-png', 'true');
+    clean.dataset.cmCanvasPngBound = '1';
+    clean.textContent = 'Download PNG';
     button.replaceWith(clean);
     clean.addEventListener('click', () => downloadPng(clean));
   }
@@ -274,69 +480,9 @@
     });
   }
 
-  const style = document.createElement('style');
-  style.id = 'cm-export-v4-styles';
-  style.textContent = `
-    #certificate.cm-export-render{width:${EXPORT_W}px!important;height:${EXPORT_H}px!important;max-width:none!important;transform:none!important;margin:0!important;box-shadow:none!important}
-    #certificate.cm-export-render .cm-cert-verify-url{display:none!important}
-    #certificate.cm-export-render .cert-description{display:block!important}
-
-    /* Foundations export — blue formal certificate */
-    #certificate.cm-export-render.simple{border:4px solid #244c78!important;background:#fff!important}
-    #certificate.cm-export-render.simple:before{inset:11px!important;border:1px solid rgba(36,76,120,.42)!important;box-shadow:none!important}
-    #certificate.cm-export-render.simple:after{display:none!important}
-    #certificate.cm-export-render.simple .cert-inner{padding:5.3% 7%!important}
-    #certificate.cm-export-render.simple .cert-type{color:#244c78!important;font-size:.86rem!important}
-    #certificate.cm-export-render.simple .cert-title{font-size:2rem!important;max-width:82%!important}
-    #certificate.cm-export-render.simple .corner{width:50px!important;height:50px!important;border-color:#7d8792!important}
-    #certificate.cm-export-render.simple .signature-block img{height:55px!important;max-width:210px!important}
-    #certificate.cm-export-render.simple .cert-qr{width:58px!important;height:58px!important}
-
-    /* Applied Skills export — teal professional certificate */
-    #certificate.cm-export-render.applied{border:6px solid #147d83!important;background:linear-gradient(135deg,#fff 0%,#fbffff 60%,#f2faf9 100%)!important}
-    #certificate.cm-export-render.applied:before{inset:10px!important;border:1px solid rgba(20,125,131,.5)!important;box-shadow:none!important}
-    #certificate.cm-export-render.applied:after{display:none!important}
-    #certificate.cm-export-render.applied .cert-inner{padding:5.3% 7%!important}
-    #certificate.cm-export-render.applied .cert-type{color:#147d83!important;font-size:.86rem!important}
-    #certificate.cm-export-render.applied .cert-title{font-size:2.1rem!important;max-width:82%!important}
-    #certificate.cm-export-render.applied .corner{width:50px!important;height:50px!important;border-color:#147d83!important}
-    #certificate.cm-export-render.applied .signature-block img{height:60px!important;max-width:220px!important}
-    #certificate.cm-export-render.applied .cert-qr{width:58px!important;height:58px!important}
-
-    #certificate.cm-export-render.simple .cert-brand,#certificate.cm-export-render.applied .cert-brand{font-size:1rem!important;gap:10px!important;letter-spacing:.22em!important}
-    #certificate.cm-export-render.simple .cert-brand img,#certificate.cm-export-render.applied .cert-brand img{width:44px!important;height:auto!important}
-    #certificate.cm-export-render.simple .cert-awarded,#certificate.cm-export-render.applied .cert-awarded{margin-top:3%!important;font-size:.68rem!important;letter-spacing:.12em!important}
-    #certificate.cm-export-render.simple .cert-for,#certificate.cm-export-render.applied .cert-for{margin-top:2%!important;font-size:.78rem!important}
-    #certificate.cm-export-render.simple .cert-description,#certificate.cm-export-render.applied .cert-description{font-size:.72rem!important;max-width:620px!important;margin-top:1.4%!important}
-    #certificate.cm-export-render.simple .cert-bottom,#certificate.cm-export-render.applied .cert-bottom{margin-top:auto!important;width:100%!important;display:grid!important;grid-template-columns:1fr 1.15fr 1fr!important;gap:25px!important;align-items:end!important}
-    #certificate.cm-export-render.simple .signature-line,#certificate.cm-export-render.applied .signature-line{width:190px!important;margin:0 auto 4px!important}
-
-    /* Career export — grand navy/gold master certificate */
-    #certificate.cm-export-render:not(.simple):not(.applied){border:14px solid #071a33!important;background:radial-gradient(circle at 15% 18%,rgba(193,145,65,.06),transparent 22%),radial-gradient(circle at 85% 82%,rgba(7,26,51,.045),transparent 22%),#fffdf8!important}
-    #certificate.cm-export-render:not(.simple):not(.applied):before{inset:9px!important;border:2px solid #caa45e!important;box-shadow:inset 0 0 0 6px #fffdf8,inset 0 0 0 7px rgba(7,26,51,.28)!important}
-    #certificate.cm-export-render:not(.simple):not(.applied):after{display:block!important;content:""!important;position:absolute!important;inset:31px!important;border:1px solid rgba(7,26,51,.16)!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .corner{width:104px!important;height:104px!important;border-color:#071a33!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-inner{padding:5.5% 8.5% 5.2%!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-brand{font-size:1.05rem!important;letter-spacing:.28em!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-brand img{width:49px!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-type{font-size:1rem!important;letter-spacing:.23em!important;margin-top:1.9%!important;color:#ae7b2d!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-awarded{margin-top:3.1%!important;font-size:.72rem!important;letter-spacing:.18em!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-for{margin-top:2.1%!important;font-size:.82rem!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-title{font-size:2.65rem!important;max-width:850px!important;line-height:1.08!important;margin-top:.9%!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-description{font-size:.77rem!important;line-height:1.55!important;max-width:720px!important;margin-top:1.7%!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-bottom{grid-template-columns:.9fr 1.3fr .9fr!important;gap:34px!important;margin-top:auto!important;padding:0 2.5% 1.8%!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .signature-block img{height:78px!important;max-width:250px!important;width:250px!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .signature-line{width:225px!important;margin-top:-6px!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-qr{width:64px!important;height:64px!important}
-    #certificate.cm-export-render:not(.simple):not(.applied) .cert-seal{display:block!important;right:8%!important;top:15.2%!important;width:132px!important}
-  `;
-  if (!document.getElementById(style.id)) document.head.appendChild(style);
-
-  window.CM_CERT_EXPORT = { captureCertificate, downloadPdf, downloadPng };
-
   window.addEventListener('hashchange', () => setTimeout(scheduleBind, 40));
   document.addEventListener('cm-auth-changed', () => setTimeout(scheduleBind, 60));
   const app = document.getElementById('app');
-  if (app) new MutationObserver(scheduleBind).observe(app, { childList:true, subtree:true });
+  if (app) new MutationObserver(scheduleBind).observe(app, { childList: true, subtree: true });
   setTimeout(scheduleBind, 100);
 })();
