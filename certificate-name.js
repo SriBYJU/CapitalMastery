@@ -2,9 +2,30 @@
   'use strict';
 
   const SDK = '12.18.0';
-  const CONFIRM_PREFIX = 'cmCertificateNameConfirmedV1:';
   const STATE_KEY = 'capitalMasteryLocalStateV1';
-  let modalOpen = false;
+  const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV2:';
+  const PENDING_ROUTE_KEY = 'cmPendingLearningRouteV1';
+
+  const GATED_ROOTS = new Set([
+    'careers',
+    'career',
+    'learn',
+    'quiz',
+    'official-simulation',
+    'simulation',
+    'final',
+    'passport',
+    'credentials',
+    'credential',
+    'certificate',
+    'achievement',
+    'compare',
+    'admin-preview'
+  ]);
+
+  let gateOpen = false;
+  let nameModalOpen = false;
+  let routeGuardBusy = false;
 
   function esc(value = '') {
     return String(value).replace(/[&<>"']/g, c => ({
@@ -16,39 +37,143 @@
     return window.CM_AUTH?.user || null;
   }
 
-  function currentName(user = currentUser()) {
-    if (!user) return '';
-    return String(user.displayName || user.email?.split('@')[0] || '').trim();
+  function authReady() {
+    return !!window.CM_AUTH?.ready;
   }
 
-  function confirmKey(user) {
-    return `${CONFIRM_PREFIX}${user.uid}`;
+  function routeRoot(hash = location.hash) {
+    return String(hash || '#/')
+      .replace(/^#\/?/, '')
+      .split('?')[0]
+      .split('/')
+      .filter(Boolean)[0] || '';
   }
 
-  function isConfirmed(user) {
-    return localStorage.getItem(confirmKey(user)) === 'true';
+  function isGatedHash(hash) {
+    return GATED_ROOTS.has(routeRoot(hash));
   }
 
-  function setConfirmed(user, value = true) {
-    if (value) localStorage.setItem(confirmKey(user), 'true');
-    else localStorage.removeItem(confirmKey(user));
+  function readState() {
+    try {
+      const state = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
+      return state && state.version === 1 ? state : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function onboardingKey(user) {
+    return `${ONBOARD_PREFIX}${user.uid}`;
+  }
+
+  function stateHasConfirmedName() {
+    const profile = readState()?.profile || {};
+    return profile.certificateNameConfirmed === true && !!String(profile.certificateName || profile.name || '').trim();
+  }
+
+  function isNameOnboarded(user = currentUser()) {
+    if (!user) return false;
+    return localStorage.getItem(onboardingKey(user)) === 'true' || stateHasConfirmedName();
+  }
+
+  function setNameOnboarded(user, value = true) {
+    if (!user) return;
+    if (value) localStorage.setItem(onboardingKey(user), 'true');
+    else localStorage.removeItem(onboardingKey(user));
+  }
+
+  function currentDisplayName(user = currentUser()) {
+    const stateName = readState()?.profile?.certificateName;
+    return String(stateName || user?.displayName || '').replace(/\s+/g, ' ').trim();
+  }
+
+  function savePendingRoute(hash) {
+    if (!hash || !isGatedHash(hash)) return;
+    sessionStorage.setItem(PENDING_ROUTE_KEY, hash);
+  }
+
+  function pendingRoute() {
+    return sessionStorage.getItem(PENDING_ROUTE_KEY) || '';
+  }
+
+  function clearPendingRoute() {
+    sessionStorage.removeItem(PENDING_ROUTE_KEY);
+  }
+
+  function closeGate() {
+    document.getElementById('cm-learning-gate')?.remove();
+    gateOpen = false;
+  }
+
+  function openLearningGate(targetHash = '#/careers') {
+    if (currentUser()) {
+      if (!isNameOnboarded()) openNameOnboarding({ targetHash });
+      return;
+    }
+
+    if (targetHash && isGatedHash(targetHash)) savePendingRoute(targetHash);
+    if (gateOpen) return;
+    gateOpen = true;
+
+    const d = document.createElement('div');
+    d.id = 'cm-learning-gate';
+    d.className = 'modal-backdrop';
+    d.innerHTML = `
+      <div class="modal cm-learning-gate-modal" role="dialog" aria-modal="true" aria-labelledby="cm-learning-gate-title">
+        <div class="cm-gate-icon">CM</div>
+        <div class="eyebrow">FREE CAPITAL MASTERY ACCOUNT</div>
+        <h2 id="cm-learning-gate-title">Sign in to save your progress and earn credentials.</h2>
+        <p class="cm-gate-lead">Your account is how Capital Mastery knows which coursework and official assessment results belong to you. That lets us save your progress, sync it across devices, and issue verified credentials to the right learner.</p>
+        <div class="cm-gate-benefits">
+          <div><span>✓</span><p><strong>Save your progress</strong><br>Pick up where you left off instead of starting over.</p></div>
+          <div><span>✓</span><p><strong>Take official assessments</strong><br>Secure scores are connected to your account.</p></div>
+          <div><span>✓</span><p><strong>Earn verified credentials</strong><br>Credentials can only be issued when we know who completed the pathway.</p></div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-primary" type="button" data-cm-gate-continue>Create free account / Sign in →</button>
+          <button class="btn btn-outline" type="button" data-cm-gate-close>Not now</button>
+        </div>
+        <p class="small muted" style="margin-top:14px">Capital Mastery is free. No payment information is required.</p>
+      </div>`;
+
+    document.body.appendChild(d);
+    d.querySelector('[data-cm-gate-continue]')?.addEventListener('click', () => {
+      closeGate();
+      location.hash = '#/login';
+    });
+    d.querySelector('[data-cm-gate-close]')?.addEventListener('click', closeGate);
+    d.addEventListener('click', event => {
+      if (event.target === d) closeGate();
+    });
+  }
+
+  function fullNameError(name) {
+    const cleaned = String(name || '').replace(/\s+/g, ' ').trim();
+    if (cleaned.length < 3) return 'Enter the full name you want printed on your credentials.';
+    const pieces = cleaned.split(' ').filter(Boolean);
+    if (pieces.length < 2) return 'Please enter at least your first and last name.';
+    if (pieces.some(piece => !/[\p{L}]/u.test(piece))) return 'Please enter a valid first and last name.';
+    return '';
   }
 
   function updateLocalProfileName(name) {
     try {
-      const state = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
-      if (!state || state.version !== 1) return;
+      const state = readState();
+      if (!state) return;
       state.profile ||= {};
       state.profile.name = name;
+      state.profile.certificateName = name;
+      state.profile.certificateNameConfirmed = true;
       state.updatedAt = new Date().toISOString();
       localStorage.setItem(STATE_KEY, JSON.stringify(state));
       window.CM_SYNC?.flush?.().catch(() => {});
     } catch (_) {}
   }
 
-  async function saveDisplayName(name) {
-    const cleaned = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 80);
-    if (cleaned.length < 2) throw new Error('Enter the name you want printed on your certificates.');
+  async function saveFullName(rawName) {
+    const cleaned = String(rawName || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+    const validationError = fullNameError(cleaned);
+    if (validationError) throw new Error(validationError);
 
     const appApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-app.js`);
     const authApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-auth.js`);
@@ -60,7 +185,8 @@
     await authApi.updateProfile(user, { displayName: cleaned });
     await user.reload();
     await user.getIdToken(true);
-    setConfirmed(user, true);
+
+    setNameOnboarded(user, true);
     updateLocalProfileName(cleaned);
 
     if (window.CM_AUTH) window.CM_AUTH.user = auth.currentUser;
@@ -71,110 +197,98 @@
     return cleaned;
   }
 
-  function closeModal() {
-    document.getElementById('cm-certificate-name-modal')?.remove();
-    modalOpen = false;
+  function closeNameModal() {
+    document.getElementById('cm-full-name-onboarding')?.remove();
+    nameModalOpen = false;
   }
 
-  function openNameModal({ forceEdit = false } = {}) {
-    const user = currentUser();
-    if (!user || modalOpen) return;
-    modalOpen = true;
+  function resumeAfterName() {
+    const next = pendingRoute();
+    clearPendingRoute();
+    if (next && next !== '#/login') {
+      location.hash = next;
+      return;
+    }
+    if (routeRoot() === 'login') location.hash = '#/careers';
+  }
 
-    const name = currentName(user);
-    const backdrop = document.createElement('div');
-    backdrop.id = 'cm-certificate-name-modal';
-    backdrop.className = 'modal-backdrop';
-    backdrop.innerHTML = `
-      <div class="modal cm-cert-name-modal" role="dialog" aria-modal="true" aria-labelledby="cm-cert-name-title">
-        <div class="eyebrow">CERTIFICATE NAME</div>
-        <h2 id="cm-cert-name-title">Is this the name you'd like on your certificates?</h2>
-        <p>Your Capital Mastery credentials will use this display name.</p>
-        <div class="cm-cert-name-preview">${esc(name || 'No name set')}</div>
-        <div class="cm-cert-name-edit" ${forceEdit ? '' : 'hidden'}>
-          <label for="cm-cert-name-input">Name on certificate</label>
-          <input id="cm-cert-name-input" type="text" maxlength="80" autocomplete="name" value="${esc(name)}" placeholder="Your name">
-        </div>
-        <div class="cm-cert-name-message" hidden></div>
-        <div class="modal-actions cm-cert-name-actions">
-          ${forceEdit ? '' : '<button class="btn btn-gold" type="button" data-cert-name-confirm>Yes, use this name</button>'}
-          <button class="btn btn-outline" type="button" data-cert-name-edit>${forceEdit ? 'Cancel' : 'Edit name'}</button>
-          <button class="btn btn-primary" type="button" data-cert-name-save ${forceEdit ? '' : 'hidden'}>Save name</button>
-        </div>
-        <p class="small muted" style="margin-top:14px">This is the display name shown on Capital Mastery credentials. It is not independent identity verification.</p>
+  function openNameOnboarding({ forceEdit = false, targetHash = '' } = {}) {
+    const user = currentUser();
+    if (!user || nameModalOpen) return;
+    if (targetHash && isGatedHash(targetHash)) savePendingRoute(targetHash);
+    nameModalOpen = true;
+
+    const suggested = currentDisplayName(user);
+    const d = document.createElement('div');
+    d.id = 'cm-full-name-onboarding';
+    d.className = 'modal-backdrop';
+    d.innerHTML = `
+      <div class="modal cm-full-name-modal" role="dialog" aria-modal="true" aria-labelledby="cm-full-name-title">
+        <div class="eyebrow">ONE LAST STEP</div>
+        <h2 id="cm-full-name-title">What name should appear on your credentials?</h2>
+        <p>Please enter your full first and last name. We use this as the display name on your Capital Mastery account and any credentials you earn.</p>
+        <form id="cm-full-name-form">
+          <label for="cm-full-name-input">Full first and last name</label>
+          <input id="cm-full-name-input" name="fullName" type="text" maxlength="80" autocomplete="name" value="${esc(suggested)}" placeholder="First Last" required>
+          <div class="cm-full-name-message" hidden></div>
+          <button class="btn btn-primary btn-block" type="submit">${forceEdit ? 'Save name' : 'Save name & continue →'}</button>
+        </form>
+        ${forceEdit ? '<button class="cm-name-cancel" type="button" data-cm-name-cancel>Cancel</button>' : ''}
+        <p class="small muted" style="margin-top:14px">Use the name you want printed publicly on your credentials. You can edit it later from your account. This is a display name, not independent identity verification.</p>
       </div>`;
 
-    document.body.appendChild(backdrop);
-    const editBox = backdrop.querySelector('.cm-cert-name-edit');
-    const preview = backdrop.querySelector('.cm-cert-name-preview');
-    const input = backdrop.querySelector('#cm-cert-name-input');
-    const editButton = backdrop.querySelector('[data-cert-name-edit]');
-    const saveButton = backdrop.querySelector('[data-cert-name-save]');
-    const confirmButton = backdrop.querySelector('[data-cert-name-confirm]');
-    const message = backdrop.querySelector('.cm-cert-name-message');
+    document.body.appendChild(d);
+    const form = d.querySelector('#cm-full-name-form');
+    const input = d.querySelector('#cm-full-name-input');
+    const message = d.querySelector('.cm-full-name-message');
+    const submit = form?.querySelector('button[type="submit"]');
 
     const showError = text => {
       message.hidden = false;
       message.textContent = text;
-      message.className = 'cm-cert-name-message bad';
+      message.className = 'cm-full-name-message bad';
     };
 
-    confirmButton?.addEventListener('click', async () => {
+    form?.addEventListener('submit', async event => {
+      event.preventDefault();
       try {
-        confirmButton.disabled = true;
-        if (!name) {
-          editBox.hidden = false;
-          preview.hidden = true;
-          saveButton.hidden = false;
-          editButton.textContent = 'Cancel';
-          input.focus();
-          return;
-        }
-        await saveDisplayName(name);
-        closeModal();
+        submit.disabled = true;
+        submit.textContent = 'Saving…';
+        await saveFullName(input.value);
+        closeNameModal();
         enhanceAccountCard();
+        if (!forceEdit) resumeAfterName();
       } catch (error) {
-        showError(error.message || 'Could not save certificate name.');
+        showError(error.message || 'Could not save your credential name.');
       } finally {
-        confirmButton.disabled = false;
+        submit.disabled = false;
+        submit.textContent = forceEdit ? 'Save name' : 'Save name & continue →';
       }
     });
 
-    editButton?.addEventListener('click', () => {
-      if (forceEdit || !editBox.hidden) {
-        closeModal();
-        return;
-      }
-      editBox.hidden = false;
-      preview.hidden = true;
-      saveButton.hidden = false;
-      editButton.textContent = 'Cancel';
-      input.focus();
-      input.select();
-    });
+    d.querySelector('[data-cm-name-cancel]')?.addEventListener('click', closeNameModal);
+    setTimeout(() => {
+      input?.focus();
+      if (!suggested) input?.select();
+    }, 50);
+  }
 
-    saveButton?.addEventListener('click', async () => {
-      try {
-        saveButton.disabled = true;
-        saveButton.textContent = 'Saving…';
-        const saved = await saveDisplayName(input.value);
-        preview.textContent = saved;
-        closeModal();
-        enhanceAccountCard();
-      } catch (error) {
-        showError(error.message || 'Could not save certificate name.');
-      } finally {
-        saveButton.disabled = false;
-        saveButton.textContent = 'Save name';
-      }
-    });
+  function enhanceCreateAccountForm() {
+    const form = document.getElementById('cm-create-form');
+    if (!form || form.dataset.cmNameFlowUpdated === 'true') return;
+    form.dataset.cmNameFlowUpdated = 'true';
 
-    backdrop.addEventListener('click', event => {
-      if (event.target === backdrop && isConfirmed(user)) closeModal();
-    });
+    const nameInput = form.querySelector('input[name="name"]');
+    nameInput?.closest('label')?.remove();
+
+    const note = document.createElement('div');
+    note.className = 'cm-signup-name-note';
+    note.innerHTML = '<strong>Next:</strong> after you create your account, we’ll ask for your full first and last name so we know exactly what to print on your credentials.';
+    form.prepend(note);
   }
 
   function enhanceAccountCard() {
+    enhanceCreateAccountForm();
     const user = currentUser();
     if (!user) return;
     const grid = document.querySelector('.cm-account-grid');
@@ -182,45 +296,98 @@
 
     const row = document.createElement('div');
     row.setAttribute('data-cm-certificate-name-row', 'true');
-    row.innerHTML = `<span>Certificate Name</span><strong>${esc(currentName(user) || 'Not set')}</strong><button type="button" class="cm-cert-name-link" data-cm-edit-certificate-name>Edit certificate name</button>`;
+    row.innerHTML = `<span>Credential Name</span><strong>${esc(currentDisplayName(user) || 'Not set')}</strong><button type="button" class="cm-cert-name-link" data-cm-edit-certificate-name>Edit credential name</button>`;
     grid.appendChild(row);
-    row.querySelector('[data-cm-edit-certificate-name]')?.addEventListener('click', () => openNameModal({ forceEdit: true }));
+    row.querySelector('[data-cm-edit-certificate-name]')?.addEventListener('click', () => openNameOnboarding({ forceEdit: true }));
   }
 
-  function maybePrompt(user) {
-    if (!user || isConfirmed(user)) {
+  function maybePromptForName(user) {
+    if (!user) return;
+    if (isNameOnboarded(user)) {
       enhanceAccountCard();
       return;
     }
-    setTimeout(() => openNameModal(), 250);
+    setTimeout(() => openNameOnboarding(), 180);
+  }
+
+  function enforceCurrentRoute() {
+    if (!authReady() || routeGuardBusy) return;
+    const hash = location.hash || '#/';
+    if (!isGatedHash(hash)) return;
+
+    if (!currentUser()) {
+      routeGuardBusy = true;
+      savePendingRoute(hash);
+      history.replaceState(null, '', `${location.pathname}${location.search}#/`);
+      routeGuardBusy = false;
+      openLearningGate(hash);
+      return;
+    }
+
+    if (!isNameOnboarded()) openNameOnboarding({ targetHash: hash });
   }
 
   function injectStyles() {
-    if (document.getElementById('cm-certificate-name-styles')) return;
+    if (document.getElementById('cm-account-gate-styles')) return;
     const style = document.createElement('style');
-    style.id = 'cm-certificate-name-styles';
+    style.id = 'cm-account-gate-styles';
     style.textContent = `
-      .cm-cert-name-modal{max-width:600px}.cm-cert-name-modal h2{color:var(--navy);font-family:Georgia,"Times New Roman",serif;font-size:2rem;margin:8px 0 10px}.cm-cert-name-preview{margin:18px 0;padding:18px;border:1px solid #d7dde3;background:#f7f8fa;border-radius:12px;color:var(--navy);font:700 1.45rem Georgia,"Times New Roman",serif}.cm-cert-name-edit{display:grid;gap:7px;margin:18px 0}.cm-cert-name-edit[hidden]{display:none}.cm-cert-name-edit label{font-weight:800;color:var(--navy)}.cm-cert-name-edit input{width:100%;border:1px solid #cbd2da;border-radius:10px;padding:12px 13px;font-size:1rem}.cm-cert-name-message{padding:10px 12px;border-radius:10px;margin:10px 0}.cm-cert-name-message.bad{background:#fff0f0;color:#8b3232}.cm-cert-name-link{display:inline-block;margin-top:8px;border:0;background:transparent;padding:0;color:var(--navy-3);text-decoration:underline;cursor:pointer;font-size:.78rem;font-weight:750}.cm-cert-name-actions{display:flex;gap:9px;flex-wrap:wrap}.cm-cert-name-actions [hidden]{display:none}
+      .cm-learning-gate-modal,.cm-full-name-modal{max-width:620px}.cm-learning-gate-modal h2,.cm-full-name-modal h2{color:var(--navy);font-family:Georgia,"Times New Roman",serif;font-size:2rem;line-height:1.12;margin:8px 0 12px}.cm-gate-lead{font-size:1rem;line-height:1.6}.cm-gate-icon{width:48px;height:48px;border-radius:14px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:900;letter-spacing:.04em;margin-bottom:14px}.cm-gate-benefits{display:grid;gap:10px;margin:20px 0}.cm-gate-benefits>div{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;padding:12px 13px;border:1px solid #e1e6eb;border-radius:12px;background:#f8fafb}.cm-gate-benefits>div>span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#e9f5ed;color:#245b43;font-weight:900}.cm-gate-benefits p{margin:0}.cm-full-name-modal form{display:grid;gap:10px;margin-top:18px}.cm-full-name-modal label{font-weight:800;color:var(--navy)}.cm-full-name-modal input{width:100%;border:1px solid #cbd2da;border-radius:11px;padding:13px 14px;font-size:1rem;outline:none}.cm-full-name-modal input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}.cm-full-name-message{padding:10px 12px;border-radius:10px}.cm-full-name-message.bad{background:#fff0f0;color:#8b3232}.cm-name-cancel{border:0;background:transparent;color:var(--navy-3);text-decoration:underline;cursor:pointer;margin-top:10px}.cm-cert-name-link{display:inline-block;margin-top:8px;border:0;background:transparent;padding:0;color:var(--navy-3);text-decoration:underline;cursor:pointer;font-size:.78rem;font-weight:750}.cm-signup-name-note{padding:11px 12px;border-radius:10px;background:#f4f7fa;border:1px solid #e1e6eb;color:#4e5b68;font-size:.86rem;line-height:1.45;margin-bottom:2px}
     `;
     document.head.appendChild(style);
   }
 
+  document.addEventListener('click', event => {
+    const anchor = event.target.closest('a[href^="#/"]');
+    if (!anchor) return;
+    const targetHash = anchor.getAttribute('href') || '';
+    if (!isGatedHash(targetHash)) return;
+
+    if (!authReady()) return;
+
+    if (!currentUser()) {
+      event.preventDefault();
+      event.stopPropagation();
+      openLearningGate(targetHash);
+      return;
+    }
+
+    if (!isNameOnboarded()) {
+      event.preventDefault();
+      event.stopPropagation();
+      openNameOnboarding({ targetHash });
+    }
+  }, true);
+
+  window.addEventListener('hashchange', () => setTimeout(enforceCurrentRoute, 0));
+
   document.addEventListener('cm-auth-changed', event => {
     const user = event.detail?.user || null;
-    if (user) maybePrompt(user);
+    closeGate();
+    if (user) maybePromptForName(user);
+    setTimeout(enforceCurrentRoute, 50);
   });
 
   document.addEventListener('cm-certificate-name-changed', () => setTimeout(enhanceAccountCard, 50));
 
-  const observer = new MutationObserver(() => enhanceAccountCard());
+  const observer = new MutationObserver(() => {
+    enhanceCreateAccountForm();
+    enhanceAccountCard();
+  });
   observer.observe(document.documentElement, { childList: true, subtree: true });
 
   injectStyles();
-  if (window.CM_AUTH?.ready && window.CM_AUTH.user) maybePrompt(window.CM_AUTH.user);
+  enhanceCreateAccountForm();
+  enhanceAccountCard();
+
+  if (authReady()) {
+    if (currentUser()) maybePromptForName(currentUser());
+    setTimeout(enforceCurrentRoute, 50);
+  }
 
   window.CM_CERT_NAME = {
-    open: () => openNameModal({ forceEdit: true }),
-    get: () => currentName(),
-    confirmed: () => !!currentUser() && isConfirmed(currentUser())
+    open: () => openNameOnboarding({ forceEdit: true }),
+    get: () => currentDisplayName(),
+    confirmed: () => !!currentUser() && isNameOnboarded(currentUser())
   };
 })();
