@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Capital Mastery — Firebase Auth Test</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#071a33;color:#fff;min-height:100vh;margin:0;display:grid;place-items:center;padding:24px}
+    main{width:min(620px,100%);background:#0d2748;border:1px solid rgba(255,255,255,.14);border-radius:18px;padding:28px;box-sizing:border-box}
+    h1{margin-top:0}.muted{color:#b9c8db}button{border:0;border-radius:10px;padding:12px 16px;font-weight:700;cursor:pointer;margin:6px 8px 6px 0}#google{background:#fff;color:#142033}#signout{background:#183b68;color:#fff}pre{white-space:pre-wrap;word-break:break-word;background:#06152a;padding:16px;border-radius:12px;min-height:90px}.ok{color:#86efac}.bad{color:#fca5a5}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Capital Mastery Auth Test</h1>
+    <p class="muted">Temporary page to verify Firebase sign-in → ID token → Cloudflare Worker authentication.</p>
+    <button id="google">Sign in with Google</button>
+    <button id="signout">Sign out</button>
+    <pre id="status">Waiting for sign-in…</pre>
+  </main>
+
+  <script src="firebase-config.js"></script>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.18.0/firebase-auth.js";
+
+    const status = document.getElementById('status');
+    const app = initializeApp(window.CAPITAL_MASTERY_FIREBASE_CONFIG);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    function show(value, ok = true) {
+      status.className = ok ? 'ok' : 'bad';
+      status.textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+    }
+
+    async function checkWorker(user) {
+      if (!user) {
+        show('Signed out.');
+        return;
+      }
+      try {
+        show('Signed in. Verifying with Capital Mastery API…');
+        const token = await user.getIdToken(true);
+        const response = await fetch(`${window.CAPITAL_MASTERY_API_URL}/auth-check`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await response.json();
+        show({
+          firebaseUser: { uid: user.uid, email: user.email, displayName: user.displayName },
+          worker: data
+        }, response.ok && data.ok === true);
+      } catch (error) {
+        show({ error: error.message, code: error.code || null }, false);
+      }
+    }
+
+    document.getElementById('google').addEventListener('click', async () => {
+      try {
+        const result = await signInWithPopup(auth, provider);
+        await checkWorker(result.user);
+      } catch (error) {
+        show({ error: error.message, code: error.code || null }, false);
+      }
+    });
+
+    document.getElementById('signout').addEventListener('click', async () => {
+      await signOut(auth);
+    });
+
+    onAuthStateChanged(auth, (user) => checkWorker(user));
+  </script>
+</body>
+</html>
