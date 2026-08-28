@@ -1,35 +1,49 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() { return request.auth != null; }
-    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
-    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function owns(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
 
     match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
-      allow create, update: if isOwner(uid);
-      allow delete: if isOwner(uid) || isAdmin();
+      allow read: if owns(uid);
+      allow create, update: if owns(uid)
+        && request.resource.data.keys().hasOnly([
+          'displayName',
+          'email',
+          'createdAt',
+          'lastSeenAt'
+        ]);
+      allow delete: if owns(uid);
+
+      match /progress/{docId} {
+        allow read: if owns(uid);
+        allow create, update: if owns(uid)
+          && docId == 'state'
+          && request.resource.data.version == 1
+          && request.resource.data.syncVersion == 1
+          && request.resource.data.keys().hasOnly([
+            'version',
+            'profile',
+            'careers',
+            'preferences',
+            'createdAt',
+            'updatedAt',
+            'syncVersion',
+            'serverUpdatedAt'
+          ]);
+        allow delete: if owns(uid) && docId == 'state';
+      }
     }
 
-    match /users/{uid}/progress/{docId} {
-      allow read, create, update: if isOwner(uid) || isAdmin();
-      allow delete: if isAdmin();
-    }
-
-    // Authoritative credentials are server-created. Client writes denied.
-    match /credentials/{credentialId} {
-      allow read: if signedIn() || isAdmin();
-      allow write: if false;
-    }
-
-    match /publicCredentials/{token} {
-      allow read: if true;
-      allow write: if false;
-    }
-
-    match /adminAudit/{eventId} {
-      allow read: if isAdmin();
-      allow write: if false;
+    // Official scores, credentials, revocations and admin audit records are
+    // authoritative in Cloudflare D1 and are changed only through the Worker.
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
