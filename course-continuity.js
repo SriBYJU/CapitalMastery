@@ -118,7 +118,7 @@
   style.id = 'cm-course-continuity-styles';
   style.textContent = `
     .cm-prior-pass{display:flex;justify-content:space-between;gap:14px;align-items:center;padding:14px 15px;border-radius:12px;background:#eaf6ef;border:1px solid #c7dfd1;color:#245b43;margin:0 0 18px}.cm-prior-pass strong{color:#245b43}.cm-prior-pass p{margin:3px 0 0}.cm-prior-pass .btn{flex:0 0 auto}
-    @media(max-width:680px){.cm-prior-pass{display:grid}.cm-prior-pass .btn{width:100%}}
+    @media(max-width:680px){.site-header .nav{gap:10px}.cm-prior-pass{display:grid}.cm-prior-pass .btn{width:100%}}
   `;
   if (!document.getElementById(style.id)) document.head.appendChild(style);
 
