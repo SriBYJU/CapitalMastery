@@ -12,6 +12,7 @@
   let debounceTimer = null;
   let suppressLocalHook = false;
   let initialized = false;
+  let rootProfileInitializedForUid = null;
 
   const CM_SYNC = window.CM_SYNC = {
     ready: false,
@@ -48,6 +49,11 @@
   function stateUpdatedAt(state) {
     const value = Date.parse(state?.updatedAt || state?.createdAt || 0);
     return Number.isFinite(value) ? value : 0;
+  }
+
+  function isoFromMillis(value) {
+    const ms = Number(value || 0);
+    return new Date(ms > 0 ? ms : Date.now()).toISOString();
   }
 
   function maxScore(a, b) {
@@ -88,7 +94,9 @@
     if (!remote) return normalizeState(local, firebaseUser);
     if (!local) return normalizeState(remote, firebaseUser);
 
-    const preferLocal = stateUpdatedAt(local) >= stateUpdatedAt(remote);
+    const remoteUpdated = stateUpdatedAt(remote);
+    const localUpdated = stateUpdatedAt(local);
+    const preferLocal = localUpdated >= remoteUpdated;
     const careerIds = new Set([
       ...Object.keys(remote.careers || {}),
       ...Object.keys(local.careers || {})
@@ -104,12 +112,14 @@
 
     return {
       version: 1,
-      profile: { ...(remote.profile || {}), ...(local.profile || {}), name },
+      profile: preferLocal
+        ? { ...(remote.profile || {}), ...(local.profile || {}), name }
+        : { ...(local.profile || {}), ...(remote.profile || {}), name },
       careers,
       credentials: [],
       preferences: preferLocal ? { ...(remote.preferences || {}), ...(local.preferences || {}) } : { ...(local.preferences || {}), ...(remote.preferences || {}) },
       createdAt: remote.createdAt || local.createdAt || new Date().toISOString(),
-      updatedAt: new Date(Math.max(stateUpdatedAt(remote), stateUpdatedAt(local), Date.now())).toISOString()
+      updatedAt: isoFromMillis(Math.max(remoteUpdated, localUpdated))
     };
   }
 
@@ -124,7 +134,7 @@
     copy.preferences = copy.preferences || {};
     copy.credentials = [];
     copy.createdAt = copy.createdAt || new Date().toISOString();
-    copy.updatedAt = copy.updatedAt || new Date().toISOString();
+    copy.updatedAt = copy.updatedAt || copy.createdAt || new Date().toISOString();
     return copy;
   }
 
@@ -143,6 +153,24 @@
     };
   }
 
+  async function writeRootProfile(state) {
+    const uid = user.uid;
+    const ref = fs.doc(db, 'users', uid);
+    const base = {
+      displayName: user.displayName || state.profile?.name || null,
+      email: user.email || null,
+      lastSeenAt: fs.serverTimestamp()
+    };
+
+    if (rootProfileInitializedForUid !== uid) {
+      const snap = await fs.getDoc(ref);
+      if (!snap.exists()) base.createdAt = fs.serverTimestamp();
+      rootProfileInitializedForUid = uid;
+    }
+
+    await fs.setDoc(ref, base, { merge: true });
+  }
+
   async function syncLocalToCloud(state) {
     if (!db || !fs || !user || !state) return false;
     if (qaMode()) {
@@ -153,12 +181,7 @@
     try {
       setStatus('syncing');
       const uid = user.uid;
-      await fs.setDoc(fs.doc(db, 'users', uid), {
-        displayName: user.displayName || state.profile?.name || null,
-        email: user.email || null,
-        lastSeenAt: fs.serverTimestamp(),
-        createdAt: fs.serverTimestamp()
-      }, { merge: true });
+      await writeRootProfile(state);
       await fs.setDoc(fs.doc(db, 'users', uid, 'progress', 'state'), cloudPayload(state), { merge: false });
       CM_SYNC.lastSyncedAt = new Date().toISOString();
       setStatus('synced');
@@ -194,8 +217,8 @@
 
       await syncLocalToCloud({ ...merged, credentials: [] });
 
-      // app.js keeps its state in an internal variable, so a one-time reload is the
-      // safest way to make a newly hydrated cloud state visible everywhere.
+      // app.js keeps state inside its closure. Reload only when cloud hydration
+      // actually changed learner-visible state, avoiding unnecessary reloads.
       const hydrationKey = `cmCloudHydrated:${firebaseUser.uid}`;
       if (changed && sessionStorage.getItem(hydrationKey) !== '1') {
         sessionStorage.setItem(hydrationKey, '1');
@@ -217,11 +240,22 @@
     if (Storage.prototype.__cmSyncPatched) return;
     const original = Storage.prototype.setItem;
     Object.defineProperty(Storage.prototype, '__cmSyncPatched', { value: true, configurable: false });
+
     Storage.prototype.setItem = function(key, value) {
-      const result = original.call(this, key, value);
       if (this === localStorage && key === STATE_KEY && !suppressLocalHook) {
-        try { queueSync(JSON.parse(value)); } catch (_) {}
+        try {
+          const parsed = JSON.parse(value);
+          if (parsed && parsed.version === 1) {
+            parsed.updatedAt = new Date().toISOString();
+            value = JSON.stringify(parsed);
+            const result = original.call(this, key, value);
+            queueSync(parsed);
+            return result;
+          }
+        } catch (_) {}
       }
+
+      const result = original.call(this, key, value);
       return result;
     };
   }
@@ -240,6 +274,7 @@
 
       if (window.CM_AUTH?.ready && window.CM_AUTH.user) {
         user = window.CM_AUTH.user;
+        rootProfileInitializedForUid = null;
         await hydrateFromCloud(user);
       }
     } catch (error) {
@@ -250,6 +285,7 @@
 
   document.addEventListener('cm-auth-changed', async event => {
     user = event.detail?.user || null;
+    rootProfileInitializedForUid = null;
     if (!CM_SYNC.ready) return;
     if (!user) {
       setStatus('signed-out');
