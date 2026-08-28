@@ -4,6 +4,8 @@
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
   const STATEFUL_ROOTS = new Set(['career','learn','quiz','official-simulation','simulation','final','passport','credentials','credential','certificate','achievement','login']);
+  let credentialRepairTimer = null;
+  let credentialRepairCount = 0;
 
   function esc(v='') {
     return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -69,16 +71,23 @@
 
   function enhanceMobileMenu() {
     const modal = document.querySelector('#cm-modal .modal');
-    if (!modal || modal.querySelector('[data-cm-profile-menu]')) return;
+    if (!modal) return;
     const heading = modal.querySelector('h2');
     if (!heading || heading.textContent.trim().toLowerCase() !== 'menu') return;
     const grid = modal.querySelector('.grid');
     if (!grid) return;
+
+    // The stability layer owns the single mobile account entry so users never see
+    // duplicate Profile / Account buttons from older compatibility layers.
+    grid.querySelector('[data-cm-e2e-account-link]')?.remove();
+    grid.querySelectorAll('[data-cm-profile-menu]').forEach((node, index) => { if (index > 0) node.remove(); });
+
+    if (grid.querySelector('[data-cm-profile-menu]')) return;
     const a = document.createElement('a');
     a.className = 'btn btn-primary';
     a.href = '#/login';
     a.setAttribute('data-cm-profile-menu','true');
-    a.innerHTML = window.CM_AUTH?.user ? `👤 Profile & Account` : `👤 Sign in / Create account`;
+    a.innerHTML = window.CM_AUTH?.user ? '👤 Profile & Account' : '👤 Sign in / Create account';
     a.addEventListener('click', () => window.CM?.closeModal?.());
     grid.appendChild(a);
   }
@@ -117,11 +126,42 @@
     if (STATEFUL_ROOTS.has(root) && window.CM_AUTH?.user) location.reload();
   }
 
+  function repairCredentialRendererRace() {
+    const [root] = routeParts();
+    if (root !== 'credentials') {
+      credentialRepairCount = 0;
+      clearTimeout(credentialRepairTimer);
+      credentialRepairTimer = null;
+      return;
+    }
+
+    const main = document.querySelector('main#main');
+    if (!main || main.querySelector('.cm-live-credential') || main.querySelector('.credentials-hero')) {
+      credentialRepairCount = 0;
+      clearTimeout(credentialRepairTimer);
+      credentialRepairTimer = null;
+      return;
+    }
+
+    const basicRendererVisible = !!main.querySelector('.cm-credential-card') ||
+      [...main.querySelectorAll('.page-hero .eyebrow')].some(x => x.textContent.includes('VERIFIED CREDENTIALS'));
+    if (!basicRendererVisible || credentialRepairCount >= 3 || credentialRepairTimer) return;
+
+    credentialRepairTimer = setTimeout(() => {
+      credentialRepairTimer = null;
+      const currentMain = document.querySelector('main#main');
+      if (routeParts()[0] !== 'credentials' || currentMain?.querySelector('.cm-live-credential') || currentMain?.querySelector('.credentials-hero')) return;
+      credentialRepairCount++;
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }, 160);
+  }
+
   function enhance() {
     if (redirectLegacySimulation()) return;
     ensureProfileButton();
     enhanceMobileMenu();
     enhanceAccountHub();
+    repairCredentialRendererRace();
   }
 
   installStateTimestampGuard();
@@ -148,7 +188,7 @@
     .cm-profile-hub{margin-top:20px;padding:15px;border:1px solid #e0e5ea;border-radius:13px;background:#f8fafb}
     .cm-profile-hub-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.cm-profile-hub-head span:first-child{display:block;font-size:.68rem;letter-spacing:.12em;color:var(--gold);font-weight:900}.cm-profile-hub-head strong{display:block;color:var(--navy);margin-top:2px}.cm-profile-live{font-size:.75rem;color:#2e7456!important;letter-spacing:0!important}
     .cm-profile-hub-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.cm-profile-hub-links a{background:#fff;border:1px solid #dbe1e6;border-radius:9px;padding:8px 10px;text-decoration:none;color:var(--navy);font-size:.8rem;font-weight:800}
-    @media(max-width:980px){.cm-profile-button{display:inline-flex;margin-left:auto}.mobile-menu{margin-left:0!important}.cm-profile-text{display:none}.cm-profile-button{padding:5px;border-radius:50%;width:42px;height:42px;justify-content:center}.cm-profile-avatar{width:30px;height:30px}}
+    @media(max-width:980px){.nav-actions .cm-e2e-profile-nav{display:none!important}.cm-profile-button{display:inline-flex;margin-left:auto}.mobile-menu{margin-left:0!important}.cm-profile-text{display:none}.cm-profile-button{padding:5px;border-radius:50%;width:42px;height:42px;justify-content:center}.cm-profile-avatar{width:30px;height:30px}}
     @media(max-width:680px){.cm-profile-button{display:inline-flex!important;flex:0 0 40px;width:40px;height:40px;min-height:40px}.cm-profile-avatar{width:29px;height:29px}.cm-profile-hub-links{display:grid}.cm-profile-hub-links a{text-align:center}}
     @media print{.cm-profile-button{display:none!important}}
   `;
