@@ -4,12 +4,8 @@
   let scheduled = false;
   let qrLoader = null;
 
-  function isCertificateRoute() {
-    return String(location.hash || '').startsWith('#/certificate/');
-  }
-
   function verificationUrl() {
-    const text = document.querySelector('.cm-cert-verify-url')?.textContent || '';
+    const text = document.querySelector('#certificate .cm-cert-verify-url')?.textContent || '';
     return text.replace(/^\s*Verify:\s*/i, '').trim();
   }
 
@@ -30,6 +26,7 @@
     qrLoader = new Promise((resolve, reject) => {
       const existing = document.querySelector('script[data-cm-qrcode-lib]');
       if (existing) {
+        if (window.QRCode) return resolve(window.QRCode);
         existing.addEventListener('load', () => resolve(window.QRCode), { once:true });
         existing.addEventListener('error', reject, { once:true });
         return;
@@ -46,7 +43,7 @@
   }
 
   async function makeRealQr() {
-    const el = document.getElementById('cm-live-cert-mark');
+    const el = document.querySelector('#certificate #cm-live-cert-mark');
     const url = verificationUrl();
     if (!el || !url || el.dataset.cmRealQr === url) return;
 
@@ -89,7 +86,7 @@
   }
 
   function enhanceCertificate() {
-    if (!isCertificateRoute()) return;
+    if (!document.getElementById('certificate')) return;
     const cert = ensureFrame();
     if (!cert) return;
     markNameLength(cert);
@@ -114,11 +111,11 @@
     @media(max-width:700px){
       .cert-page{padding-top:16px}
       .cert-page .cm-live-verified-banner{width:calc(100% - 16px);margin:0 auto 10px;font-size:.72rem;padding:8px 10px}
-      .cm-cert-responsive-frame{position:relative;width:calc(100vw - 16px);height:calc((100vw - 16px)/1.414);margin:0 auto;overflow:hidden}
-      .cm-cert-responsive-frame #certificate{position:absolute!important;left:0;top:0;margin:0!important;width:1000px!important;max-width:none!important;height:707.2px!important;aspect-ratio:auto!important;transform-origin:top left!important;transform:scale(calc((100vw - 16px)/1000))!important;box-sizing:border-box!important}
+      .cm-cert-responsive-frame{position:relative;width:100%;height:auto;margin:0 auto;overflow:hidden}
+      .cm-cert-responsive-frame #certificate{position:absolute!important;left:0;top:0;margin:0!important;width:1000px!important;max-width:none!important;height:707.2px!important;aspect-ratio:auto!important;transform-origin:top left!important;box-sizing:border-box!important}
 
-      /* Shared fixed-canvas geometry. The whole desktop certificate is scaled as a
-         single object on mobile, so signatures, QR codes and borders never drift. */
+      /* Shared fixed-canvas geometry. Each certificate keeps its desktop design and
+         the entire 1000x707 canvas is scaled as one object on mobile. */
       .cm-cert-responsive-frame #certificate .cert-inner{padding:5.3% 7%!important}
       .cm-cert-responsive-frame #certificate .cert-brand{font-size:1rem!important;gap:10px!important;letter-spacing:.22em!important}
       .cm-cert-responsive-frame #certificate .cert-brand img{width:44px!important;height:auto!important}
@@ -141,7 +138,7 @@
       .cm-cert-responsive-frame #certificate .corner{width:90px!important;height:90px!important}
       .cm-cert-responsive-frame #certificate .cm-cert-verify-url{display:none!important}
 
-      /* FOUNDATIONS — formal blue certificate */
+      /* FOUNDATIONS — formal blue */
       .cm-cert-responsive-frame #certificate.simple{border:4px solid #244c78!important;background:#fff!important;box-shadow:none!important}
       .cm-cert-responsive-frame #certificate.simple:before{inset:11px!important;border:1px solid rgba(36,76,120,.42)!important;box-shadow:none!important}
       .cm-cert-responsive-frame #certificate.simple:after{display:none!important}
@@ -150,7 +147,7 @@
       .cm-cert-responsive-frame #certificate.simple .cert-title{font-size:2rem!important}
       .cm-cert-responsive-frame #certificate.simple .signature-block img{height:55px!important;max-width:210px!important}
 
-      /* APPLIED SKILLS — teal professional certificate */
+      /* APPLIED SKILLS — teal */
       .cm-cert-responsive-frame #certificate.applied{border:6px solid #147d83!important;background:linear-gradient(135deg,#fff 0%,#fbffff 60%,#f2faf9 100%)!important;box-shadow:none!important}
       .cm-cert-responsive-frame #certificate.applied:before{inset:10px!important;border:1px solid rgba(20,125,131,.5)!important;box-shadow:none!important}
       .cm-cert-responsive-frame #certificate.applied:after{display:none!important}
@@ -159,7 +156,7 @@
       .cm-cert-responsive-frame #certificate.applied .cert-title{font-size:2.1rem!important}
       .cm-cert-responsive-frame #certificate.applied .signature-block img{height:60px!important;max-width:220px!important}
 
-      /* CAREER — grand navy/gold master certificate */
+      /* CAREER — grand navy/gold */
       .cm-cert-responsive-frame #certificate:not(.simple):not(.applied){border:14px solid #071a33!important;background:radial-gradient(circle at 15% 18%,rgba(193,145,65,.06),transparent 22%),radial-gradient(circle at 85% 82%,rgba(7,26,51,.045),transparent 22%),#fffdf8!important;box-shadow:none!important}
       .cm-cert-responsive-frame #certificate:not(.simple):not(.applied):before{inset:9px!important;border:2px solid #caa45e!important;box-shadow:inset 0 0 0 6px #fffdf8,inset 0 0 0 7px rgba(7,26,51,.28)!important}
       .cm-cert-responsive-frame #certificate:not(.simple):not(.applied):after{display:block!important;content:""!important;position:absolute!important;inset:31px!important;border:1px solid rgba(7,26,51,.16)!important;pointer-events:none!important}
@@ -179,11 +176,6 @@
       .cm-cert-responsive-frame #certificate:not(.simple):not(.applied) .cert-seal{display:block!important;right:8%!important;top:15.2%!important;width:132px!important}
 
       .cert-toolbar{width:calc(100% - 16px);margin:18px auto 0!important}
-    }
-
-    @media print{
-      .cm-cert-responsive-frame{width:auto!important;height:auto!important;overflow:visible!important}
-      .cm-cert-responsive-frame #certificate{position:relative!important;left:auto!important;top:auto!important;transform:none!important;width:100%!important;height:auto!important;aspect-ratio:1.414/1!important}
     }
   `;
   if (!document.getElementById(style.id)) document.head.appendChild(style);
