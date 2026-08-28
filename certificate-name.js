@@ -7,20 +7,8 @@
   const PENDING_ROUTE_KEY = 'cmPendingLearningRouteV1';
 
   const GATED_ROOTS = new Set([
-    'careers',
-    'career',
-    'learn',
-    'quiz',
-    'official-simulation',
-    'simulation',
-    'final',
-    'passport',
-    'credentials',
-    'credential',
-    'certificate',
-    'achievement',
-    'compare',
-    'admin-preview'
+    'careers','career','learn','quiz','official-simulation','simulation','final',
+    'passport','credentials','credential','certificate','achievement','compare','admin-preview'
   ]);
 
   let gateOpen = false;
@@ -29,51 +17,37 @@
   const nameChecks = new Map();
 
   function esc(value = '') {
-    return String(value).replace(/[&<>"']/g, c => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    })[c]);
+    return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   }
 
-  function currentUser() {
-    return window.CM_AUTH?.user || null;
-  }
-
-  function authReady() {
-    return !!window.CM_AUTH?.ready;
-  }
+  function currentUser() { return window.CM_AUTH?.user || null; }
+  function authReady() { return !!window.CM_AUTH?.ready; }
 
   function routeRoot(hash = location.hash) {
-    return String(hash || '#/')
-      .replace(/^#\/?/, '')
-      .split('?')[0]
-      .split('/')
-      .filter(Boolean)[0] || '';
+    return String(hash || '#/').replace(/^#\/?/, '').split('?')[0].split('/').filter(Boolean)[0] || '';
   }
 
-  function isGatedHash(hash) {
-    return GATED_ROOTS.has(routeRoot(hash));
+  function isGatedHash(hash) { return GATED_ROOTS.has(routeRoot(hash)); }
+
+  function blankState() {
+    const now = new Date().toISOString();
+    return { version:1, profile:{}, careers:{}, credentials:[], preferences:{}, createdAt:now, updatedAt:now };
   }
 
   function readState() {
     try {
       const state = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
       return state && state.version === 1 ? state : null;
-    } catch (_) {
-      return null;
-    }
+    } catch (_) { return null; }
   }
 
-  function onboardingKey(user) {
-    return `${ONBOARD_PREFIX}${user.uid}`;
-  }
+  function stateForWrite() { return readState() || blankState(); }
+  function onboardingKey(user) { return `${ONBOARD_PREFIX}${user.uid}`; }
 
   function localProfileConfirmation() {
     const profile = readState()?.profile || {};
     const name = String(profile.certificateName || profile.name || '').replace(/\s+/g, ' ').trim();
-    return {
-      confirmed: profile.certificateNameConfirmed === true && !!name,
-      name
-    };
+    return { confirmed: profile.certificateNameConfirmed === true && !!name, name };
   }
 
   function setLocalOnboarded(user, value = true) {
@@ -96,14 +70,8 @@
     if (!hash || !isGatedHash(hash)) return;
     sessionStorage.setItem(PENDING_ROUTE_KEY, hash);
   }
-
-  function pendingRoute() {
-    return sessionStorage.getItem(PENDING_ROUTE_KEY) || '';
-  }
-
-  function clearPendingRoute() {
-    sessionStorage.removeItem(PENDING_ROUTE_KEY);
-  }
+  function pendingRoute() { return sessionStorage.getItem(PENDING_ROUTE_KEY) || ''; }
+  function clearPendingRoute() { sessionStorage.removeItem(PENDING_ROUTE_KEY); }
 
   function closeGate() {
     document.getElementById('cm-learning-gate')?.remove();
@@ -138,14 +106,9 @@
       </div>`;
 
     document.body.appendChild(d);
-    d.querySelector('[data-cm-gate-continue]')?.addEventListener('click', () => {
-      closeGate();
-      location.hash = '#/login';
-    });
+    d.querySelector('[data-cm-gate-continue]')?.addEventListener('click', () => { closeGate(); location.hash = '#/login'; });
     d.querySelector('[data-cm-gate-close]')?.addEventListener('click', closeGate);
-    d.addEventListener('click', event => {
-      if (event.target === d) closeGate();
-    });
+    d.addEventListener('click', event => { if (event.target === d) closeGate(); });
   }
 
   function fullNameError(name) {
@@ -158,15 +121,16 @@
   }
 
   function updateLocalProfileName(name) {
-    const state = readState();
-    if (!state) return false;
-    state.profile ||= {};
-    state.profile.name = name;
-    state.profile.certificateName = name;
-    state.profile.certificateNameConfirmed = true;
-    state.updatedAt = new Date().toISOString();
-    localStorage.setItem(STATE_KEY, JSON.stringify(state));
-    return true;
+    try {
+      const state = stateForWrite();
+      state.profile ||= {};
+      state.profile.name = name;
+      state.profile.certificateName = name;
+      state.profile.certificateNameConfirmed = true;
+      state.updatedAt = new Date().toISOString();
+      localStorage.setItem(STATE_KEY, JSON.stringify(state));
+      return true;
+    } catch (_) { return false; }
   }
 
   async function waitForSync(timeoutMs = 7000) {
@@ -185,13 +149,10 @@
       const app = appApi.getApps().length ? appApi.getApp() : appApi.initializeApp(window.CAPITAL_MASTERY_FIREBASE_CONFIG);
       const db = fsApi.getFirestore(app);
       const snap = await fsApi.getDoc(fsApi.doc(db, 'users', user.uid, 'progress', 'state'));
-      if (!snap.exists()) return { confirmed: false, name: '' };
+      if (!snap.exists()) return { confirmed:false, name:'' };
       const profile = snap.data()?.profile || {};
       const name = String(profile.certificateName || profile.name || '').replace(/\s+/g, ' ').trim();
-      return {
-        confirmed: profile.certificateNameConfirmed === true && !!name,
-        name
-      };
+      return { confirmed: profile.certificateNameConfirmed === true && !!name, name };
     } catch (error) {
       console.warn('Could not check credential-name onboarding state:', error);
       return null;
@@ -201,8 +162,7 @@
   function mirrorRemoteName(name) {
     if (!name) return;
     try {
-      const state = readState();
-      if (!state) return;
+      const state = stateForWrite();
       state.profile ||= {};
       state.profile.name = name;
       state.profile.certificateName = name;
@@ -215,7 +175,6 @@
   async function isNameOnboarded(user = currentUser()) {
     if (!user) return false;
     if (locallyOnboarded(user)) return true;
-
     if (nameChecks.has(user.uid)) return nameChecks.get(user.uid);
 
     const check = (async () => {
@@ -227,7 +186,6 @@
       }
       return false;
     })();
-
     nameChecks.set(user.uid, check);
     return check;
   }
@@ -248,10 +206,7 @@
     await user.reload();
     await user.getIdToken(true);
 
-    if (!updateLocalProfileName(cleaned)) {
-      throw new Error('Your learning profile is still loading. Please try again in a moment.');
-    }
-
+    if (!updateLocalProfileName(cleaned)) throw new Error('Could not create your learning profile. Please try again.');
     const syncReady = await waitForSync();
     if (!syncReady) throw new Error('Progress sync is still connecting. Please try again.');
     const synced = await window.CM_SYNC.flush();
@@ -259,12 +214,8 @@
 
     setLocalOnboarded(user, true);
     nameChecks.set(user.uid, Promise.resolve(true));
-
     if (window.CM_AUTH) window.CM_AUTH.user = auth.currentUser;
-    document.dispatchEvent(new CustomEvent('cm-certificate-name-changed', {
-      detail: { user: auth.currentUser, displayName: cleaned }
-    }));
-
+    document.dispatchEvent(new CustomEvent('cm-certificate-name-changed', { detail:{ user:auth.currentUser, displayName:cleaned } }));
     return cleaned;
   }
 
@@ -276,11 +227,11 @@
   function resumeAfterName() {
     const next = pendingRoute();
     clearPendingRoute();
-    if (next && next !== '#/login') {
-      location.hash = next;
-      return;
-    }
-    if (routeRoot() === 'login') location.hash = '#/careers';
+    const target = next && next !== '#/login' ? next : (routeRoot() === 'login' ? '#/careers' : location.hash || '#/careers');
+    if (target !== location.hash) location.hash = target;
+    // app.js keeps its own in-memory state. A clean reload here guarantees the newly
+    // saved name/profile is reflected everywhere before the learner continues.
+    setTimeout(() => location.reload(), 20);
   }
 
   function openNameOnboarding({ forceEdit = false, targetHash = '' } = {}) {
@@ -313,12 +264,7 @@
     const input = d.querySelector('#cm-full-name-input');
     const message = d.querySelector('.cm-full-name-message');
     const submit = form?.querySelector('button[type="submit"]');
-
-    const showError = text => {
-      message.hidden = false;
-      message.textContent = text;
-      message.className = 'cm-full-name-message bad';
-    };
+    const showError = text => { message.hidden = false; message.textContent = text; message.className = 'cm-full-name-message bad'; };
 
     form?.addEventListener('submit', async event => {
       event.preventDefault();
@@ -338,20 +284,14 @@
     });
 
     d.querySelector('[data-cm-name-cancel]')?.addEventListener('click', closeNameModal);
-    setTimeout(() => {
-      input?.focus();
-      if (!suggested) input?.select();
-    }, 50);
+    setTimeout(() => { input?.focus(); if (!suggested) input?.select(); }, 50);
   }
 
   function enhanceCreateAccountForm() {
     const form = document.getElementById('cm-create-form');
     if (!form || form.dataset.cmNameFlowUpdated === 'true') return;
     form.dataset.cmNameFlowUpdated = 'true';
-
-    const nameInput = form.querySelector('input[name="name"]');
-    nameInput?.closest('label')?.remove();
-
+    form.querySelector('input[name="name"]')?.closest('label')?.remove();
     const note = document.createElement('div');
     note.className = 'cm-signup-name-note';
     note.innerHTML = '<strong>Next:</strong> after creating your account, you’ll complete one required step: enter your full first and last name for your credentials. It is saved to your account and does not repeat on every login.';
@@ -366,21 +306,17 @@
     if (!grid) return;
     if (force) grid.querySelector('[data-cm-certificate-name-row]')?.remove();
     if (grid.querySelector('[data-cm-certificate-name-row]')) return;
-
     const row = document.createElement('div');
     row.setAttribute('data-cm-certificate-name-row', 'true');
     row.innerHTML = `<span>Credential Name</span><strong>${esc(currentDisplayName(user) || 'Not set')}</strong><button type="button" class="cm-cert-name-link" data-cm-edit-certificate-name>Edit credential name</button>`;
     grid.appendChild(row);
-    row.querySelector('[data-cm-edit-certificate-name]')?.addEventListener('click', () => openNameOnboarding({ forceEdit: true }));
+    row.querySelector('[data-cm-edit-certificate-name]')?.addEventListener('click', () => openNameOnboarding({ forceEdit:true }));
   }
 
   async function maybePromptForName(user) {
     if (!user) return;
     const confirmed = await isNameOnboarded(user);
-    if (confirmed) {
-      enhanceAccountCard(true);
-      return;
-    }
+    if (confirmed) { enhanceAccountCard(true); return; }
     openNameOnboarding();
   }
 
@@ -388,7 +324,6 @@
     if (!authReady() || routeGuardBusy) return;
     const hash = location.hash || '#/';
     if (!isGatedHash(hash)) return;
-
     if (!currentUser()) {
       routeGuardBusy = true;
       savePendingRoute(hash);
@@ -397,23 +332,18 @@
       openLearningGate(hash);
       return;
     }
-
     routeGuardBusy = true;
     try {
       const confirmed = await isNameOnboarded(currentUser());
-      if (!confirmed) openNameOnboarding({ targetHash: hash });
-    } finally {
-      routeGuardBusy = false;
-    }
+      if (!confirmed) openNameOnboarding({ targetHash:hash });
+    } finally { routeGuardBusy = false; }
   }
 
   function injectStyles() {
     if (document.getElementById('cm-account-gate-styles')) return;
     const style = document.createElement('style');
     style.id = 'cm-account-gate-styles';
-    style.textContent = `
-      .cm-learning-gate-modal,.cm-full-name-modal{max-width:620px}.cm-learning-gate-modal h2,.cm-full-name-modal h2{color:var(--navy);font-family:Georgia,"Times New Roman",serif;font-size:2rem;line-height:1.12;margin:8px 0 12px}.cm-gate-lead{font-size:1rem;line-height:1.6}.cm-gate-icon{width:48px;height:48px;border-radius:14px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:900;letter-spacing:.04em;margin-bottom:14px}.cm-gate-benefits{display:grid;gap:10px;margin:20px 0}.cm-gate-benefits>div{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;padding:12px 13px;border:1px solid #e1e6eb;border-radius:12px;background:#f8fafb}.cm-gate-benefits>div>span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#e9f5ed;color:#245b43;font-weight:900}.cm-gate-benefits p{margin:0}.cm-full-name-modal form{display:grid;gap:10px;margin-top:18px}.cm-full-name-modal label{font-weight:800;color:var(--navy)}.cm-full-name-modal input{width:100%;border:1px solid #cbd2da;border-radius:11px;padding:13px 14px;font-size:1rem;outline:none}.cm-full-name-modal input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}.cm-full-name-message{padding:10px 12px;border-radius:10px}.cm-full-name-message.bad{background:#fff0f0;color:#8b3232}.cm-name-cancel{border:0;background:transparent;color:var(--navy-3);text-decoration:underline;cursor:pointer;margin-top:10px}.cm-cert-name-link{display:inline-block;margin-top:8px;border:0;background:transparent;padding:0;color:var(--navy-3);text-decoration:underline;cursor:pointer;font-size:.78rem;font-weight:750}.cm-signup-name-note{padding:11px 12px;border-radius:10px;background:#f4f7fa;border:1px solid #e1e6eb;color:#4e5b68;font-size:.86rem;line-height:1.45;margin-bottom:2px}
-    `;
+    style.textContent = `.cm-learning-gate-modal,.cm-full-name-modal{max-width:620px}.cm-learning-gate-modal h2,.cm-full-name-modal h2{color:var(--navy);font-family:Georgia,"Times New Roman",serif;font-size:2rem;line-height:1.12;margin:8px 0 12px}.cm-gate-lead{font-size:1rem;line-height:1.6}.cm-gate-icon{width:48px;height:48px;border-radius:14px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:900;letter-spacing:.04em;margin-bottom:14px}.cm-gate-benefits{display:grid;gap:10px;margin:20px 0}.cm-gate-benefits>div{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;padding:12px 13px;border:1px solid #e1e6eb;border-radius:12px;background:#f8fafb}.cm-gate-benefits>div>span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#e9f5ed;color:#245b43;font-weight:900}.cm-gate-benefits p{margin:0}.cm-full-name-modal form{display:grid;gap:10px;margin-top:18px}.cm-full-name-modal label{font-weight:800;color:var(--navy)}.cm-full-name-modal input{width:100%;border:1px solid #cbd2da;border-radius:11px;padding:13px 14px;font-size:1rem;outline:none}.cm-full-name-modal input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}.cm-full-name-message{padding:10px 12px;border-radius:10px}.cm-full-name-message.bad{background:#fff0f0;color:#8b3232}.cm-name-cancel{border:0;background:transparent;color:var(--navy-3);text-decoration:underline;cursor:pointer;margin-top:10px}.cm-cert-name-link{display:inline-block;margin-top:8px;border:0;background:transparent;padding:0;color:var(--navy-3);text-decoration:underline;cursor:pointer;font-size:.78rem;font-weight:750}.cm-signup-name-note{padding:11px 12px;border-radius:10px;background:#f4f7fa;border:1px solid #e1e6eb;color:#4e5b68;font-size:.86rem;line-height:1.45;margin-bottom:2px}`;
     document.head.appendChild(style);
   }
 
@@ -421,58 +351,39 @@
     const anchor = event.target.closest('a[href^="#/"]');
     if (!anchor) return;
     const targetHash = anchor.getAttribute('href') || '';
-    if (!isGatedHash(targetHash)) return;
-    if (!authReady()) return;
-
+    if (!isGatedHash(targetHash) || !authReady()) return;
     if (!currentUser()) {
-      event.preventDefault();
-      event.stopPropagation();
-      openLearningGate(targetHash);
-      return;
+      event.preventDefault(); event.stopPropagation(); openLearningGate(targetHash); return;
     }
-
     if (locallyOnboarded(currentUser())) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    savePendingRoute(targetHash);
+    event.preventDefault(); event.stopPropagation(); savePendingRoute(targetHash);
     const confirmed = await isNameOnboarded(currentUser());
-    if (confirmed) {
-      clearPendingRoute();
-      location.hash = targetHash;
-    } else {
-      openNameOnboarding({ targetHash });
-    }
+    if (confirmed) { clearPendingRoute(); location.hash = targetHash; }
+    else openNameOnboarding({ targetHash });
   }, true);
 
   window.addEventListener('hashchange', () => setTimeout(enforceCurrentRoute, 0));
-
   document.addEventListener('cm-auth-changed', event => {
     const user = event.detail?.user || null;
     closeGate();
     if (user) setTimeout(() => maybePromptForName(user), 120);
     setTimeout(enforceCurrentRoute, 80);
   });
-
   document.addEventListener('cm-certificate-name-changed', () => setTimeout(() => enhanceAccountCard(true), 50));
 
-  const observer = new MutationObserver(() => {
-    enhanceCreateAccountForm();
-    enhanceAccountCard();
-  });
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  const observer = new MutationObserver(() => { enhanceCreateAccountForm(); enhanceAccountCard(); });
+  observer.observe(document.documentElement, { childList:true, subtree:true });
 
   injectStyles();
   enhanceCreateAccountForm();
   enhanceAccountCard();
-
   if (authReady()) {
     if (currentUser()) setTimeout(() => maybePromptForName(currentUser()), 120);
     setTimeout(enforceCurrentRoute, 80);
   }
 
   window.CM_CERT_NAME = {
-    open: () => openNameOnboarding({ forceEdit: true }),
+    open: () => openNameOnboarding({ forceEdit:true }),
     get: () => currentDisplayName(),
     confirmed: () => !!currentUser() && locallyOnboarded(currentUser()),
     check: () => currentUser() ? isNameOnboarded(currentUser()) : Promise.resolve(false)
