@@ -3,7 +3,7 @@
 
   const SDK = '12.18.0';
   const STATE_KEY = 'capitalMasteryLocalStateV1';
-  const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV2:';
+  const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV3:';
   const PENDING_ROUTE_KEY = 'cmPendingLearningRouteV1';
 
   const GATED_ROOTS = new Set([
@@ -26,6 +26,7 @@
   let gateOpen = false;
   let nameModalOpen = false;
   let routeGuardBusy = false;
+  const nameChecks = new Map();
 
   function esc(value = '') {
     return String(value).replace(/[&<>"']/g, c => ({
@@ -66,20 +67,24 @@
     return `${ONBOARD_PREFIX}${user.uid}`;
   }
 
-  function stateHasConfirmedName() {
+  function localProfileConfirmation() {
     const profile = readState()?.profile || {};
-    return profile.certificateNameConfirmed === true && !!String(profile.certificateName || profile.name || '').trim();
+    const name = String(profile.certificateName || profile.name || '').replace(/\s+/g, ' ').trim();
+    return {
+      confirmed: profile.certificateNameConfirmed === true && !!name,
+      name
+    };
   }
 
-  function isNameOnboarded(user = currentUser()) {
-    if (!user) return false;
-    return localStorage.getItem(onboardingKey(user)) === 'true' || stateHasConfirmedName();
-  }
-
-  function setNameOnboarded(user, value = true) {
+  function setLocalOnboarded(user, value = true) {
     if (!user) return;
     if (value) localStorage.setItem(onboardingKey(user), 'true');
     else localStorage.removeItem(onboardingKey(user));
+  }
+
+  function locallyOnboarded(user = currentUser()) {
+    if (!user) return false;
+    return localStorage.getItem(onboardingKey(user)) === 'true' || localProfileConfirmation().confirmed;
   }
 
   function currentDisplayName(user = currentUser()) {
@@ -106,11 +111,7 @@
   }
 
   function openLearningGate(targetHash = '#/careers') {
-    if (currentUser()) {
-      if (!isNameOnboarded()) openNameOnboarding({ targetHash });
-      return;
-    }
-
+    if (currentUser()) return;
     if (targetHash && isGatedHash(targetHash)) savePendingRoute(targetHash);
     if (gateOpen) return;
     gateOpen = true;
@@ -157,6 +158,48 @@
   }
 
   function updateLocalProfileName(name) {
+    const state = readState();
+    if (!state) return false;
+    state.profile ||= {};
+    state.profile.name = name;
+    state.profile.certificateName = name;
+    state.profile.certificateNameConfirmed = true;
+    state.updatedAt = new Date().toISOString();
+    localStorage.setItem(STATE_KEY, JSON.stringify(state));
+    return true;
+  }
+
+  async function waitForSync(timeoutMs = 7000) {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) return true;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    return false;
+  }
+
+  async function remoteNameConfirmation(user) {
+    try {
+      const appApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-app.js`);
+      const fsApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-firestore.js`);
+      const app = appApi.getApps().length ? appApi.getApp() : appApi.initializeApp(window.CAPITAL_MASTERY_FIREBASE_CONFIG);
+      const db = fsApi.getFirestore(app);
+      const snap = await fsApi.getDoc(fsApi.doc(db, 'users', user.uid, 'progress', 'state'));
+      if (!snap.exists()) return { confirmed: false, name: '' };
+      const profile = snap.data()?.profile || {};
+      const name = String(profile.certificateName || profile.name || '').replace(/\s+/g, ' ').trim();
+      return {
+        confirmed: profile.certificateNameConfirmed === true && !!name,
+        name
+      };
+    } catch (error) {
+      console.warn('Could not check credential-name onboarding state:', error);
+      return null;
+    }
+  }
+
+  function mirrorRemoteName(name) {
+    if (!name) return;
     try {
       const state = readState();
       if (!state) return;
@@ -164,10 +207,29 @@
       state.profile.name = name;
       state.profile.certificateName = name;
       state.profile.certificateNameConfirmed = true;
-      state.updatedAt = new Date().toISOString();
+      state.updatedAt = state.updatedAt || new Date().toISOString();
       localStorage.setItem(STATE_KEY, JSON.stringify(state));
-      window.CM_SYNC?.flush?.().catch(() => {});
     } catch (_) {}
+  }
+
+  async function isNameOnboarded(user = currentUser()) {
+    if (!user) return false;
+    if (locallyOnboarded(user)) return true;
+
+    if (nameChecks.has(user.uid)) return nameChecks.get(user.uid);
+
+    const check = (async () => {
+      const remote = await remoteNameConfirmation(user);
+      if (remote?.confirmed) {
+        setLocalOnboarded(user, true);
+        mirrorRemoteName(remote.name);
+        return true;
+      }
+      return false;
+    })();
+
+    nameChecks.set(user.uid, check);
+    return check;
   }
 
   async function saveFullName(rawName) {
@@ -186,8 +248,17 @@
     await user.reload();
     await user.getIdToken(true);
 
-    setNameOnboarded(user, true);
-    updateLocalProfileName(cleaned);
+    if (!updateLocalProfileName(cleaned)) {
+      throw new Error('Your learning profile is still loading. Please try again in a moment.');
+    }
+
+    const syncReady = await waitForSync();
+    if (!syncReady) throw new Error('Progress sync is still connecting. Please try again.');
+    const synced = await window.CM_SYNC.flush();
+    if (!synced) throw new Error('Could not save your credential name to your account. Please try again.');
+
+    setLocalOnboarded(user, true);
+    nameChecks.set(user.uid, Promise.resolve(true));
 
     if (window.CM_AUTH) window.CM_AUTH.user = auth.currentUser;
     document.dispatchEvent(new CustomEvent('cm-certificate-name-changed', {
@@ -224,9 +295,9 @@
     d.className = 'modal-backdrop';
     d.innerHTML = `
       <div class="modal cm-full-name-modal" role="dialog" aria-modal="true" aria-labelledby="cm-full-name-title">
-        <div class="eyebrow">ONE LAST STEP</div>
+        <div class="eyebrow">${forceEdit ? 'CREDENTIAL NAME' : 'ONE REQUIRED STEP'}</div>
         <h2 id="cm-full-name-title">What name should appear on your credentials?</h2>
-        <p>Please enter your full first and last name. We use this as the display name on your Capital Mastery account and any credentials you earn.</p>
+        <p>${forceEdit ? 'Update the name Capital Mastery will use for future credentials.' : 'Please enter your full first and last name. This one-time step connects your account to the name printed on credentials you earn.'}</p>
         <form id="cm-full-name-form">
           <label for="cm-full-name-input">Full first and last name</label>
           <input id="cm-full-name-input" name="fullName" type="text" maxlength="80" autocomplete="name" value="${esc(suggested)}" placeholder="First Last" required>
@@ -234,7 +305,7 @@
           <button class="btn btn-primary btn-block" type="submit">${forceEdit ? 'Save name' : 'Save name & continue →'}</button>
         </form>
         ${forceEdit ? '<button class="cm-name-cancel" type="button" data-cm-name-cancel>Cancel</button>' : ''}
-        <p class="small muted" style="margin-top:14px">Use the name you want printed publicly on your credentials. You can edit it later from your account. This is a display name, not independent identity verification.</p>
+        <p class="small muted" style="margin-top:14px">This setup is saved to your account, so you will not be asked again when signing in on another device. You can edit the name later from Profile.</p>
       </div>`;
 
     document.body.appendChild(d);
@@ -253,10 +324,10 @@
       event.preventDefault();
       try {
         submit.disabled = true;
-        submit.textContent = 'Saving…';
+        submit.textContent = 'Saving to your account…';
         await saveFullName(input.value);
         closeNameModal();
-        enhanceAccountCard();
+        enhanceAccountCard(true);
         if (!forceEdit) resumeAfterName();
       } catch (error) {
         showError(error.message || 'Could not save your credential name.');
@@ -283,16 +354,18 @@
 
     const note = document.createElement('div');
     note.className = 'cm-signup-name-note';
-    note.innerHTML = '<strong>Next:</strong> after you create your account, we’ll ask for your full first and last name so we know exactly what to print on your credentials.';
+    note.innerHTML = '<strong>Next:</strong> after creating your account, you’ll complete one required step: enter your full first and last name for your credentials. It is saved to your account and does not repeat on every login.';
     form.prepend(note);
   }
 
-  function enhanceAccountCard() {
+  function enhanceAccountCard(force = false) {
     enhanceCreateAccountForm();
     const user = currentUser();
     if (!user) return;
     const grid = document.querySelector('.cm-account-grid');
-    if (!grid || grid.querySelector('[data-cm-certificate-name-row]')) return;
+    if (!grid) return;
+    if (force) grid.querySelector('[data-cm-certificate-name-row]')?.remove();
+    if (grid.querySelector('[data-cm-certificate-name-row]')) return;
 
     const row = document.createElement('div');
     row.setAttribute('data-cm-certificate-name-row', 'true');
@@ -301,16 +374,17 @@
     row.querySelector('[data-cm-edit-certificate-name]')?.addEventListener('click', () => openNameOnboarding({ forceEdit: true }));
   }
 
-  function maybePromptForName(user) {
+  async function maybePromptForName(user) {
     if (!user) return;
-    if (isNameOnboarded(user)) {
-      enhanceAccountCard();
+    const confirmed = await isNameOnboarded(user);
+    if (confirmed) {
+      enhanceAccountCard(true);
       return;
     }
-    setTimeout(() => openNameOnboarding(), 180);
+    openNameOnboarding();
   }
 
-  function enforceCurrentRoute() {
+  async function enforceCurrentRoute() {
     if (!authReady() || routeGuardBusy) return;
     const hash = location.hash || '#/';
     if (!isGatedHash(hash)) return;
@@ -324,7 +398,13 @@
       return;
     }
 
-    if (!isNameOnboarded()) openNameOnboarding({ targetHash: hash });
+    routeGuardBusy = true;
+    try {
+      const confirmed = await isNameOnboarded(currentUser());
+      if (!confirmed) openNameOnboarding({ targetHash: hash });
+    } finally {
+      routeGuardBusy = false;
+    }
   }
 
   function injectStyles() {
@@ -337,12 +417,11 @@
     document.head.appendChild(style);
   }
 
-  document.addEventListener('click', event => {
+  document.addEventListener('click', async event => {
     const anchor = event.target.closest('a[href^="#/"]');
     if (!anchor) return;
     const targetHash = anchor.getAttribute('href') || '';
     if (!isGatedHash(targetHash)) return;
-
     if (!authReady()) return;
 
     if (!currentUser()) {
@@ -352,9 +431,16 @@
       return;
     }
 
-    if (!isNameOnboarded()) {
-      event.preventDefault();
-      event.stopPropagation();
+    if (locallyOnboarded(currentUser())) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    savePendingRoute(targetHash);
+    const confirmed = await isNameOnboarded(currentUser());
+    if (confirmed) {
+      clearPendingRoute();
+      location.hash = targetHash;
+    } else {
       openNameOnboarding({ targetHash });
     }
   }, true);
@@ -364,11 +450,11 @@
   document.addEventListener('cm-auth-changed', event => {
     const user = event.detail?.user || null;
     closeGate();
-    if (user) maybePromptForName(user);
-    setTimeout(enforceCurrentRoute, 50);
+    if (user) setTimeout(() => maybePromptForName(user), 120);
+    setTimeout(enforceCurrentRoute, 80);
   });
 
-  document.addEventListener('cm-certificate-name-changed', () => setTimeout(enhanceAccountCard, 50));
+  document.addEventListener('cm-certificate-name-changed', () => setTimeout(() => enhanceAccountCard(true), 50));
 
   const observer = new MutationObserver(() => {
     enhanceCreateAccountForm();
@@ -381,13 +467,14 @@
   enhanceAccountCard();
 
   if (authReady()) {
-    if (currentUser()) maybePromptForName(currentUser());
-    setTimeout(enforceCurrentRoute, 50);
+    if (currentUser()) setTimeout(() => maybePromptForName(currentUser()), 120);
+    setTimeout(enforceCurrentRoute, 80);
   }
 
   window.CM_CERT_NAME = {
     open: () => openNameOnboarding({ forceEdit: true }),
     get: () => currentDisplayName(),
-    confirmed: () => !!currentUser() && isNameOnboarded(currentUser())
+    confirmed: () => !!currentUser() && locallyOnboarded(currentUser()),
+    check: () => currentUser() ? isNameOnboarded(currentUser()) : Promise.resolve(false)
   };
 })();
