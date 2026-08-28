@@ -5,6 +5,7 @@
   const USER_STATE_PREFIX = 'capitalMasteryUserStateV1:';
   const ACTIVE_UID_KEY = 'capitalMasteryActiveUidV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
+  const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV3:';
   const DEFAULT_NAME = 'Jordan Smith';
 
   function parse(raw) {
@@ -16,9 +17,13 @@
 
   function key(uid) { return `${USER_STATE_PREFIX}${uid}`; }
 
+  function cleanName(value) {
+    return String(value || '').replace(/\s+/g, ' ').trim();
+  }
+
   function blank(user) {
     const now = new Date().toISOString();
-    const displayName = String(user?.displayName || '').replace(/\s+/g, ' ').trim();
+    const displayName = cleanName(user?.displayName);
     return {
       version: 1,
       profile: {
@@ -43,6 +48,28 @@
     localStorage.setItem(key(uid), JSON.stringify(current));
   }
 
+  function safeLegacyStateFor(user) {
+    const legacy = parse(localStorage.getItem(STATE_KEY));
+    if (!legacy || legacy.profile?.accountUid) return null;
+
+    const firebaseName = cleanName(user.displayName);
+    const legacyName = cleanName(legacy.profile?.certificateName || legacy.profile?.name);
+    const uidWasOnboarded = localStorage.getItem(`${ONBOARD_PREFIX}${user.uid}`) === 'true';
+
+    // Preserve old unsynced state only when there is strong evidence that it
+    // belongs to this exact Firebase account. Otherwise discard it rather than
+    // risk moving another user's name/progress into this account.
+    if (!uidWasOnboarded && (!firebaseName || !legacyName || firebaseName !== legacyName)) return null;
+
+    legacy.profile ||= {};
+    legacy.profile.accountUid = user.uid;
+    if (firebaseName && legacyName !== firebaseName) {
+      legacy.profile.name = firebaseName;
+      legacy.profile.certificateName = firebaseName;
+    }
+    return legacy;
+  }
+
   function activate(user) {
     if (!user?.uid) return;
     const previousUid = localStorage.getItem(ACTIVE_UID_KEY);
@@ -51,11 +78,16 @@
     if (previousUid !== user.uid) localStorage.removeItem(QA_KEY);
 
     let state = parse(localStorage.getItem(key(user.uid)));
-    if (!state || state.profile?.accountUid !== user.uid) state = blank(user);
+    if (!state || state.profile?.accountUid !== user.uid) {
+      state = !previousUid ? safeLegacyStateFor(user) : null;
+    }
+    if (!state) state = blank(user);
+
     state.profile ||= {};
     state.profile.accountUid = user.uid;
 
     localStorage.setItem(ACTIVE_UID_KEY, user.uid);
+    localStorage.setItem(key(user.uid), JSON.stringify(state));
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
   }
 
