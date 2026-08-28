@@ -174,12 +174,9 @@
 
   function enhanceProfileControls() {
     const account = document.querySelector('.nav-actions a[href="#/login"]');
-    if (account) {
+    if (account && !account.classList.contains('cm-e2e-profile-nav')) {
       account.classList.add('cm-e2e-profile-nav');
-      const loggedIn = !!window.CM_AUTH?.user;
-      account.textContent = loggedIn ? 'Profile' : 'Sign in';
-      account.title = loggedIn ? 'Open your Capital Mastery profile' : 'Sign in to Capital Mastery';
-      account.setAttribute('aria-label', account.title);
+      account.setAttribute('aria-label', 'Open your Capital Mastery account');
     }
 
     const menuGrid = document.querySelector('#cm-modal .grid');
@@ -219,14 +216,16 @@
     }
 
     const mark = actions.querySelector('button[onclick*="CM.markPart"]');
-    if (mark) {
+    if (mark && mark.dataset.cmE2eMode !== mode) {
+      mark.dataset.cmE2eMode = mode;
       mark.textContent = marked ? '✓ Learning Complete' : '✓ Mark Learning Complete';
       mark.disabled = marked;
       mark.classList.toggle('cm-e2e-marked', marked);
     }
 
     const quiz = actions.querySelector('a[href^="#/quiz/"]');
-    if (quiz) {
+    if (quiz && quiz.dataset.cmE2eMode !== mode) {
+      quiz.dataset.cmE2eMode = mode;
       quiz.classList.toggle('cm-e2e-locked', !marked);
       if (!marked) {
         quiz.setAttribute('aria-disabled','true');
@@ -236,6 +235,17 @@
         quiz.textContent = part === 5 ? 'Take Simulation Knowledge Check →' : 'Take Official Assessment →';
       }
     }
+  }
+
+  function dedupeLessonContent() {
+    if (parts()[0] !== 'learn') return;
+    const seen = new Set();
+    document.querySelectorAll('.concept-list .concept-block').forEach(block => {
+      const key = block.querySelector('h3')?.textContent.trim().toLowerCase();
+      if (!key) return;
+      if (seen.has(key)) block.remove();
+      else seen.add(key);
+    });
   }
 
   function flashGuide() {
@@ -372,6 +382,7 @@
     if (redirectLegacySimulation()) return;
     enhanceProfileControls();
     enhanceLesson();
+    dedupeLessonContent();
     enhanceOfficialForm();
     enhanceResult();
     enhanceAppliedAutosave();
