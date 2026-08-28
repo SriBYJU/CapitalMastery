@@ -1,12 +1,19 @@
 (() => {
   'use strict';
 
+  const API = window.CAPITAL_MASTERY_API_URL;
   const STATE_KEY = 'capitalMasteryLocalStateV1';
-  const DIRTY_KEY = 'cmOfficialResultDirtyV1';
-  const DRAFT_PREFIX = 'cmOfficialDraftV3:';
+  const QA_KEY = 'capitalMasteryQaPreviewV1';
+  const DIRTY_KEY = 'cmOfficialResultDirtyV2';
+  const DRAFT_PREFIX = 'cmOfficialDraftV4:';
   const PAGE_TOKEN = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const PASS = 80;
   const CONTACT_EMAIL = 'avadhanula.shriyan@gmail.com';
   const LINKEDIN_URL = 'https://www.linkedin.com/in/shriyan-avadhanula-744190428/';
+  const API_ALIASES = { fpa: 'fp-and-a', 'fp-a': 'fp-and-a', 'fp&a': 'fp-and-a' };
+
+  let reconcileBusy = false;
+  let lastReconcileKey = '';
 
   function esc(v='') {
     return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -16,16 +23,44 @@
     return String(hash || '#/').replace(/^#\/?/,'').split('?')[0].split('/').filter(Boolean);
   }
 
-  function state() {
+  function apiPathway(id) {
+    return API_ALIASES[id] || id;
+  }
+
+  function qaMode() {
+    return localStorage.getItem(QA_KEY) === 'true';
+  }
+
+  function readState() {
     try {
       const x = JSON.parse(localStorage.getItem(STATE_KEY) || 'null');
       return x && x.version === 1 ? x : null;
     } catch (_) { return null; }
   }
 
+  function saveState(x) {
+    if (!x) return;
+    x.updatedAt = new Date().toISOString();
+    localStorage.setItem(STATE_KEY, JSON.stringify(x));
+    window.CM_SYNC?.flush?.().catch(() => {});
+  }
+
   function isLearningMarked(pathway, part) {
-    const list = state()?.careers?.[pathway]?.learningComplete;
+    const list = readState()?.careers?.[pathway]?.learningComplete;
     return Array.isArray(list) && list.includes(Number(part));
+  }
+
+  async function idToken() {
+    return window.CM_AUTH?.getIdToken ? await window.CM_AUTH.getIdToken() : null;
+  }
+
+  async function apiFetch(path) {
+    const token = await idToken();
+    if (!token) throw new Error('Sign in to continue.');
+    const response = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
   }
 
   function dirty() {
@@ -48,6 +83,117 @@
     location.reload();
   }
 
+  function redirectLegacySimulation() {
+    const [root, pathway] = parts();
+    if (root !== 'simulation' || !pathway || !window.CM_AUTH?.user || qaMode()) return false;
+    location.replace(`${location.pathname}${location.search}#/official-simulation/${encodeURIComponent(pathway)}`);
+    return true;
+  }
+
+  async function reconcileOfficialProgress(force=false) {
+    if (reconcileBusy || qaMode() || !window.CM_AUTH?.ready || !window.CM_AUTH?.user) return false;
+    const [root, pathway] = parts();
+    if (!pathway || !['career','learn','quiz','official-simulation','simulation','final','achievement'].includes(root)) return false;
+
+    const key = `${window.CM_AUTH.user.uid}|${pathway}|${location.hash}`;
+    if (!force && lastReconcileKey === key) return false;
+    lastReconcileKey = key;
+    reconcileBusy = true;
+
+    try {
+      const data = await apiFetch(`/progress/${encodeURIComponent(apiPathway(pathway))}`);
+      const rows = Array.isArray(data.progress) ? data.progress : [];
+      if (!rows.length) return false;
+
+      const s = readState();
+      if (!s) return false;
+      s.careers ||= {};
+      s.careers[pathway] ||= {learningComplete:[],completedParts:[],quizScores:{},simulationKnowledge:null,simulationScore:null,finalScore:null,applied:{},simResponses:{},readiness:null};
+      const cs = s.careers[pathway];
+      cs.learningComplete = Array.isArray(cs.learningComplete) ? cs.learningComplete : [];
+      cs.completedParts = Array.isArray(cs.completedParts) ? cs.completedParts : [];
+      cs.quizScores ||= {};
+
+      const before = JSON.stringify({
+        learningComplete: cs.learningComplete,
+        completedParts: cs.completedParts,
+        quizScores: cs.quizScores,
+        simulationKnowledge: cs.simulationKnowledge,
+        simulationScore: cs.simulationScore,
+        finalScore: cs.finalScore
+      });
+
+      const official = Object.fromEntries(rows.map(r => [r.item_id, r]));
+      for (let part = 1; part <= 5; part++) {
+        const row = official[`part-${part}`];
+        if (!row) continue;
+        const score = Number(row.best_score || 0);
+        const passed = Number(row.completed) === 1 && score >= PASS;
+        if (part <= 4) cs.quizScores[part] = score;
+        else cs.simulationKnowledge = score;
+        if (passed && !cs.learningComplete.includes(part)) cs.learningComplete.push(part);
+        if (part <= 4 && passed && !cs.completedParts.includes(part)) cs.completedParts.push(part);
+      }
+
+      const simRow = official.simulation;
+      if (simRow) cs.simulationScore = Number(simRow.best_score || 0);
+      else if (official['part-5']) cs.simulationScore = null;
+
+      const simPassed = !!simRow && Number(simRow.completed) === 1 && Number(simRow.best_score || 0) >= PASS;
+      cs.completedParts = cs.completedParts.filter(n => Number(n) !== 5);
+      if (simPassed) cs.completedParts.push(5);
+
+      const finalRow = official.final;
+      if (finalRow) cs.finalScore = Number(finalRow.best_score || 0);
+      else if (simRow) cs.finalScore = null;
+
+      cs.learningComplete = [...new Set(cs.learningComplete.map(Number))].sort((a,b)=>a-b);
+      cs.completedParts = [...new Set(cs.completedParts.map(Number))].sort((a,b)=>a-b);
+
+      const after = JSON.stringify({
+        learningComplete: cs.learningComplete,
+        completedParts: cs.completedParts,
+        quizScores: cs.quizScores,
+        simulationKnowledge: cs.simulationKnowledge,
+        simulationScore: cs.simulationScore,
+        finalScore: cs.finalScore
+      });
+
+      if (before !== after) {
+        saveState(s);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.warn('Capital Mastery progress reconciliation skipped:', error);
+      return false;
+    } finally {
+      reconcileBusy = false;
+    }
+  }
+
+  function enhanceProfileControls() {
+    const account = document.querySelector('.nav-actions a[href="#/login"]');
+    if (account) {
+      account.classList.add('cm-e2e-profile-nav');
+      const loggedIn = !!window.CM_AUTH?.user;
+      account.textContent = loggedIn ? 'Profile' : 'Sign in';
+      account.title = loggedIn ? 'Open your Capital Mastery profile' : 'Sign in to Capital Mastery';
+      account.setAttribute('aria-label', account.title);
+    }
+
+    const menuGrid = document.querySelector('#cm-modal .grid');
+    if (menuGrid && !menuGrid.querySelector('[data-cm-e2e-account-link]')) {
+      const a = document.createElement('a');
+      a.className = 'btn btn-outline';
+      a.href = '#/login';
+      a.dataset.cmE2eAccountLink = '1';
+      a.textContent = window.CM_AUTH?.user ? 'Profile / Account' : 'Sign in / Create Account';
+      a.addEventListener('click', () => window.CM?.closeModal?.());
+      menuGrid.appendChild(a);
+    }
+  }
+
   function enhanceLesson() {
     const [root, pathway, rawPart] = parts();
     if (root !== 'learn' || !pathway || !rawPart) return;
@@ -68,21 +214,19 @@
     if (guide.dataset.mode !== mode) {
       guide.dataset.mode = mode;
       guide.innerHTML = marked
-        ? '<span class="cm-e2e-step good">✓</span><div><strong>Learning marked complete.</strong><p>Your lesson completion is saved. Now take the official assessment and score 80% or higher to complete this part.</p></div>'
+        ? '<span class="cm-e2e-step good">✓</span><div><strong>Learning marked complete.</strong><p>Your lesson completion is saved. Now take the official assessment and score 80% or higher. <b>After the quiz, reload once if the pathway card does not immediately update.</b></p></div>'
         : '<span class="cm-e2e-step">1</span><div><strong>Mark the lesson complete before taking the quiz.</strong><p>Click <b>Mark Learning Complete</b> below first. This records that you finished the lesson and unlocks the official assessment.</p></div>';
     }
 
     const mark = actions.querySelector('button[onclick*="CM.markPart"]');
-    if (mark && mark.dataset.mode !== mode) {
-      mark.dataset.mode = mode;
+    if (mark) {
       mark.textContent = marked ? '✓ Learning Complete' : '✓ Mark Learning Complete';
       mark.disabled = marked;
       mark.classList.toggle('cm-e2e-marked', marked);
     }
 
     const quiz = actions.querySelector('a[href^="#/quiz/"]');
-    if (quiz && quiz.dataset.mode !== mode) {
-      quiz.dataset.mode = mode;
+    if (quiz) {
       quiz.classList.toggle('cm-e2e-locked', !marked);
       if (!marked) {
         quiz.setAttribute('aria-disabled','true');
@@ -138,18 +282,48 @@
     }
   }
 
+  function normalizePartFiveAfterResult() {
+    const [root, pathway, rawPart] = parts();
+    if (root !== 'quiz' || Number(rawPart) !== 5 || !pathway) return;
+    const s = readState();
+    const cs = s?.careers?.[pathway];
+    if (!cs || Number(cs.simulationScore || 0) >= PASS) return;
+    if (Array.isArray(cs.completedParts) && cs.completedParts.includes(5)) {
+      cs.completedParts = cs.completedParts.filter(n => Number(n) !== 5);
+      saveState(s);
+    }
+  }
+
   function enhanceResult() {
     const result = document.querySelector('.cm-result');
     if (!result || result.dataset.cmE2eReady === '1') return;
     result.dataset.cmE2eReady = '1';
+    normalizePartFiveAfterResult();
     setDirty();
     sessionStorage.removeItem(draftKey());
 
     const note = document.createElement('div');
     note.className = 'cm-e2e-result-note';
-    note.innerHTML = '<strong>Your official result is saved.</strong> If the pathway does not immediately show <b>Complete</b>, reload the page once to refresh the display. Capital Mastery also refreshes it automatically when you continue.';
+    note.innerHTML = '<strong>Your official result is saved.</strong> When you finish a quiz, <b>reload the page once if the pathway does not immediately show Complete</b>. Capital Mastery also refreshes official progress automatically when you continue.';
     const actions = result.querySelector('.cm-result-actions');
     (actions || result).insertAdjacentElement(actions ? 'beforebegin' : 'beforeend', note);
+  }
+
+  function enhanceAppliedAutosave() {
+    document.querySelectorAll('textarea[data-applied]').forEach(textarea => {
+      if (textarea.dataset.cmSaveStatus === '1') return;
+      textarea.dataset.cmSaveStatus = '1';
+      const status = document.createElement('div');
+      status.className = 'cm-e2e-autosave-status';
+      status.textContent = 'Saved to your progress';
+      textarea.insertAdjacentElement('afterend', status);
+      let timer = null;
+      textarea.addEventListener('input', () => {
+        status.textContent = 'Saving…';
+        clearTimeout(timer);
+        timer = setTimeout(() => { status.textContent = '✓ Saved to your progress'; }, 800);
+      });
+    });
   }
 
   function addFounderContact() {
@@ -195,9 +369,12 @@
   }
 
   function enhance() {
+    if (redirectLegacySimulation()) return;
+    enhanceProfileControls();
     enhanceLesson();
     enhanceOfficialForm();
     enhanceResult();
+    enhanceAppliedAutosave();
     addFounderContact();
     cleanStaleCopy();
   }
@@ -244,6 +421,13 @@
     (missing[0] || writing || error).scrollIntoView({behavior:'smooth', block:'center'});
   }, true);
 
+  async function routeRefresh(force=false) {
+    enhance();
+    if (redirectLegacySimulation()) return;
+    const changed = await reconcileOfficialProgress(force);
+    if (changed && !document.querySelector('.cm-result')) location.reload();
+  }
+
   window.addEventListener('hashchange', () => {
     const d = dirty();
     if (d && d.pageToken === PAGE_TOKEN && d.route !== location.hash) {
@@ -251,11 +435,12 @@
       setTimeout(() => location.reload(), 0);
       return;
     }
-    setTimeout(enhance, 40);
+    setTimeout(() => routeRefresh(true), 60);
   });
 
-  window.addEventListener('pageshow', () => setTimeout(enhance, 40));
-  document.addEventListener('cm-auth-changed', () => setTimeout(enhance, 60));
+  window.addEventListener('pageshow', event => setTimeout(() => routeRefresh(!!event.persisted), 70));
+  window.addEventListener('focus', () => setTimeout(() => routeRefresh(false), 100));
+  document.addEventListener('cm-auth-changed', () => setTimeout(() => routeRefresh(true), 90));
 
   const observer = new MutationObserver(enhance);
   observer.observe(document.documentElement, {childList:true, subtree:true});
@@ -263,9 +448,11 @@
   const style = document.createElement('style');
   style.id = 'cm-e2e-styles';
   style.textContent = `
-    .cm-e2e-complete-guide{display:grid;grid-template-columns:40px 1fr;gap:13px;align-items:start;margin:25px 0 14px;padding:16px 17px;border:1px solid #dbe1e6;border-radius:14px;background:#f8fafb}.cm-e2e-complete-guide strong{color:var(--navy)}.cm-e2e-complete-guide p{margin:4px 0 0;line-height:1.5}.cm-e2e-step{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--navy);color:#fff;font-weight:900}.cm-e2e-step.good{background:#e7f4ec;color:#245b43}.cm-e2e-complete-guide.flash{animation:cmE2eFlash 1s ease}.cm-e2e-locked{opacity:.55;cursor:not-allowed;filter:saturate(.45)}.cm-e2e-marked{opacity:.78}.cm-e2e-save-note,.cm-e2e-result-note{padding:12px 14px;border-radius:11px;margin:12px 0 19px;line-height:1.5}.cm-e2e-save-note{background:#f5f7fa;border:1px solid #e0e5ea;color:#4b5865}.cm-e2e-result-note{background:#f6f2e8;border:1px solid #e2d2a9;color:#5b5138;text-align:left}.cm-e2e-form-error{padding:12px 14px;border-radius:10px;background:#fff0f0;color:#8b3232;margin-bottom:16px;font-weight:700}.cm-e2e-unanswered{border-color:#d98989!important;box-shadow:0 0 0 2px rgba(180,60,60,.08)}.cm-e2e-founder-contact{max-width:1120px;margin:28px auto 0;padding:24px;border:1px solid #dfe4e8;border-radius:18px;background:#fff;box-shadow:var(--shadow-sm)}.cm-e2e-founder-contact h3{font-size:1.6rem;color:var(--navy);margin:6px 0 8px}.cm-e2e-founder-contact p{margin:0 0 16px}.cm-e2e-contact-actions{display:flex;gap:10px;flex-wrap:wrap}@keyframes cmE2eFlash{0%,100%{box-shadow:none}35%{box-shadow:0 0 0 5px rgba(185,138,67,.2);border-color:var(--gold)}}@media(max-width:700px){.cm-e2e-complete-guide{grid-template-columns:34px 1fr;padding:14px}.cm-e2e-step{width:32px;height:32px}.cm-e2e-founder-contact{margin:20px 16px 0}.cm-e2e-contact-actions .btn{width:100%}}
+    .cm-e2e-complete-guide{display:grid;grid-template-columns:40px 1fr;gap:13px;align-items:start;margin:25px 0 14px;padding:16px 17px;border:1px solid #dbe1e6;border-radius:14px;background:#f8fafb}.cm-e2e-complete-guide strong{color:var(--navy)}.cm-e2e-complete-guide p{margin:4px 0 0;line-height:1.5}.cm-e2e-step{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--navy);color:#fff;font-weight:900}.cm-e2e-step.good{background:#e7f4ec;color:#245b43}.cm-e2e-complete-guide.flash{animation:cmE2eFlash 1s ease}.cm-e2e-locked{opacity:.55;cursor:not-allowed;filter:saturate(.45)}.cm-e2e-marked{opacity:.78}.cm-e2e-save-note,.cm-e2e-result-note{padding:12px 14px;border-radius:11px;margin:12px 0 19px;line-height:1.5}.cm-e2e-save-note{background:#f5f7fa;border:1px solid #e0e5ea;color:#4b5865}.cm-e2e-result-note{background:#f6f2e8;border:1px solid #e2d2a9;color:#5b5138;text-align:left}.cm-e2e-form-error{padding:12px 14px;border-radius:10px;background:#fff0f0;color:#8b3232;margin-bottom:16px;font-weight:700}.cm-e2e-unanswered{border-color:#d98989!important;box-shadow:0 0 0 2px rgba(180,60,60,.08)}.cm-e2e-autosave-status{font-size:.74rem;color:#607080;margin-top:6px}.cm-e2e-founder-contact{max-width:1120px;margin:28px auto 0;padding:24px;border:1px solid #dfe4e8;border-radius:18px;background:#fff;box-shadow:var(--shadow-sm)}.cm-e2e-founder-contact h3{font-size:1.6rem;color:var(--navy);margin:6px 0 8px}.cm-e2e-founder-contact p{margin:0 0 16px}.cm-e2e-contact-actions{display:flex;gap:10px;flex-wrap:wrap}@keyframes cmE2eFlash{0%,100%{box-shadow:none}35%{box-shadow:0 0 0 5px rgba(185,138,67,.2);border-color:var(--gold)}}
+    @media(max-width:980px){.nav-actions .cm-e2e-profile-nav{display:inline-flex!important;min-width:72px}.nav{gap:10px}.cm-e2e-profile-nav{font-size:.82rem;padding:7px 10px;min-height:36px}}
+    @media(max-width:700px){.cm-e2e-complete-guide{grid-template-columns:34px 1fr;padding:14px}.cm-e2e-step{width:32px;height:32px}.cm-e2e-founder-contact{margin:20px 16px 0}.cm-e2e-contact-actions .btn{width:100%}.nav-actions .cm-e2e-profile-nav{display:inline-flex!important}.brand-name{font-size:.72rem}.nav{gap:7px}}
   `;
   if (!document.getElementById(style.id)) document.head.appendChild(style);
 
-  enhance();
+  setTimeout(() => routeRefresh(true), 150);
 })();
