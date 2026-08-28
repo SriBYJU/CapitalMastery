@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://sribyju.github.io/CapitalMastery/sitemap.xml

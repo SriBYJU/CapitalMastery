@@ -1,0 +1,117 @@
+{
+  "checks": {
+    "javascript_syntax": {
+      "pass": true,
+      "detail": ""
+    },
+    "career_count_16": {
+      "pass": true,
+      "detail": "16 careers"
+    },
+    "credential_claim_48": {
+      "pass": true,
+      "detail": "16 pathways \u00d7 3 certificates = 48"
+    },
+    "marketing_claim_45plus": {
+      "pass": true,
+      "detail": "Homepage claim 45+ is below actual 48"
+    },
+    "career_ids_unique": {
+      "pass": true,
+      "detail": ""
+    },
+    "career_content_depth": {
+      "pass": true,
+      "detail": "Each career: \u226510 vocab, \u22655 concepts, \u22656 toolkit labs, \u22655 applied tasks, \u22655 sources"
+    },
+    "all_vocab_defined": {
+      "pass": true,
+      "detail": "[]"
+    },
+    "all_concepts_defined": {
+      "pass": true,
+      "detail": "[]"
+    },
+    "research_source_count": {
+      "pass": true,
+      "detail": "22 named research sources"
+    },
+    "source_urls_https": {
+      "pass": true,
+      "detail": ""
+    },
+    "required_files_present": {
+      "pass": true,
+      "detail": ""
+    },
+    "seo_title": {
+      "pass": true,
+      "detail": ""
+    },
+    "meta_description": {
+      "pass": true,
+      "detail": ""
+    },
+    "manifest_linked": {
+      "pass": true,
+      "detail": ""
+    },
+    "ui_route_sweep": {
+      "pass": true,
+      "detail": "180 routes checked; bad=[]"
+    },
+    "browser_console_clean": {
+      "pass": true,
+      "detail": "[]"
+    },
+    "part_quiz_10_questions": {
+      "pass": true,
+      "detail": "10"
+    },
+    "final_exam_20_questions": {
+      "pass": true,
+      "detail": "20"
+    },
+    "threshold_79_fails": {
+      "pass": true,
+      "detail": "career credentials=0"
+    },
+    "threshold_80_passes": {
+      "pass": true,
+      "detail": "career credentials=1"
+    },
+    "three_credentials_per_completed_path": {
+      "pass": true,
+      "detail": "3"
+    },
+    "unique_credential_ids": {
+      "pass": true,
+      "detail": ""
+    },
+    "credential_issue_dates_present": {
+      "pass": true,
+      "detail": ""
+    },
+    "simulation_workspace_has_tasks": {
+      "pass": true,
+      "detail": "6 tasks"
+    },
+    "linkedin_add_profile_modal": {
+      "pass": true,
+      "detail": ""
+    },
+    "linkedin_post_generator": {
+      "pass": true,
+      "detail": ""
+    },
+    "mobile_no_horizontal_overflow": {
+      "pass": true,
+      "detail": "[]"
+    },
+    "preview_screenshot_package": {
+      "pass": true,
+      "detail": "33 organized screenshots"
+    }
+  },
+  "failures": []
+}

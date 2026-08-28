@@ -1,0 +1,246 @@
+<!doctype html><html><head><meta charset="utf-8"><title>admin-qa</title><link rel="stylesheet" href="../../styles.css"><style>@page{size:1440px 1000px;margin:0}html,body{width:1440px;margin:0;background:#f7f5ef}.site-header{position:relative}.admin-banner{display:none}.footer{display:none}.section{padding-top:54px}.cert-page{padding:24px 0}.certificate{width:1080px;height:764px}</style></head><body><div class="admin-banner">QA PREVIEW MODE — progress can be bypassed. Preview credentials are not live verified credentials.</div>
+    <header class="site-header"><div class="container nav">
+      <a class="brand" href="#/"><img src="../../assets/logo-mark.svg" alt="Capital Mastery logo"><span class="brand-name">CAPITAL MASTERY</span></a>
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#/" class="">Home</a>
+        <a href="#/careers" class="">Careers</a>
+        <a href="#/credentials" class="">Credentials</a>
+        <a href="#/about" class="">About</a>
+        <a href="#/passport" class="active">My Learning</a>
+      </nav>
+      <button class="mobile-menu" aria-label="Open menu" onclick="CM.mobileMenu()">☰</button>
+      <div class="nav-actions"><a class="btn btn-outline btn-sm" href="#/login">Sign in</a><a class="btn btn-primary btn-sm" href="#/careers">Start Free</a></div>
+    </div></header><main id="main"><section class="page-hero"><div class="container"><div class="eyebrow">ADMIN / QA</div><h1>Capital Mastery Release Lab</h1><p>Full feature preview without hard-coding an admin password. Firebase will later protect this area with a server-verified admin claim.</p></div></section><section class="section-tight"><div class="container"><div class="admin-grid"><div class="admin-card"><h3>QA Preview Mode</h3><p>Enabled</p><button class="btn btn-primary btn-sm" onclick="CM.toggleQa()">Disable QA Mode</button></div><div class="admin-card"><h3>Credential Lab</h3><p>Preview all three certificate levels without creating a live verified record.</p><div class="admin-actions"><a class="btn btn-soft btn-sm" href="#/certificate/investment-banking/foundations">Foundations</a><a class="btn btn-soft btn-sm" href="#/certificate/investment-banking/applied">Applied</a><a class="btn btn-gold btn-sm" href="#/certificate/investment-banking/career">Career</a></div></div><div class="admin-card"><h3>Boundary Tests</h3><p>Set IB demo scores to 79, 80 or 100 and verify pass/fail behavior.</p><div class="admin-actions"><button class="btn btn-soft btn-sm" onclick="CM.qaScores(79)">79%</button><button class="btn btn-soft btn-sm" onclick="CM.qaScores(80)">80%</button><button class="btn btn-soft btn-sm" onclick="CM.qaScores(100)">100%</button></div></div><div class="admin-card"><h3>Progress States</h3><p>Jump the flagship pathway to a testing state.</p><div class="admin-actions"><button class="btn btn-soft btn-sm" onclick="CM.qaProgress(0)">0%</button><button class="btn btn-soft btn-sm" onclick="CM.qaProgress(20)">20%</button><button class="btn btn-soft btn-sm" onclick="CM.qaProgress(40)">40%</button><button class="btn btn-soft btn-sm" onclick="CM.qaProgress(60)">60%</button><button class="btn btn-soft btn-sm" onclick="CM.qaProgress(80)">80%</button><button class="btn btn-soft btn-sm" onclick="CM.qaProgress(100)">100%</button></div></div><div class="admin-card"><h3>Simulation Lab</h3><p>Jump directly to the full practical simulation.</p><a class="btn btn-primary btn-sm" href="#/simulation/investment-banking">Open Project Northstar</a></div><div class="admin-card"><h3>Reset QA State</h3><p>Clear local progress and credentials. Firebase data is not involved.</p><button class="btn btn-danger btn-sm" onclick="CM.resetState()">Reset Local State</button></div></div><div class="section-head" style="margin-top:50px"><div><div class="eyebrow">CURRENT LOCAL STATE</div><h2>Debug snapshot</h2></div></div><pre class="admin-state">{
+  &quot;version&quot;: 1,
+  &quot;profile&quot;: {
+    &quot;name&quot;: &quot;Jordan Smith&quot;
+  },
+  &quot;careers&quot;: {
+    &quot;investment-banking&quot;: {
+      &quot;learningComplete&quot;: [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      &quot;completedParts&quot;: [
+        1,
+        2,
+        3,
+        4,
+        5
+      ],
+      &quot;quizScores&quot;: {
+        &quot;1&quot;: 90,
+        &quot;2&quot;: 90,
+        &quot;3&quot;: 90,
+        &quot;4&quot;: 90
+      },
+      &quot;simulationKnowledge&quot;: 90,
+      &quot;simulationScore&quot;: 90,
+      &quot;finalScore&quot;: 90,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;private-equity&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;venture-capital&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;equity-research&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;asset-management&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;hedge-funds&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;sales-trading&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;quant-finance&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;private-credit&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;corporate-banking&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;corporate-development&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;fpa&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;treasury&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;wealth-management&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;risk-management&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    },
+    &quot;real-estate-finance&quot;: {
+      &quot;learningComplete&quot;: [],
+      &quot;completedParts&quot;: [],
+      &quot;quizScores&quot;: {},
+      &quot;simulationKnowledge&quot;: null,
+      &quot;simulationScore&quot;: null,
+      &quot;finalScore&quot;: null,
+      &quot;applied&quot;: {},
+      &quot;simResponses&quot;: {},
+      &quot;readiness&quot;: null
+    }
+  },
+  &quot;credentials&quot;: [
+    {
+      &quot;careerId&quot;: &quot;investment-banking&quot;,
+      &quot;type&quot;: &quot;foundations&quot;,
+      &quot;issuedAt&quot;: &quot;2026-08-27T23:01:35.245Z&quot;,
+      &quot;credentialId&quot;: &quot;CM-INVES-FND-2026-392399&quot;,
+      &quot;status&quot;: &quot;preview-active&quot;,
+      &quot;criteriaVersion&quot;: &quot;1.0&quot;
+    },
+    {
+      &quot;careerId&quot;: &quot;investment-banking&quot;,
+      &quot;type&quot;: &quot;applied&quot;,
+      &quot;issuedAt&quot;: &quot;2026-08-27T23:01:35.245Z&quot;,
+      &quot;credentialId&quot;: &quot;CM-INVES-APP-2026-984237&quot;,
+      &quot;status&quot;: &quot;preview-active&quot;,
+      &quot;criteriaVersion&quot;: &quot;1.0&quot;
+    },
+    {
+      &quot;careerId&quot;: &quot;investment-banking&quot;,
+      &quot;type&quot;: &quot;career&quot;,
+      &quot;issuedAt&quot;: &quot;2026-08-27T23:01:35.245Z&quot;,
+      &quot;credentialId&quot;: &quot;CM-INVES-CAR-2026-400627&quot;,
+      &quot;status&quot;: &quot;preview-active&quot;,
+      &quot;criteriaVersion&quot;: &quot;1.0&quot;
+    }
+  ],
+  &quot;preferences&quot;: {},
+  &quot;createdAt&quot;: &quot;2026-08-27T23:01:35.243Z&quot;
+}</pre></div></section></main><footer class="footer"><div class="container"><div class="footer-grid">
+      <div class="footer-brand"><a class="brand" href="#/"><img src="../../assets/logo-mark.svg" alt=""><span class="brand-name">CAPITAL MASTERY</span></a><p>Learn it. Practice it. Prove it. Free finance-career training with sourced learning, graded simulations and verifiable credential architecture.</p></div>
+      <div><h4>Learn</h4><a href="#/careers" class="">Careers</a><a href="#/passport" class="">My Learning</a><a href="#/credentials" class="">Credentials</a></div>
+      <div><h4>About</h4><a href="#/about" class="">About Capital Mastery</a><a href="#/methodology" class="">Research Methodology</a><a href="#/credential-policy" class="">Credential Policy</a></div>
+      <div><h4>Legal</h4><a href="#/privacy" class="">Privacy</a><a href="#/terms" class="">Terms</a><a href="#/disclaimer" class="">Educational Disclaimer</a></div>
+    </div><div class="footer-bottom"><span>© 2026 Capital Mastery. Made by Shriyan Avadhanula.</span><span>Independent educational platform. No employer endorsement implied.</span></div></div></footer></body></html>

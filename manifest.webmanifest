@@ -1,0 +1,14 @@
+{
+  "name": "Capital Mastery",
+  "short_name": "Capital Mastery",
+  "description": "Learn it. Practice it. Prove it. Free finance career pathways and credentials.",
+  "start_url": "./#/",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f5ef",
+  "theme_color": "#071a33",
+  "icons": [
+    {"src":"assets/icon-192.png","sizes":"192x192","type":"image/png"},
+    {"src":"assets/icon-512.png","sizes":"512x512","type":"image/png"}
+  ]
+}
