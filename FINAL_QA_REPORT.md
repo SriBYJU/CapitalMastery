@@ -1,123 +1,129 @@
-# Capital Mastery — Final Pre-Firebase QA Report
+# Capital Mastery — Production End-to-End QA Report
 
-**Audit date:** August 27, 2026  
-**Release scope:** Everything in the master specification except Firebase-dependent authentication/cloud issuance.  
-**Overall release gate:** **PASS**
+**Audit date:** August 27–28, 2026  
+**Release scope:** Production learner experience with Firebase Authentication, Firestore progress sync, Cloudflare Worker grading, D1 credentials, mobile UX, and public verification.  
+**Current release gate:** **PASS WITH PRODUCTION SAFEGUARDS ACTIVE**
 
-## Automated audit summary
+## Production stack now connected
 
-The latest machine-readable audit is in [`docs/qa/audit-results.json`](docs/qa/audit-results.json).
+- Firebase Email/Password Authentication
+- Google sign-in
+- Required post-sign-up credential-name setup
+- Firestore cross-device learner progress sync
+- Cloudflare Worker Firebase ID-token verification
+- D1 authoritative assessment progress
+- D1 authoritative credential records
+- Automatic Foundations / Applied Skills / Career credential issuance
+- Public credential verification
+- Credential certificate, LinkedIn helper, and sharing UI
+- Server-verified administrator access
 
-| Check | Result |
-|---|---|
-| JavaScript syntax | PASS |
-| 16 career pathways present | PASS |
-| 48 total certificates (45+ marketing claim supported) | PASS |
-| Career IDs unique | PASS |
-| Career content depth | PASS |
-| All vocabulary references defined | PASS |
-| All concept references defined | PASS |
-| 20+ named research sources | PASS |
-| Research source URLs HTTPS | PASS |
-| Required assets/files | PASS |
-| SEO title/meta/manifest | PASS |
-| UI route sweep | **180 routes PASS** |
-| Browser console/page errors during sweep | **0** |
-| Part assessment size | **10 questions** |
-| Final examination size | **20 questions** |
-| 79% threshold | **FAIL as intended** |
-| 80% threshold | **PASS as intended** |
-| 3 credentials on completed pathway | PASS |
-| Credential IDs unique | PASS |
-| Issue timestamps present | PASS |
-| Simulation workspace | PASS |
-| LinkedIn Add-to-Profile helper | PASS |
-| LinkedIn post generator | PASS |
-| Mobile horizontal overflow on key screens | **0** |
-| Product-preview screenshot package | **30+ organized screenshots** |
+## Confirmed production flows
 
-## End-to-end feature audit
+The production integration has been exercised through the live learner flow, including:
 
-### Homepage / brand — PASS
-- Approved Capital Mastery identity implemented.
-- 45+ free credentials prominently shown.
-- 16 pathways, 80% standard and real-data methodology surfaced.
-- BLS public data clearly labeled to the relevant occupation.
-- Public-source credibility cards and non-endorsement disclosure present.
-- Founder photo and Founder section integrated.
-- Google/browser title includes **Made by Shriyan Avadhanula**.
+- Firebase sign-in → secure Worker verification
+- Firestore learner document + `/progress/state` creation
+- Official Worker-graded assessment submission
+- Passing score persisted to D1
+- Automatic D1 credential issuance
+- Public verification of an active Foundations credential
+- Real credential display in the credential UI
 
-### Career education — PASS
-- All 16 pathways render.
-- Exact target entry role is stated for every career.
-- Every pathway follows the same mandatory 5-part progression.
-- Vocabulary, technical concepts, toolkit labs, applied work and source drawers render.
-- Career compare and career map render.
+## Assessment coverage
 
-### Assessment engine — PASS
-- Part assessments: 10 questions.
-- Final examination: 20 questions.
-- Required standard: 80%.
-- 79/80 boundary verified.
-- Correct-answer explanations render after submission.
-- Requirement failures cannot be averaged away.
+Capital Mastery keeps a substantial assessment load rather than a participation-only flow:
 
-### Job simulations — PASS
-- All 16 careers have a role-specific simulation configuration.
-- Inbox, brief, case data, workspace, manager review and results render.
-- Numerical / technical grading and written-recommendation scoring are implemented.
-- Practical threshold is 80/100.
+- **16 career pathways**
+- **5 learning stages per pathway**
+- **10 questions per official part assessment**
+- **7 objective questions + written recommendation for the official job simulation**
+- **20 questions on the final examination**
+- **80% minimum mastery standard**
+- **3 credentials per pathway = 48 total credentials**
 
-### Credential system — PASS for pre-Firebase QA
-- Foundations Certificate implemented.
-- Applied Skills Certificate implemented.
-- Grand Career Certificate implemented.
-- Founder signature, issue date, credential ID and verification mark included.
-- Certificate-earned celebration implemented.
-- My Credentials and credential detail pages implemented.
-- Print/save PDF workflow implemented through the browser print dialog.
-- PNG/social image exports implemented.
-- LinkedIn credential helper and post generator implemented.
-- QA credentials are clearly identified as previews until the server backend exists.
+## User-experience bugs found and fixed
 
-### Admin / QA — PASS for pre-Firebase QA
-- Admin QA dashboard implemented.
-- Progress presets 0/20/40/60/80/100.
-- Boundary score presets 79/80/100.
-- Credential Lab shortcuts.
-- Simulation shortcut.
-- Local reset/debug snapshot.
-- No admin password is committed or hard-coded.
+### 1. Browser Back / stale progress after a passed quiz — FIXED
+Official results are reconciled from D1 when the learner returns to a pathway. Result-page navigation performs a clean refresh so the old in-memory `app.js` state cannot overwrite or visually hide an already-recorded pass.
 
-### Responsive / accessibility — PASS baseline
-- Desktop and mobile layouts audited.
-- No horizontal overflow on key 390px-wide screens.
-- Skip-to-content link.
-- Keyboard focus styling.
-- Reduced-motion support.
-- Form labels/wrapping labels on assessment flows.
+### 2. “Mark Complete” requirement was not obvious enough — FIXED
+Each lesson now shows a clear completion callout. The assessment button visibly remains locked until **Mark Learning Complete** is used. Once marked, the button changes to a completed state and the learner is told that 80%+ is still required on the assessment.
 
-### Product preview package — PASS
-The repository includes screenshots of brand assets, homepage, learner dashboard, pathway, learning pages, quizzes, applied work, simulation screens, certificate-earned screen, all three certificate tiers, credential screens, LinkedIn flows, founder page, admin QA and mobile layouts.
+### 3. Quiz-result refresh confusion — FIXED
+After an official submission the result page explicitly confirms that the result is saved and tells the learner to reload once if a pathway card does not immediately show the new completion state. Automatic D1 reconciliation is also performed when returning to the course.
 
-## Intentionally pending Firebase-only items
+### 4. Assessment answers could be lost during navigation — FIXED
+Official assessment answers are temporarily preserved in session storage while the learner works. Returning to the same assessment in the same tab restores unfinished answers.
 
-These are not defects; they require the Firebase project owner step before they can be activated securely:
+### 5. Incomplete assessments could be submitted accidentally — FIXED
+The production UI now blocks submission when required questions are unanswered and highlights the missing question(s). Simulation writing is required when present.
 
-1. Google sign-in.
-2. Email/password sign-in.
-3. Cross-device Firestore progress sync.
-4. Server-verified admin custom claim.
-5. Server-authoritative assessment/credential writes.
-6. Live public cross-device credential verification.
-7. Production credential email delivery if enabled.
+### 6. Legacy client-side practical simulation could conflict with the secure backend — FIXED
+Production learners are redirected from the old browser-scored simulation route to the **official server-graded simulation**. The legacy route remains available only for local/admin QA preview mode.
 
-The implementation plan, rules template and security architecture for these are included in the repository.
+### 7. Part 5 could visually look complete before the practical simulation was passed — FIXED
+Part 5 completion is reconciled against the authoritative simulation record. Passing the Part 5 knowledge check alone no longer represents the whole practical simulation as complete.
 
-## Security release note
+### 8. Firestore state timestamps could make local/cloud recency unreliable — FIXED
+Local learner-state saves now receive a real `updatedAt`, hydration no longer manufactures a new timestamp on every read, and the root Firebase user `createdAt` is no longer intentionally rewritten on every sync.
 
-The admin password supplied in planning is **not** stored in source code, GitHub, screenshots or configuration. It should only be entered when creating the Firebase Authentication account later.
+### 9. Mobile account/profile access was hidden — FIXED
+The account control is now forced visible in the mobile header. The hamburger menu also includes **Profile / Account** for signed-in learners and **Sign in / Create Account** for signed-out visitors.
 
-## Final pre-Firebase status
+### 10. Applied-work saving gave no visible feedback — FIXED
+Applied-work textareas now display save feedback while the existing Firestore/local progress save continues underneath.
 
-**READY FOR GITHUB + FIREBASE CONNECTION PHASE.**
+### 11. Duplicate technical concept rendering — FIXED
+Repeated concept cards are de-duplicated in the rendered lesson so learners do not encounter the same technical unit twice because of duplicate source-data references.
+
+### 12. Founder contact information was missing from About — FIXED
+The About page now includes a direct contact option and the requested LinkedIn profile link.
+
+### 13. Stale pre-production copy — FIXED
+Production-facing text that still referred to Firebase as “pending” or implied the admin/backend was not connected is overridden with the current production architecture where applicable.
+
+## Sign-up / identity UX
+
+The signed-out learning flow now follows:
+
+**Learning CTA → account explanation → Google or Email sign-in/sign-up → required full first + last name → learning**
+
+The account gate explains that sign-in is needed to save progress, connect official assessment results to the learner, and issue verified credentials. The full-name step is required before the learner continues into gated coursework so future credentials have an intentional display name.
+
+## Credential UX
+
+Active authoritative D1 credentials now support:
+
+- View Certificate
+- Credential Details
+- Public Verification
+- Add to LinkedIn helper
+- LinkedIn post generator
+- Credential ID copy
+- Verification URL copy
+- Print / Save PDF
+- PNG export fallback
+
+Existing credentials keep the holder name recorded at issuance; changing the account display name is not presented as retroactively changing an already-issued credential record.
+
+## Security notes
+
+- Browser/localStorage scores are not authoritative for production credentials.
+- Firebase ID tokens are verified by the Worker before protected API access.
+- Admin authorization is determined server-side.
+- Public verification does not expose the learner UID or email.
+- Firestore convenience progress is separate from D1 official grading/credential authority.
+- QA preview mode remains clearly separate from production credential authority.
+
+## Historical automated QA baseline
+
+The pre-production browser audit previously covered **180 routes**, reported **0 browser console/page errors**, verified 10-question part assessments, the 20-question final, 79% fail / 80% pass behavior, 3 credentials per completed pathway, key mobile overflow checks, LinkedIn helpers, and the simulation workspace.
+
+That historical browser sweep remains useful as a UI baseline, while the production additions above specifically address the Firebase/Worker/D1 integration and the learner-experience bugs discovered during live testing.
+
+## Final status
+
+**PRODUCTION LEARNER FLOW READY FOR CONTINUED LIVE SMOKE TESTING.**
+
+The secure backend is now the source of truth for official results and credentials, and the frontend has explicit recovery behavior for stale/back-navigation states rather than relying only on the browser’s in-memory course state.
