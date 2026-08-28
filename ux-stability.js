@@ -6,9 +6,10 @@
   const STATEFUL_ROOTS = new Set(['career','learn','quiz','official-simulation','simulation','final','passport','credentials','credential','certificate','achievement','login']);
   let credentialRepairTimer = null;
   let credentialRepairCount = 0;
+  let enhanceScheduled = false;
 
   function esc(v='') {
-    return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   }
 
   function routeParts(hash=location.hash) {
@@ -52,6 +53,7 @@
   function ensureProfileButton() {
     const nav = document.querySelector('.site-header .nav');
     if (!nav) return;
+
     let button = nav.querySelector('.cm-profile-button');
     if (!button) {
       button = document.createElement('a');
@@ -61,8 +63,16 @@
       if (mobileMenu) nav.insertBefore(button, mobileMenu);
       else nav.appendChild(button);
     }
+
     const user = window.CM_AUTH?.user;
     const label = profileLabel();
+    const signature = `${user?.uid || 'signed-out'}|${label}|${user ? '1' : '0'}`;
+
+    // Critical performance guard: assigning innerHTML on every MutationObserver
+    // callback creates another mutation and can lock the page in a render loop.
+    if (button.dataset.cmProfileSignature === signature) return;
+
+    button.dataset.cmProfileSignature = signature;
     button.setAttribute('aria-label', user ? `Open profile for ${label}` : 'Sign in or create an account');
     button.title = user ? `Profile · ${label}` : 'Sign in / Create account';
     button.innerHTML = `<span class="cm-profile-avatar">${esc(profileInitial())}</span><span class="cm-profile-text">${esc(user ? label : 'Sign in')}</span>`;
@@ -77,17 +87,32 @@
     const grid = modal.querySelector('.grid');
     if (!grid) return;
 
-    // The stability layer owns the single mobile account entry so users never see
-    // duplicate Profile / Account buttons from older compatibility layers.
-    grid.querySelector('[data-cm-e2e-account-link]')?.remove();
-    grid.querySelectorAll('[data-cm-profile-menu]').forEach((node, index) => { if (index > 0) node.remove(); });
+    const label = window.CM_AUTH?.user ? '👤 Profile & Account' : '👤 Sign in / Create account';
+    const legacy = grid.querySelector('[data-cm-e2e-account-link]');
+    const owned = [...grid.querySelectorAll('[data-cm-profile-menu]')].find(node => !node.hasAttribute('data-cm-e2e-account-link'));
 
-    if (grid.querySelector('[data-cm-profile-menu]')) return;
+    // capital-mastery-e2e.js may create a compatibility account entry. Adopt it
+    // instead of deleting it; deleting it caused the other observer to recreate it
+    // forever on mobile. If both briefly exist, keep the compatibility node and
+    // remove only our duplicate so the DOM settles after one pass.
+    if (legacy) {
+      if (owned) owned.remove();
+      legacy.setAttribute('data-cm-profile-menu', 'true');
+      if (legacy.className !== 'btn btn-primary') legacy.className = 'btn btn-primary';
+      if (legacy.textContent !== label) legacy.textContent = label;
+      return;
+    }
+
+    if (owned) {
+      if (owned.textContent !== label) owned.textContent = label;
+      return;
+    }
+
     const a = document.createElement('a');
     a.className = 'btn btn-primary';
     a.href = '#/login';
     a.setAttribute('data-cm-profile-menu','true');
-    a.innerHTML = window.CM_AUTH?.user ? '👤 Profile & Account' : '👤 Sign in / Create account';
+    a.textContent = label;
     a.addEventListener('click', () => window.CM?.closeModal?.());
     grid.appendChild(a);
   }
@@ -164,19 +189,34 @@
     repairCredentialRendererRace();
   }
 
+  function scheduleEnhance(delay = 0) {
+    if (delay > 0) {
+      setTimeout(scheduleEnhance, delay);
+      return;
+    }
+    if (enhanceScheduled) return;
+    enhanceScheduled = true;
+    requestAnimationFrame(() => {
+      enhanceScheduled = false;
+      enhance();
+    });
+  }
+
   installStateTimestampGuard();
 
   window.addEventListener('pageshow', refreshFromBfcache);
-  window.addEventListener('hashchange', () => setTimeout(enhance, 25));
-  document.addEventListener('cm-auth-changed', () => setTimeout(enhance, 40));
-  document.addEventListener('cm-certificate-name-changed', () => setTimeout(enhance, 40));
+  window.addEventListener('hashchange', () => scheduleEnhance(25));
+  document.addEventListener('cm-auth-changed', () => scheduleEnhance(40));
+  document.addEventListener('cm-certificate-name-changed', () => scheduleEnhance(40));
   window.addEventListener('online', () => {
     window.CM_SYNC?.flush?.().catch(() => {});
-    setTimeout(enhance, 30);
+    scheduleEnhance(30);
   });
 
-  const observer = new MutationObserver(enhance);
-  observer.observe(document.documentElement, { childList: true, subtree: true });
+  // Observe app renders, but collapse a burst of mutations into one animation-frame
+  // pass. Combined with idempotent DOM writes above, this avoids runaway CPU use.
+  const observer = new MutationObserver(() => scheduleEnhance());
+  observer.observe(document.getElementById('app') || document.documentElement, { childList: true, subtree: true });
 
   const style = document.createElement('style');
   style.id = 'cm-ux-stability-styles';
@@ -194,5 +234,5 @@
   `;
   if (!document.getElementById(style.id)) document.head.appendChild(style);
 
-  enhance();
+  scheduleEnhance();
 })();
