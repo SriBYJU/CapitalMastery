@@ -2,6 +2,7 @@
   'use strict';
 
   const API = window.CAPITAL_MASTERY_API_URL;
+  const V2_API = window.CAPITAL_MASTERY_V2_API_URL || API;
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const PASS = 80;
   let rerenderGuard = '';
@@ -26,7 +27,7 @@
   }
 
   function levelLabel(level) {
-    return ({ foundations: 'Foundations', applied: 'Applied Skills', career: 'Career' })[level] || level;
+    return ({ foundations:'Foundations', essentials:'Essentials', applied:'Applied Skills', role_lab:'Role Lab', professional_readiness:'Professional Readiness', career:'Career' })[level] || String(level||'').replace(/_/g,' ').replace(/\b\w/g,m=>m.toUpperCase());
   }
 
   function formatDate(value) {
@@ -59,6 +60,24 @@
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.ok === false) throw new Error(data.error || `Request failed (${response.status})`);
     return data;
+  }
+
+  async function v2ApiFetch(path, options = {}, auth = true) {
+    const headers = { ...(options.headers || {}) };
+    if (options.body && !headers['Content-Type']) headers['Content-Type'] = 'application/json';
+    if (auth) {
+      const token = await idToken();
+      if (!token) throw new Error('Sign in to continue.');
+      headers.Authorization = `Bearer ${token}`;
+    }
+    const response = await fetch(`${V2_API}${path}`, { ...options, headers });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.ok === false) throw new Error(data.error || `Request failed (${response.status})`);
+    return data;
+  }
+
+  function isV2Level(level) {
+    return ['essentials','role_lab','professional_readiness'].includes(level);
   }
 
   function verifyUrl(credential) {
@@ -191,10 +210,18 @@
       const credential = await findCredential(pathwayId, level);
       if (!credential) throw new Error('No issued credential was found for this pathway and level.');
       const c = careerById(pathwayId);
-      const skills = c ? [...new Set([...(c.vocab || []).slice(0, 5), ...(c.deliverables || []).slice(0, 4)])] : [];
+      let evidenceData = null;
+      if (isV2Level(level)) {
+        try { evidenceData = await v2ApiFetch(`/enterprise/credentials/${encodeURIComponent(credential.credential_id)}/evidence`); }
+        catch (error) { console.warn('V2 credential evidence unavailable:', error); }
+      }
+      const profile = evidenceData?.evidence?.find(x => x.type === 'competency_profile')?.data?.competencies || [];
+      const skills = profile.length ? profile.map(x => `${x.name} · ${Number(x.score)}%`) : (c ? [...new Set([...(c.vocab || []).slice(0, 5), ...(c.deliverables || []).slice(0, 4)])] : []);
+      const evidenceRows = (evidenceData?.evidence || []).filter(x => ['assessment','role_lab','readiness'].includes(x.type));
+      const evidenceHtml = evidenceRows.length ? `<div class="cm-v2-evidence-detail"><h3>Verified evidence</h3>${evidenceRows.map(x => { const d=x.data||{}; const score=d.score ?? d.overallScore; return `<div><span>${esc(x.title)}</span><b>${score==null?'Recorded':`${Number(score)}%`}</b></div>`; }).join('')}</div>` : '';
       const el = main();
       if (!el) return;
-      el.innerHTML = `<section class="section"><div class="container credential-detail"><article class="credential-summary"><span class="verify-status">✓ VERIFIED ACTIVE</span><div class="eyebrow" style="margin-top:20px">${esc(levelLabel(level).toUpperCase())} CERTIFICATE</div><h1>${esc(credential.credential_title)}</h1><p>Issued to <strong>${esc(credential.holder_name)}</strong> on ${formatDate(credential.issued_at)}.</p><div class="grid grid-2" style="margin:20px 0"><div class="data-card"><div class="label">Credential ID</div><p style="word-break:break-word"><strong>${esc(credential.credential_id)}</strong></p></div><div class="data-card"><div class="label">Status</div><p><strong>${esc(credential.status)}</strong></p></div></div>${skills.length ? `<h3>Skills represented by this pathway</h3><div class="skills-wrap">${skills.map(s => `<span class="skill">${esc(s)}</span>`).join('')}</div>` : ''}<div class="feedback-box" style="margin-top:20px"><strong>Authoritative record:</strong> this credential is issued and verified by the Capital Mastery secure API and D1 database.</div></article><aside class="share-panel"><h3>Use your credential</h3><a class="btn btn-gold btn-block" href="#/certificate/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">View Certificate</a><button class="btn btn-outline btn-block" style="margin-top:8px" data-cm-live-linkedin="${esc(credential.credential_id)}">Add to LinkedIn</button><button class="btn btn-outline btn-block" style="margin-top:8px" data-cm-live-post="${esc(credential.credential_id)}">Create LinkedIn Post</button><a class="btn btn-outline btn-block" style="margin-top:8px" href="#/verify/${encodeURIComponent(credential.public_token)}">Open Public Verification</a><label>Credential ID</label><div class="copy-row">${esc(credential.credential_id)}</div><button class="btn btn-soft btn-sm" data-cm-live-copy="${esc(credential.credential_id)}">Copy ID</button><label style="display:block;margin-top:14px">Credential URL</label><div class="copy-row">${esc(verifyUrl(credential))}</div><button class="btn btn-soft btn-sm" data-cm-live-copy="${esc(verifyUrl(credential))}">Copy Link</button></aside></div></section>`;
+      el.innerHTML = `<section class="section"><div class="container credential-detail"><article class="credential-summary"><span class="verify-status">✓ VERIFIED ACTIVE</span><div class="eyebrow" style="margin-top:20px">${esc(levelLabel(level).toUpperCase())} CERTIFICATE</div><h1>${esc(credential.credential_title)}</h1><p>Issued to <strong>${esc(credential.holder_name)}</strong> on ${formatDate(credential.issued_at)}.</p><div class="grid grid-2" style="margin:20px 0"><div class="data-card"><div class="label">Credential ID</div><p style="word-break:break-word"><strong>${esc(credential.credential_id)}</strong></p></div><div class="data-card"><div class="label">Status</div><p><strong>${esc(credential.status)}</strong></p></div></div>${skills.length ? `<h3>${profile.length?'Measured competencies':'Skills represented by this pathway'}</h3><div class="skills-wrap">${skills.map(s => `<span class="skill">${esc(s)}</span>`).join('')}</div>` : ''}${evidenceHtml}<div class="feedback-box" style="margin-top:20px"><strong>Authoritative record:</strong> this credential is issued and verified by the Capital Mastery secure API and D1 database.</div></article><aside class="share-panel"><h3>Use your credential</h3><a class="btn btn-gold btn-block" href="#/certificate/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">View Certificate</a><button class="btn btn-outline btn-block" style="margin-top:8px" data-cm-live-linkedin="${esc(credential.credential_id)}">Add to LinkedIn</button><button class="btn btn-outline btn-block" style="margin-top:8px" data-cm-live-post="${esc(credential.credential_id)}">Create LinkedIn Post</button><a class="btn btn-outline btn-block" style="margin-top:8px" href="#/verify/${encodeURIComponent(credential.public_token)}">Open Public Verification</a><label>Credential ID</label><div class="copy-row">${esc(credential.credential_id)}</div><button class="btn btn-soft btn-sm" data-cm-live-copy="${esc(credential.credential_id)}">Copy ID</button><label style="display:block;margin-top:14px">Credential URL</label><div class="copy-row">${esc(verifyUrl(credential))}</div><button class="btn btn-soft btn-sm" data-cm-live-copy="${esc(verifyUrl(credential))}">Copy Link</button></aside></div></section>`;
       bindCredentialButtons([credential]);
     } catch (error) {
       renderError('Credential unavailable.', error.message);
@@ -208,16 +235,21 @@
       if (!credential || credential.status !== 'active') throw new Error('An active issued credential is required to view this certificate.');
       const c = careerById(pathwayId);
       const isCareer = level === 'career';
-      const cls = level === 'foundations' ? 'simple' : level === 'applied' ? 'applied' : '';
-      const description = isCareer
-        ? 'for demonstrating mastery across required learning, technical assessments, applied work, a graded job simulation, and the final examination under the Capital Mastery Standard.'
-        : level === 'applied'
-          ? 'for successfully completing the applied learning, professional toolkit, and required assessments under the Capital Mastery Standard.'
-          : 'for successfully completing the career foundations and technical academy requirements under the Capital Mastery Standard.';
+      const isFlagship = isCareer || level === 'professional_readiness';
+      const cls = ['foundations','essentials'].includes(level) ? 'simple' : ['applied','role_lab'].includes(level) ? 'applied' : '';
+      const descriptions = {
+        foundations:'for successfully completing the career foundations and required technical assessments under the Capital Mastery Standard.',
+        essentials:'for applying the career foundations in a guided mini case and meeting the required Essentials assessment standard.',
+        applied:'for successfully completing the applied learning, professional toolkit, and required assessments under the Capital Mastery Standard.',
+        role_lab:'for successfully performing the required live-style Role Lab workflow, including analysis, quality control, revision and professional judgment.',
+        professional_readiness:'for demonstrating evidence-backed readiness across the baseline diagnostic, required credentials, Role Lab, competency floors and Professional Readiness Final under Capital Mastery Standard 2.0.',
+        career:'for demonstrating mastery across required learning, technical assessments, applied work, a graded job simulation, and the final examination under the Capital Mastery Standard.'
+      };
+      const description = descriptions[level] || 'for successfully completing the verified Capital Mastery credential requirements.';
       const displayTitle = credential.credential_title.replace(/ Certificate$/, '').replace(/ Career Certificate$/, '');
       const el = main();
       if (!el) return;
-      el.innerHTML = `<section class="cert-page"><div class="cm-live-verified-banner">✓ VERIFIED ACTIVE CREDENTIAL · Authoritative D1 record</div><div id="certificate" class="certificate ${cls}"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>${isCareer ? '<img class="cert-seal" src="assets/seal.svg" alt="Capital Mastery seal">' : ''}<div class="cert-inner"><div class="cert-brand"><img src="assets/logo-mark.svg" alt="">CAPITAL MASTERY</div><div class="cert-type">${esc(levelLabel(level))} Certificate</div><div class="cert-awarded">This certificate is ${isCareer ? 'proudly ' : ''}awarded to</div><div class="cert-name">${esc(credential.holder_name)}</div><div class="cert-for">for successfully completing the requirements of</div><div class="cert-title">${esc(displayTitle)}</div><div class="cert-description">${esc(description)}</div><div class="cert-bottom"><div class="cert-meta"><span>ISSUED</span><strong>${formatDate(credential.issued_at)}</strong></div><div class="signature-block"><img src="assets/founder-signature.png" alt="Founder signature"><div class="signature-line"></div><strong>Shriyan Avadhanula</strong><span>Founder, Capital Mastery</span></div><div class="cert-meta"><div id="cm-live-cert-mark" class="cert-qr"></div><span>CREDENTIAL ID</span><strong>${esc(credential.credential_id)}</strong></div></div><div class="cm-cert-verify-url">Verify: ${esc(verifyUrl(credential))}</div></div></div><div class="cert-toolbar"><button class="btn btn-primary" data-cm-live-print>Download / Print PDF</button><button class="btn btn-outline" data-cm-live-png>Download PNG</button><a class="btn btn-outline" href="#/credential/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">Credential Details</a><button class="btn btn-gold" data-cm-live-linkedin="${esc(credential.credential_id)}">Add to LinkedIn</button></div></section>`;
+      el.innerHTML = `<section class="cert-page"><div class="cm-live-verified-banner">✓ VERIFIED ACTIVE CREDENTIAL · Authoritative D1 record</div><div id="certificate" class="certificate ${cls}"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>${isFlagship ? '<img class="cert-seal" src="assets/seal.svg" alt="Capital Mastery seal">' : ''}<div class="cert-inner"><div class="cert-brand"><img src="assets/logo-mark.svg" alt="">CAPITAL MASTERY</div><div class="cert-type">${esc(levelLabel(level))} Certificate</div><div class="cert-awarded">This certificate is ${isFlagship ? 'proudly ' : ''}awarded to</div><div class="cert-name">${esc(credential.holder_name)}</div><div class="cert-for">for successfully completing the requirements of</div><div class="cert-title">${esc(displayTitle)}</div><div class="cert-description">${esc(description)}</div><div class="cert-bottom"><div class="cert-meta"><span>ISSUED</span><strong>${formatDate(credential.issued_at)}</strong></div><div class="signature-block"><img src="assets/founder-signature.png" alt="Founder signature"><div class="signature-line"></div><strong>Shriyan Avadhanula</strong><span>Founder, Capital Mastery</span></div><div class="cert-meta"><div id="cm-live-cert-mark" class="cert-qr"></div><span>CREDENTIAL ID</span><strong>${esc(credential.credential_id)}</strong></div></div><div class="cm-cert-verify-url">Verify: ${esc(verifyUrl(credential))}</div></div></div><div class="cert-toolbar"><button class="btn btn-primary" data-cm-live-print>Download / Print PDF</button><button class="btn btn-outline" data-cm-live-png>Download PNG</button><a class="btn btn-outline" href="#/credential/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">Credential Details</a><button class="btn btn-gold" data-cm-live-linkedin="${esc(credential.credential_id)}">Add to LinkedIn</button></div></section>`;
       renderVerificationMark(document.getElementById('cm-live-cert-mark'), credential.public_token);
       bindCredentialButtons([credential]);
       document.querySelector('[data-cm-live-print]')?.addEventListener('click', () => window.print());
@@ -392,7 +424,7 @@
     const style = document.createElement('style');
     style.id = 'cm-live-ui-styles';
     style.textContent = `
-      .cm-live-credential{display:flex;flex-direction:column;gap:4px}.cm-live-credential h3{color:var(--navy);font-size:1.2rem}.cm-live-actions{display:grid;gap:8px;margin-top:auto;padding-top:12px}.cm-live-warning{padding:10px 12px;border-radius:10px;background:#fff0f0;color:#8b3232}.cm-live-verified-banner{max-width:1120px;margin:0 auto 14px;padding:10px 14px;border-radius:10px;background:#eaf6ef;color:#245b43;font-weight:800;text-align:center}.cm-cert-verify-url{font-size:.68rem;color:#5d6670;text-align:center;margin-top:12px;word-break:break-all}.cm-issued-tools{display:grid;gap:8px;margin-top:10px}.cm-issued-tool-row{display:flex;gap:8px;flex-wrap:wrap}.cm-live-modal label{display:block;font-weight:800;color:var(--navy);margin-top:12px}.cm-live-modal textarea{border:1px solid #cbd2da;border-radius:10px;padding:12px}.cert-toolbar{flex-wrap:wrap}
+      .cm-live-credential{display:flex;flex-direction:column;gap:4px}.cm-live-credential h3{color:var(--navy);font-size:1.2rem}.cm-live-actions{display:grid;gap:8px;margin-top:auto;padding-top:12px}.cm-live-warning{padding:10px 12px;border-radius:10px;background:#fff0f0;color:#8b3232}.cm-live-verified-banner{max-width:1120px;margin:0 auto 14px;padding:10px 14px;border-radius:10px;background:#eaf6ef;color:#245b43;font-weight:800;text-align:center}.cm-cert-verify-url{font-size:.68rem;color:#5d6670;text-align:center;margin-top:12px;word-break:break-all}.cm-issued-tools{display:grid;gap:8px;margin-top:10px}.cm-issued-tool-row{display:flex;gap:8px;flex-wrap:wrap}.cm-v2-evidence-detail{display:grid;margin-top:20px}.cm-v2-evidence-detail>div{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid #e3e7e9}.cm-v2-evidence-detail>div span{color:#53616e}.cm-live-modal label{display:block;font-weight:800;color:var(--navy);margin-top:12px}.cm-live-modal textarea{border:1px solid #cbd2da;border-radius:10px;padding:12px}.cert-toolbar{flex-wrap:wrap}
       @media(max-width:700px){.cm-issued-tool-row{display:grid}.cm-issued-tool-row .btn{width:100%}.cert-toolbar .btn{width:100%}}
     `;
     document.head.appendChild(style);

@@ -9,3 +9,6 @@ window.CAPITAL_MASTERY_FIREBASE_CONFIG = {
 };
 
 window.CAPITAL_MASTERY_API_URL = "https://capital-mastery-api.avadhanula-shriyan.workers.dev";
+
+// Capital Mastery 2.0 uses the same audited production Worker as the legacy authoritative API.
+window.CAPITAL_MASTERY_V2_API_URL = "https://capital-mastery-api.avadhanula-shriyan.workers.dev";

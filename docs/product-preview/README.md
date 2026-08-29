@@ -6,7 +6,7 @@ Folders include:
 
 - `01-brand` — approved brand board, logo mark, horizontal wordmark and credential seal
 - `02-homepage` — desktop homepage
-- `03-login` — pre-Firebase account screen
+- `03-login` — historical local-QA account screen
 - `04-dashboard` — learner passport/dashboard
 - `05-career-pathway` — career directory and flagship pathway
 - `06-learning` — foundations/technical/research methodology

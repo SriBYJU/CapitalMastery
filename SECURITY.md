@@ -1,24 +1,55 @@
 # Security Notes
 
+## Production security boundary
+
+Capital Mastery treats the browser as untrusted for official results. Firebase Authentication establishes identity, while the Cloudflare Worker verifies the Firebase ID token and enforces authorization against D1 before returning or changing authoritative data.
+
+Official assessment scores, enterprise membership, competency evidence, readiness snapshots, credential issuance, credential status, and public verification are authoritative in D1.
+
 ## Secrets
-No Firebase service-account credentials, admin passwords, private API keys or authentication tokens belong in this repository.
 
-The designated admin account must be created inside Firebase Authentication later. Admin capability must be granted through a server-controlled custom claim and validated by Security Rules / Cloud Functions, not by checking an email address in client-side JavaScript.
+Do not commit:
 
-## Preview build
-The pre-Firebase version uses local browser state so every UX flow can be tested. Any credential produced before server-side issuance is explicitly a **QA preview** and must not be treated as a live verified credential.
+- Firebase service-account credentials
+- Cloudflare API tokens
+- private keys
+- admin passwords
+- Firebase refresh tokens
+- bearer tokens
+- any server-only secret
 
-## Production credential issuance
-Production flow:
+The production administrator UID is stored in Cloudflare as the `ADMIN_UID` `secret_text` binding. Its value is not present in this repository. Worker deployments preserve that binding through Cloudflare binding inheritance.
 
-1. Learner completes requirements.
-2. Client requests eligibility verification.
-3. Server/Cloud Function reads authoritative assessment state.
-4. Function independently checks every required 80% threshold.
-5. Function creates immutable credential record and issue timestamp.
-6. Public verification page reads only the safe public credential projection.
+The Firebase Web App configuration in `firebase-config.js` is client configuration, not a service-account credential.
 
-The browser must never be allowed to set `certificateEarned=true`, authoritative scores or admin status.
+## Authentication checks
 
-## Firebase rules
-A starter rules design is provided in `firestore.rules.example`. It intentionally defaults to deny for credential writes.
+The Worker verifies Firebase ID tokens using Google's signing keys and validates the RS256 signature, signing key ID, expiration, issue time, authentication time sanity, project audience, issuer, and subject.
+
+## Tenant authorization
+
+Enterprise access is resolved server-side from `organization_members`. Client-provided organization IDs do not grant access. Mutating routes enforce role checks for Owner, Training Admin, Content Manager, Manager, Viewer, and Learner capabilities.
+
+The last active owner cannot be removed or archived.
+
+## Assessment and credential integrity
+
+- official answer keys are never returned to the learner frontend
+- hidden Role Lab grading rules remain server-side
+- V2 diagnostic and standardized assessment submission rates are limited
+- Role Lab tasks enforce configured maximum attempts
+- stable evidence IDs prevent repeated attempts from multiplying evidence weight
+- failed retakes do not erase stronger previously demonstrated evidence
+- Professional Readiness requires the direct Role Lab record, Professional Final, prerequisite credentials, readiness threshold, full evidence coverage, and critical competency floors
+
+## Employer content lifecycle
+
+Firm Layer content is versioned. Employer-facing lifecycle actions are **Hide**, **Archive**, and **Restore**. There is intentionally no permanent employer DELETE endpoint. Required Capital Mastery Standard content cannot be hidden.
+
+## Privacy and exports
+
+The My Data export includes the learner's enterprise membership/training/evidence metadata but intentionally excludes answer keys and hidden grading rules. Public credential verification exposes only privacy-safe evidence.
+
+## Local QA mode
+
+Legacy browser QA helpers remain available for deterministic regression testing. Any local QA preview credential is explicitly non-authoritative and is separate from live D1-issued credentials.

@@ -2,33 +2,55 @@
 
 **Learn it. Practice it. Prove it.**
 
-Capital Mastery is a student-first finance career training platform built around concise learning, role-specific technical skills, applied work, graded job simulations and three levels of certificates per pathway.
+Capital Mastery is a finance workforce-readiness platform that combines role learning, applied work, realistic simulations, competency measurement, and verifiable credential evidence. The original learner product remains intact while Capital Mastery 2.0 adds an employer layer for cohorts, assignments, Firm Layer customization, readiness reporting, and enterprise-grade evidence.
 
 ## Product snapshot
 
-- **16 finance career pathways**
-- **48 total certificates** (marketed as **45+ free credentials**)
-- **5 mandatory stages per career**
-- **80% minimum mastery standard**
-- **10-question part assessments**
-- **Role-specific practical job simulations**
-- **20-question final examinations**
-- **Foundations, Applied Skills and Career Certificates**
-- **LinkedIn add/share workflow**
-- **Credential verification architecture**
-- **Admin / QA lab**
-- **Public-data/source methodology**
-- Responsive desktop/mobile interface
+- **16 finance career pathways** in the preserved public learner catalog
+- Existing **Foundations, Applied Skills, and Career** credentials remain supported and verifiable
+- **80% mastery standard** for official assessed work
+- Firebase Authentication for learner and employer sign-in
+- Cloudflare Worker + D1 as the authoritative assessment, evidence, credential, and enterprise backend
+- Employer organizations, cohorts, invitations, assignments, roles, audit history, and readiness reports
+- Firm Layer customization with **Hide / Archive / Restore — no permanent employer delete**
+- Evidence-backed competency profiles and readiness snapshots
+- Investment Banking Phase 1 reference pathway with:
+  - baseline diagnostic
+  - Essentials Mini Case
+  - Applied Skills recognition
+  - seven-stage **Project Northstar** Role Lab
+  - Professional Readiness Final
+  - five-level V2 credential ladder
+- Public privacy-safe credential verification
+- LinkedIn sharing and downloadable certificate workflows
+- Responsive UI, keyboard focus states, and reduced-motion support
 
-## Firebase status
+## Phase 1 architecture
 
-Everything in the product is implemented for local QA except the production account/backend layer that requires the owner to create and configure the Firebase project. Until Firebase is connected, progress and preview credentials are stored locally in the browser and are explicitly marked as QA previews.
+```text
+GitHub Pages frontend
+        │
+        ├── Firebase Authentication
+        │
+        └── Cloudflare Worker
+                │
+                └── D1 authoritative database
+                    ├── enterprise tenants / roles
+                    ├── cohorts / assignments / invites
+                    ├── diagnostics / assessments
+                    ├── Role Lab submissions
+                    ├── competency evidence / readiness
+                    ├── credentials / evidence portfolio
+                    └── audit events
+```
 
-After Firebase is configured, the integration plan is documented in [`docs/firebase-setup.md`](docs/firebase-setup.md). Production credential issuance must be server-authoritative; users must never be allowed to create credentials by editing browser state.
+Firebase/Firestore may synchronize non-authoritative learner state, but official assessment results, readiness evidence, and credential issuance are determined server-side by the Worker and D1.
+
+See [`docs/architecture.md`](docs/architecture.md), [`docs/enterprise-security.md`](docs/enterprise-security.md), and [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md).
 
 ## Run locally
 
-This is a static web app. Serve the repository root with any local static server, for example:
+This is a static frontend. Serve the repository root with any local static server, for example:
 
 ```bash
 python3 -m http.server 8000
@@ -36,19 +58,20 @@ python3 -m http.server 8000
 
 Then open `http://localhost:8000`.
 
-## QA
+## Automated QA
 
-The repository includes automated audit scripts and an organized product-preview screenshot package.
+```bash
+node tests/static-audit.mjs
+node tests/logic-audit.mjs
+node tests/runtime-smoke.mjs
+node tests/enterprise-v2-audit.mjs
+node tests/enterprise-v2-runtime-smoke.mjs
+```
 
-- [`FEATURE_CHECKLIST.md`](FEATURE_CHECKLIST.md)
-- [`FINAL_QA_REPORT.md`](FINAL_QA_REPORT.md)
-- [`docs/qa/audit-results.json`](docs/qa/audit-results.json)
-- [`docs/product-preview/`](docs/product-preview/)
-
-The current audit covers 180 application routes, 16 pathways, quiz/final counts, the 79%/80% threshold boundary, credential issuance logic, sharing flows, simulation workspace generation and mobile overflow.
+The current suites cover the legacy 79%/80% mastery boundary, **189 existing application routes**, and **17 additional Enterprise V2 routes**, plus V2 sequencing, no-delete Firm Layer rules, role-based authorization, readiness/evidence features, accessibility hooks, and credential verification wiring.
 
 ## Founder
 
 **Shriyan Avadhanula — Founder, Capital Mastery**
 
-Capital Mastery is an independent educational platform. References to financial institutions, professional organizations and public agencies identify public research sources only and do not imply affiliation, endorsement or sponsorship.
+Capital Mastery is an independent educational platform. References to financial institutions, professional organizations, employers, and public agencies identify research sources or simulated professional contexts only and do not imply affiliation, endorsement, or sponsorship.

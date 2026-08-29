@@ -1,5 +1,7 @@
 # Capital Mastery — Live Release UX / E2E Audit
 
+> **Phase 1 superseding audit:** The authoritative current release record is [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md). This file is retained as the earlier learner-product UX audit.
+
 **Audit date:** August 28, 2026  
 **Scope:** Live Firebase + Cloudflare Worker/D1 build and user-facing course flow.  
 **Status:** Core production path is connected; UX hardening fixes below are now loaded by `index.html`.

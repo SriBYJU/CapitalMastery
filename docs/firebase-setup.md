@@ -1,32 +1,39 @@
-# Firebase Setup — Owner Step
+# Firebase Production Configuration
 
-This is the only major integration intentionally left until the Firebase project is created by the owner.
+## Current status
 
-## Owner actions
+Firebase is connected for Capital Mastery production authentication.
 
-1. Create a Firebase project named for Capital Mastery.
-2. Add a Web App.
-3. Enable Authentication providers:
-   - Google
-   - Email/Password
-4. Create Cloud Firestore.
-5. Add the production domain and GitHub Pages domain to authorized domains.
-6. If using secure Cloud Functions for live credential issuance, upgrade/link billing as Firebase requires for function deployment.
-7. Copy the standard Firebase Web App configuration values into the production config file/environment.
-8. Create the designated admin user in Firebase Authentication and apply a server-controlled `admin: true` custom claim.
+Current public Web App configuration is loaded from `firebase-config.js` and the production project ID is `capital-mastery26`.
 
-## Never commit
+Authorized production usage includes the Capital Mastery GitHub Pages origin and the Firebase-hosted project domains used during authentication/setup.
 
-- Firebase service-account JSON
-- private keys
-- admin password
-- refresh tokens
-- any server secret
+## Authentication
 
-The standard public Firebase Web App config is not the same as a service-account secret, but production deployment should still use a clear config/environment strategy.
+Capital Mastery supports the configured Firebase Authentication providers used by the frontend, including the shared onboarding flow that collects the learner's full credential name after account creation.
 
-## Migration plan
+The browser sends Firebase ID tokens to the Cloudflare Worker. The Worker independently verifies each token before official assessment, credential, learner, or employer operations.
 
-Replace the local QA persistence adapter with Firestore reads/writes, keeping the same UI state model. Practice UX can remain client-side, but live credential eligibility must be independently checked by Cloud Functions before issuing a public record.
+## Firestore role
 
-The current admin preview route must be replaced/gated by a verified Firebase custom claim before the site is considered production-authenticated.
+Firestore may synchronize non-authoritative learner/profile state. It is not the source of truth for official assessment results, competency evidence, readiness, enterprise permissions, or credential issuance.
+
+## Authoritative backend
+
+The production Cloudflare Worker and D1 database are authoritative for:
+
+- official assessment attempts and progress
+- organizations, members, invites, cohorts, and assignments
+- Firm Layer content and versions
+- competency evidence and scores
+- readiness snapshots
+- Role Lab runs and submissions
+- V2 assessment attempts
+- credential definitions, issuance, evidence, status, and verification
+- enterprise audit events
+
+## Secret handling
+
+Never commit service-account JSON, private keys, admin passwords, refresh tokens, Cloudflare credentials, or server secrets.
+
+The production administrator UID is stored as a Cloudflare secret binding and is intentionally absent from this repository.
