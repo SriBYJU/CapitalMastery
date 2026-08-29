@@ -12,5 +12,5 @@ ok(ui.includes("Ready · Open workbench"),'Role Lab ready state must surface aft
 ok(ui.includes('Stage status below is read from your authoritative assessment, credential and Role Lab evidence'),'assigned page must explain authoritative status source');
 ok(!ui.includes("${s.id==='role-lab'?'Role Lab':'Required'}"),'hard-coded Required stage labels must be removed');
 ok(css.includes('.cmv2-stage-state.complete')&&css.includes('.cmv2-assignment-progress-bar'),'assigned evidence timeline styling missing');
-ok(index.includes('enterprise-v2.js?v=20260829-assignedstatus1')&&index.includes('enterprise-v2.css?v=20260829-assignedstatus1'),'assigned-status assets must be cache-busted');
+ok(index.includes('enterprise-v2.js?v=20260829-bigfirm1')&&index.includes('enterprise-v2.css?v=20260829-bigfirm1'),'assigned-status assets must be cache-busted');
 console.log('ASSIGNED PROGRAM AUTHORITATIVE STATUS AUDIT PASS');
