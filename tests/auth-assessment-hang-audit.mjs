@@ -10,3 +10,8 @@ ok(live.includes('waitForAuthReady'),'assessment route must have auth watchdog')
 ok(live.includes('cm-auth-retry'),'assessment timeout must expose retry action');
 ok(live.includes("setTimeout(() => route(), 250)"),'assessment route must automatically retry while auth initializes');
 console.log('AUTH/ASSESSMENT HANG REGRESSION PASS');
+
+const index=fs.readFileSync('index.html','utf8');
+ok(index.includes('firebase-auth.js?v=20260829-authfix1'),'firebase auth hotfix must be cache-busted');
+ok(index.includes('capital-mastery-live.js?v=20260829-authfix1'),'secure assessment hotfix must be cache-busted');
+console.log('AUTH ASSET CACHE-BUST PASS');
