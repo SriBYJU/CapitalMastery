@@ -264,7 +264,13 @@
 
   function saveDraft(form) {
     const answers = {};
-    form.querySelectorAll('input[type="radio"]:checked').forEach(i => answers[i.name] = i.value);
+    form.querySelectorAll('input[name]').forEach(input => {
+      if (input.type === 'radio') {
+        if (input.checked) answers[input.name] = input.value;
+      } else {
+        answers[input.name] = input.value;
+      }
+    });
     sessionStorage.setItem(draftKey(), JSON.stringify({answers, writing: form.querySelector('textarea[name="writing"]')?.value || ''}));
   }
 
@@ -276,7 +282,11 @@
     let saved = null;
     try { saved = JSON.parse(sessionStorage.getItem(draftKey()) || 'null'); } catch (_) {}
     if (saved?.answers) {
-      form.querySelectorAll('input[type="radio"]').forEach(i => { if (saved.answers[i.name] === i.value) i.checked = true; });
+      form.querySelectorAll('input[name]').forEach(input => {
+        if (!(input.name in saved.answers)) return;
+        if (input.type === 'radio') input.checked = saved.answers[input.name] === input.value;
+        else input.value = saved.answers[input.name];
+      });
     }
     const writing = form.querySelector('textarea[name="writing"]');
     if (writing && saved?.writing) writing.value = saved.writing;
@@ -415,7 +425,14 @@
     if (!(form instanceof HTMLFormElement) || form.id !== 'cm-official-form') return;
     form.querySelectorAll('.cm-e2e-unanswered').forEach(x => x.classList.remove('cm-e2e-unanswered'));
     const fieldsets = [...form.querySelectorAll('.cm-official-question')];
-    const missing = fieldsets.filter(f => !f.querySelector('input[type="radio"]:checked'));
+    const missing = fieldsets.filter(fieldset => {
+      const numeric = fieldset.querySelector('input[type="number"]');
+      if (numeric) return !String(numeric.value || '').trim();
+      const radios = fieldset.querySelectorAll('input[type="radio"]');
+      if (radios.length) return !fieldset.querySelector('input[type="radio"]:checked');
+      const response = fieldset.querySelector('input[name], textarea[name]');
+      return response ? !String(response.value || '').trim() : false;
+    });
     const writing = form.querySelector('textarea[name="writing"]');
     const missingWriting = !!writing && !writing.value.trim();
     if (!missing.length && !missingWriting) return saveDraft(form);
