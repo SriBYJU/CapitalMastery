@@ -161,3 +161,82 @@ A final production review identified and addressed three release-quality issues 
 
 These additions reflect public training expectations around accounting, Excel, financial modeling, valuation, M&A, error checking and case-based application while using synthetic Capital Mastery data rather than proprietary firm templates.
 
+
+## Final production black-box closure — August 29, 2026
+
+A fresh disposable learner and employer tenant were used against the deployed GitHub Pages frontend and production Cloudflare Worker after the immersive Investment Banking release. The audit intentionally followed normal learner and employer UI flows instead of seeding completion state.
+
+### Release defects discovered and fixed during black-box testing
+
+1. **Secure-assessment auth loading could hang.** Firebase readiness had been coupled too tightly to backend identity verification, leaving some official assessment routes on `Checking your account…` / `Loading secure assessment…`. Auth readiness now resolves independently, backend verification has a timeout/background path, secure assessment routes have retry/watchdog handling, and the hotfix assets are cache-busted.
+2. **Mixed numeric/table assessments were blocked by legacy completeness validation.** `capital-mastery-e2e.js` treated every official question as radio-only, so filled numeric inputs were incorrectly marked unanswered and the secure submit event was stopped before the Worker request. Mixed numeric + radio validation and numeric draft save/restore are now covered by regression tests.
+3. **Official progression did not mirror immediately after some passed parts.** An escaped part-ID regex prevented newly passed parts from being written into the learner UI state quickly enough, creating a race where D1 showed Part 3 complete while Part 4 still appeared locked. The mirror now parses part IDs correctly, refreshes in-memory state, and keeps Part 5 knowledge separate from practical-simulation completion.
+4. **The Final Examination existed but was not surfaced clearly after the Job Simulation.** The pathway now shows an explicit Final Examination row: locked before the practical simulation, actionable after the simulation passes, and scored after completion.
+
+### Fresh learner production journey
+
+The final deployed journey completed successfully:
+
+- Part 1 — Career Foundations: **100%**, 10/10, official pass
+- Part 2 — Technical Academy: **80%**, 8/10, mixed numeric/table questions submitted successfully
+- Part 3 — Professional Toolkit: **100%**, 10/10, numeric questions submitted successfully
+- Part 4 — Applied Work: realistic work-product fields completed; **100%**, 10/10, official pass
+- Part 5 — Simulation Knowledge Check: **100%**, 10/10; pathway correctly remained at 80% until practical simulation
+- Practical Job Simulation: **88% overall**, 7/7 objective, 18/30 written recommendation, official pass
+- Final Examination: **100%**, 20/20, official pass
+- Career credential automatically issued: **Investment Banking Analyst — M&A Advisory Career Certificate**
+- Public verification rendered the credential as valid/active and did not expose answer keys, private contact information, authentication data or backend secrets
+
+D1 independently confirmed the seven official assessment/progress events above before cleanup.
+
+### Final employer regression smoke
+
+A fresh temporary employer workspace was created through the production UI and verified:
+
+- workspace creation
+- Investment Banking Quick Assign with a future deadline
+- Command Center cohort/assignment rendering
+- Team & Roles with the current owner active
+- Employer Readiness Reports with a valid zero-learner state
+- Audit Log entries for organization/cohort/assignment activity
+
+No runtime errors were observed.
+
+### Final automated release gates
+
+The exact source revision passed all Phase 1 regression gates:
+
+- `tests/static-audit.mjs` — 16 careers / 48 legacy credential slots preserved
+- `tests/logic-audit.mjs` — 79/80 boundary and credential gating
+- `tests/runtime-smoke.mjs` — 189 legacy routes
+- `tests/enterprise-v2-audit.mjs` — Enterprise V2 static audit
+- `tests/enterprise-v2-runtime-smoke.mjs` — 17 Enterprise V2 routes
+- `tests/ib-reference-audit.mjs` — 12 interactive IB analyst workflows and reference-pathway controls
+- `tests/auth-assessment-hang-audit.mjs` — auth/watchdog/cache-bust regression
+- `tests/official-mixed-submit-audit.mjs` — mixed numeric/radio secure-submission regression
+- `tests/progression-mirror-audit.mjs` — immediate official progression and Part 5 boundary
+- `tests/final-exam-surface-audit.mjs` — Final Examination surface + in-memory progress sync
+
+### Final production integrity
+
+Cloudflare production settings were verified after the release:
+
+- `ADMIN_UID` remains a `secret_text` binding
+- D1 `DB` binding points to `capital-mastery-prod`
+- `FIREBASE_PROJECT_ID=capital-mastery26`
+- `ALLOWED_ORIGIN=https://sribyju.github.io`
+- Worker observability enabled
+- invocation logs enabled
+- `PRAGMA quick_check` → `ok`
+- 0 active organizations without an active owner
+- 0 orphan cohort members
+- 0 orphan assignment/cohort records
+- Investment Banking permanent V2 catalog remains 5 credential definitions / 12 diagnostic questions / 7 `ib-project-northstar` Role Lab tasks / 2 V2 assessments
+
+The final disposable D1 learner/credential/employer data was deleted in foreign-key-safe order. Post-cleanup counts for the temporary organization, memberships, assessment attempts, official progress, credentials, cohorts, assignments and enterprise audit events are all **0**.
+
+### Firebase QA-hygiene limitation
+
+The final disposable QA browser session was signed out. The available automation surfaces do not expose Firebase Admin / Firestore document deletion for this project: the browser runtime does not publish the internal Firestore instance, direct account deletion was blocked by the tool safety layer, and the connected Firebase integration exposes client authentication only, not Admin/Firestore deletes. Therefore one disposable QA Firebase Auth identity and its two Firestore sync documents could not be programmatically removed in this session. They have no authoritative D1 progress, credentials, employer membership or tenant data after the cleanup above and do not affect production behavior. This is an external test-data hygiene follow-up, not a Phase 1 product defect.
+
+**Phase 1 product and production release gates: COMPLETE.**

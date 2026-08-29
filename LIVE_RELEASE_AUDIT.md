@@ -118,3 +118,13 @@ The live build is suitable for continued real-user testing. The most important r
 7. open Profile on mobile
 8. ask Madeline: “What should I do next?” and “What is my credential ID?”
 
+
+## August 29, 2026 final Phase 1 production closure
+
+A fresh end-to-end learner completed Investment Banking through Part 1, mixed numeric/table Part 2, Part 3, Applied Work, the Part 5 knowledge check, the practical Job Simulation and the 20-question Final Examination. Server-graded results were 100%, 80%, 100%, 100%, 100%, 88% and 100% respectively. The career credential was automatically issued and its public verification page rendered valid/active without exposing answer keys or private backend data.
+
+Black-box testing found and fixed four release defects before closure: secure-assessment auth loading, mixed numeric-question submission validation, immediate official-progress mirroring, and Final Examination discoverability/in-memory state refresh. A fresh employer smoke also passed workspace creation, Quick Assign, Command Center, Team & Roles, Reports and Audit Log.
+
+After testing, all temporary authoritative D1 learner/credential/employer data was removed; D1 returned `quick_check = ok`, with zero ownerless organizations and zero orphan cohort/assignment records. Production Worker bindings and observability were re-verified. The disposable browser account was signed out; Firebase Admin/Firestore deletion is not available through the connected tool surfaces, so its non-authoritative Firebase test identity/sync docs remain an external QA-hygiene follow-up.
+
+**Phase 1 product/release status: COMPLETE.**
