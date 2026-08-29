@@ -865,6 +865,11 @@ window.CM_DATA = {
           "name": "Blackstone Private Equity",
           "url": "https://www.blackstone.com/our-businesses/private-equity/",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "CFA Institute — Private Equity Certificate",
+          "url": "https://www.cfainstitute.org/programs/private-equity-certificate",
+          "type": "Current professional skills benchmark"
         }
       ]
     },
@@ -981,6 +986,11 @@ window.CM_DATA = {
           "name": "Insight Partners Analyst Program",
           "url": "https://info.insightpartners.com/DGS-Analyst-Program.html",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "Insight Partners — Investment Summer Analyst Program",
+          "url": "https://info.insightpartners.com/Summer-Analyst-Program.html",
+          "type": "Current employer analyst-work benchmark"
         }
       ]
     },
@@ -1222,6 +1232,11 @@ window.CM_DATA = {
           "name": "BlackRock Investment Research",
           "url": "https://careers.blackrock.com/students-and-graduates-functions-investment-research",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "J.P. Morgan — Asset Management Internship",
+          "url": "https://www.jpmorganchase.com/careers/explore-opportunities/programs/asset-management-summer-analyst",
+          "type": "Current employer analyst-work benchmark"
         }
       ]
     },
@@ -1337,6 +1352,11 @@ window.CM_DATA = {
           "name": "CFA Institute — Research Analyst",
           "url": "https://www.cfainstitute.org/programs/cfa-program/careers/research-analyst",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "Point72 Academy — Investment Analyst Training",
+          "url": "https://point72.com/point72-academy/",
+          "type": "Current employer analyst-work benchmark"
         }
       ]
     },
@@ -1457,6 +1477,11 @@ window.CM_DATA = {
           "name": "CFI Sales & Trading",
           "url": "https://corporatefinanceinstitute.com/resources/career/what-is-sales-and-trading/",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "J.P. Morgan — Markets Full-time Analyst",
+          "url": "https://www.jpmorganchase.com/careers/explore-opportunities/programs/markets-fulltime-analyst",
+          "type": "Current employer analyst-work benchmark"
         }
       ]
     },
@@ -1687,6 +1712,11 @@ window.CM_DATA = {
           "name": "Apollo Credit",
           "url": "https://www.apollo.com/strategies/asset-management/credit.html",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "Apollo — Institutional Credit Strategies",
+          "url": "https://www.apollo.com/institutional/strategies/asset-management/credit",
+          "type": "Current institutional underwriting benchmark"
         }
       ]
     },
@@ -1802,6 +1832,11 @@ window.CM_DATA = {
           "name": "O*NET Credit Analysts",
           "url": "https://www.onetonline.org/link/summary/13-2041.00",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "J.P. Morgan — Commercial & Specialized Industries Analyst",
+          "url": "https://www.jpmorganchase.com/careers/explore-opportunities/programs/csi-fulltime",
+          "type": "Current banking/credit analyst benchmark"
         }
       ]
     },
@@ -1918,6 +1953,11 @@ window.CM_DATA = {
           "name": "Morgan Stanley M&A overview",
           "url": "https://www.morganstanley.com/what-we-do/investment-banking",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "Amazon — Corporate Development Finance",
+          "url": "https://www.amazon.jobs/en/jobs/10412045/senior-financial-analyst-corporate-development-finance",
+          "type": "Current employer M&A/strategy role benchmark"
         }
       ]
     },
@@ -2263,6 +2303,11 @@ window.CM_DATA = {
           "name": "CFA Institute — Portfolio Management",
           "url": "https://www.cfainstitute.org/insights/articles/career-portfolio-manager",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "J.P. Morgan — Global Private Bank Analyst Program",
+          "url": "https://www.jpmorganchase.com/careers/explore-opportunities/programs/wealth-management-fulltime-analyst",
+          "type": "Current employer client/portfolio benchmark"
         }
       ]
     },
@@ -2378,6 +2423,11 @@ window.CM_DATA = {
           "name": "CFA Institute — Risk Analyst",
           "url": "https://www.cfainstitute.org/programs/cfa-program/careers/risk-analyst-risk-manager",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "J.P. Morgan — Risk Management Full-time Analyst",
+          "url": "https://www.jpmorganchase.com/careers/explore-opportunities/programs/risk-fulltime-analyst",
+          "type": "Current employer risk-work benchmark"
         }
       ]
     },
@@ -2493,6 +2543,11 @@ window.CM_DATA = {
           "name": "BLS Financial Analysts",
           "url": "https://www.bls.gov/ooh/business-and-financial/financial-analysts.htm",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "CBRE — Financial Analyst, Financial Consulting Group",
+          "url": "https://careers.cbre.com/en_US/careers/JobDetail/Financial-Analyst-FCG/265149",
+          "type": "Current commercial real-estate underwriting benchmark"
         }
       ]
     }

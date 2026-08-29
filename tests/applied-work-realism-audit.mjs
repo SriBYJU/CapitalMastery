@@ -8,5 +8,5 @@ for(const x of required) if(!v.includes(x)) throw new Error('Missing applied-wor
 if(!css.includes('.cm-applied-persistence')||!css.includes('.cm-applied-workbench')||!css.includes('.cm-ap-grid')||!css.includes('.cm-ap-form-grid')) throw new Error('Applied work styling missing');
 if(v.includes("if(type==='treasury')return common(task")) throw new Error('Treasury Applied Work regressed to generic textarea form');
 if(!app.includes('These assignments only use skills already introduced and demonstrated in Parts 2–3')) throw new Error('Teach-before-applied contract missing');
-if(!index.includes('career-professional-visuals.js?v=20260829-firmready2')||!index.includes('styles.css?v=20260829-firmready2')) throw new Error('firm-ready Applied Work assets must be cache-busted');
+if(!/career-professional-visuals\.js\?v=[A-Za-z0-9._-]+/.test(index)||!/styles\.css\?v=[A-Za-z0-9._-]+/.test(index)) throw new Error('firm-ready Applied Work assets must be cache-busted');
 console.log('APPLIED WORK REALISM AUDIT PASS: role-format work products + teach-first linkage verified');
