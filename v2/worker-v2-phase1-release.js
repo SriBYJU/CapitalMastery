@@ -2352,6 +2352,10 @@ function buildAssessment(pathway, itemId) {
 }
 
 function stageQuestions(p, stage) {
+  if (p.id === "investment-banking" && [2,3,4].includes(stage)) {
+    return ibAppliedStageQuestions(stage);
+  }
+
   const otherRoles =
     otherValues(p, "role", 3);
 
@@ -2870,6 +2874,66 @@ function stageQuestions(p, stage) {
   );
 }
 
+function numericQuestion(id, prompt, answer, tolerance, context = '', table = null, unit = '') {
+  return {
+    id,
+    type: "numeric",
+    prompt,
+    context,
+    table,
+    unit,
+    tolerance: Number(tolerance || 0),
+    answer: Number(answer)
+  };
+}
+
+function contextualQuestion(id, prompt, correct, wrongs, context = '', table = null) {
+  return {
+    ...question(id, prompt, correct, wrongs),
+    context,
+    table
+  };
+}
+
+function ibAppliedStageQuestions(stage) {
+  if (stage === 2) return [
+    numericQuestion('ib-p2-q1','Calculate EBIT ($m).',70,0.1,'TargetCo reports EBITDA of $90m and D&A of $20m.',[['Metric','Value'],['EBITDA','$90m'],['D&A','$20m']],'$m'),
+    numericQuestion('ib-p2-q2','Calculate normalized EBITDA ($m).',90,0.1,'Reported EBITDA is $84m. A $6m restructuring charge is genuinely one-time; recurring stock compensation stays in operating expense.',[['Reported EBITDA','$84m'],['One-time restructuring charge','$6m'],['Recurring stock compensation','$3m']],'$m'),
+    numericQuestion('ib-p2-q3','Calculate implied equity value ($m).',995,0.2,'A target is valued at 9.0x NTM EBITDA. Bridge enterprise value to equity value.',[['NTM EBITDA','$120m'],['Selected EV / EBITDA','9.0x'],['Debt','$140m'],['Cash','$55m']],'$m'),
+    numericQuestion('ib-p2-q4','Calculate the median EV / EBITDA multiple (x).',9,0.05,'Calculate each peer multiple first.',[['Peer','Enterprise Value','NTM EBITDA'],['Alpha','$960m','$120m'],['Beta','$1,350m','$150m'],['Gamma','$1,100m','$100m']],'x'),
+    numericQuestion('ib-p2-q5','Calculate Gordon Growth terminal value ($m).',1716.67,1.0,'Use Year-5 FCF × (1+g) ÷ (WACC−g).',[['Year-5 FCF','$100m'],['WACC','9.0%'],['Terminal growth','3.0%']],'$m'),
+    contextualQuestion('ib-p2-q6','Which source is strongest for audited historical revenue and debt?','The company’s latest 10-K / annual report',['An unsourced finance blog','A social media post','A stale search-result snippet'],'You are spreading historical financials for a live pitch model.'),
+    contextualQuestion('ib-p2-q7','A 50 bps increase in WACC materially lowers DCF value. What should the analyst do?','Show the sensitivity and explain that valuation is meaningfully assumption-sensitive',['Hide the sensitivity','Keep only the most optimistic case','Change WACC until the valuation matches comps'],'The senior banker asks why the DCF range is wide.'),
+    numericQuestion('ib-p2-q8','Calculate transaction EV / LTM EBITDA (x).',14.5,0.05,'The buyer offers $26/share for 40m diluted shares and assumes $120m of net debt. LTM EBITDA is $80m.',null,'x'),
+    contextualQuestion('ib-p2-q9','Before comparing two EBITDA figures, what should be checked first?','Period, definition, adjustments, units and source',['Only whether both numbers are positive','Only the decimal places','Whether the larger number supports the pitch'],'One peer uses reported LTM EBITDA while another data source shows adjusted NTM EBITDA.'),
+    contextualQuestion('ib-p2-q10','Why run a downside case?','To test whether the recommendation remains defensible under weaker assumptions',['To guarantee the base case','To remove the need for judgment','To create a more optimistic answer'],'The Associate asks how the valuation holds up if revenue growth slows.')
+  ];
+  if (stage === 3) return [
+    contextualQuestion('ib-p3-q1','Which Excel modeling habit is strongest?','Reference a clearly labeled assumption cell instead of hard-coding the same number into multiple formulas',['Type the assumption into every formula','Hide assumption cells','Paste values over formulas before review'],'You are building a model that will be updated repeatedly.'),
+    contextualQuestion('ib-p3-q2','Which source should you use for a newly announced material acquisition?','The company’s 8-K / current filing and transaction announcement',['An unsourced web snippet','A two-year-old annual report only','A forum post'],'The deal was announced this morning and the pitchbook needs an updated transaction summary.'),
+    numericQuestion('ib-p3-q3','Calculate implied price per share ($).',24.875,0.02,'Use the comp multiple and bridge EV to equity value.',[['NTM EBITDA','$120m'],['Selected EV / EBITDA','9.5x'],['Debt','$180m'],['Cash','$35m'],['Diluted shares','40m']],'$/share'),
+    numericQuestion('ib-p3-q4','How much new equity financing is required ($m)?',375,0.1,'Balance Sources & Uses.',[['Uses','Amount'],['Equity purchase price','$900m'],['Debt refinanced','$150m'],['Fees','$25m'],['Sources','Amount'],['Buyer cash','$300m'],['New debt','$400m']],'$m'),
+    contextualQuestion('ib-p3-q5','Which issue should stop a model from being sent to an Associate?','Equity value subtracts cash instead of adding it',['Footnote dates are consistent','Sensitivity table responds correctly','Formatting follows the template'],'You are running a pre-submission model check.'),
+    contextualQuestion('ib-p3-q6','What makes a valuation-slide headline useful?','It states the decision-relevant takeaway supported by the page',['It only says “Valuation”','It repeats the company name','It uses as many finance terms as possible'],'Trading comps imply $22–27/share; DCF implies $25–31/share; offer is $26/share.'),
+    numericQuestion('ib-p3-q7','Calculate the offer premium (%).',30,0.05,'Use offer price relative to unaffected share price.',[['Unaffected share price','$20'],['Offer price','$26']],'%'),
+    contextualQuestion('ib-p3-q8','What is the strongest version-control behavior?','Create a new controlled version, preserve the prior working file and keep model/deck outputs synchronized',['Overwrite the only working model','Rename files FINAL_REALFINAL','Update the deck without updating linked model outputs'],'You have received four Associate comments on v07.'),
+    numericQuestion('ib-p3-q9','Calculate total transaction uses ($m).',1075,0.1,'Add purchase price, refinanced debt and fees.',[['Equity purchase price','$900m'],['Debt refinanced','$150m'],['Fees','$25m']],'$m'),
+    contextualQuestion('ib-p3-q10','When should a junior analyst escalate an issue?','When a material error, uncertainty or decision exceeds the analyst’s information or authority',['Never','Only after client materials are sent','Only if it makes the recommendation look better'],'A key source conflicts with the current model assumption.')
+  ];
+  return [
+    numericQuestion('ib-p4-q1','Calculate purchase enterprise value ($m).',1125,0.1,'Buyer offers $26/share for 40m diluted shares and assumes $85m target net debt.',null,'$m'),
+    numericQuestion('ib-p4-q2','Calculate EPS accretion / dilution (%).',6,0.05,'Buyer standalone EPS is $4.00 and pro forma EPS is $4.24.',null,'%'),
+    contextualQuestion('ib-p4-q3','Which diligence issue should be escalated first?','Top customer is 34% of revenue and its contract expires next year',['The company logo is blue','The deck uses 16:9 slides','The office lease renews in eight years with immaterial cost'],'You are reviewing the data room before updating valuation and the client recommendation.'),
+    contextualQuestion('ib-p4-q4','An Associate identifies a material share-count error. What should happen?','Correct the share count, rerun every affected output, quantify the impact and update linked materials',['Fix only the displayed price/share','Ignore it if the recommendation is unchanged','Delete the comment'],'The error affects comps, DCF price/share and the summary slide.'),
+    numericQuestion('ib-p4-q5','Calculate transaction EV / EBITDA (x).',10.5,0.05,'Equity purchase price is $900m, target net debt is $150m and LTM EBITDA is $100m.',null,'x'),
+    contextualQuestion('ib-p4-q6','Management lowers next-year revenue guidance. What is the strongest response?','Update the forecast and all dependent valuation/transaction outputs, then reassess the recommendation',['Keep the original model because work already started','Update only the slide headline','Ignore the change until after the pitch'],'The update arrives midway through the assignment.'),
+    numericQuestion('ib-p4-q7','Calculate equity value ($m) from enterprise value.',875,0.1,'Bridge EV to equity value.',[['Enterprise value','$1,000m'],['Debt','$180m'],['Cash','$55m']],'$m'),
+    contextualQuestion('ib-p4-q8','What is strongest evidence of applied mastery?','A reproducible work product that links correct analysis, sourced evidence and professional judgment',['Finishing first','Using the longest spreadsheet','Copying a sample output'],'Your work is being reviewed as if it were going to a senior banker.'),
+    contextualQuestion('ib-p4-q9','A precedent transaction is three years old and occurred in a very different market. What should you do?','Use it only with context or exclude it if it is no longer decision-relevant',['Use it because it has the highest multiple','Treat every precedent equally','Hide the announcement date'],'You are defending the selected precedent range.'),
+    contextualQuestion('ib-p4-q10','What should the final analyst email contain?','Concise conclusion, key evidence, material risks/changes, and the requested next step',['Every calculation in the model','Only the final number','No recommendation until asked twice'],'You are sending the revised valuation to your Associate before client review.')
+  ];
+}
+
 function question(
   id,
   prompt,
@@ -2945,7 +3009,10 @@ function publicQuestion(q) {
     id: q.id,
     type: q.type,
     prompt: q.prompt,
-    options: q.options
+    options: q.options || null,
+    context: q.context || null,
+    table: Array.isArray(q.table) ? q.table : null,
+    unit: q.unit || null
   };
 }
 
@@ -3029,7 +3096,12 @@ function gradeAssessment(
     const submitted =
       answers[q.id];
 
-    if (
+    if (q.type === "numeric") {
+      const value = Number(submitted);
+      if (Number.isFinite(value) && Math.abs(value - Number(q.answer)) <= Number(q.tolerance || 0)) {
+        correct++;
+      }
+    } else if (
       typeof submitted === "string" &&
       submitted === q.answer
     ) {

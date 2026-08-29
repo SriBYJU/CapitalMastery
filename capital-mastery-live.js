@@ -68,8 +68,18 @@
     el.innerHTML = `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-live-card"><div class="eyebrow">OFFICIAL ASSESSMENT</div><h1 class="serif">Sign in required.</h1><p>Official scores and verified credentials are tied to your Firebase account.</p><a class="btn btn-primary" href="#/login">Sign in →</a></div></div></section>`;
   }
 
+  function questionTableHtml(rows) {
+    if (!Array.isArray(rows) || !rows.length) return '';
+    return `<div class="cm-official-table-wrap"><table class="cm-official-table"><thead><tr>${rows[0].map(x=>`<th>${esc(x)}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r=>`<tr>${r.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+  }
+
   function questionHtml(q, i) {
-    return `<fieldset class="cm-official-question"><legend><span>${i+1}</span>${esc(q.prompt)}</legend>${(q.options || []).map((option, j) => `<label class="cm-official-option"><input type="radio" name="${esc(q.id)}" value="${esc(option)}"><span>${String.fromCharCode(65+j)}</span><p>${esc(option)}</p></label>`).join('')}</fieldset>`;
+    const context = q.context ? `<div class="cm-official-context">${esc(q.context)}</div>` : '';
+    const table = questionTableHtml(q.table);
+    const response = q.type === 'numeric'
+      ? `<label class="cm-official-numeric"><span>Your calculated answer${q.unit?` (${esc(q.unit)})`:''}</span><input type="number" step="any" name="${esc(q.id)}" required inputmode="decimal" placeholder="Enter your result"></label>`
+      : (q.options || []).map((option, j) => `<label class="cm-official-option"><input type="radio" name="${esc(q.id)}" value="${esc(option)}"><span>${String.fromCharCode(65+j)}</span><p>${esc(option)}</p></label>`).join('');
+    return `<fieldset class="cm-official-question ${q.type==='numeric'?'cm-official-question-numeric':''}"><legend><span>${i+1}</span>${esc(q.prompt)}</legend>${context}${table}${response}</fieldset>`;
   }
 
   async function renderAssessment(pathwayId, itemId) {
@@ -98,7 +108,11 @@
         const button = form.querySelector('button[type="submit"]');
         const answers = {};
         for (const q of data.questions) {
-          answers[q.id] = form.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`)?.value || '';
+          if (q.type === 'numeric') {
+            answers[q.id] = form.querySelector(`input[name="${CSS.escape(q.id)}"]`)?.value || '';
+          } else {
+            answers[q.id] = form.querySelector(`input[name="${CSS.escape(q.id)}"]:checked`)?.value || '';
+          }
         }
         const writing = String(new FormData(form).get('writing') || '');
         try {
@@ -268,7 +282,8 @@
     style.id = 'cm-live-styles';
     style.textContent = `
       .cm-official-shell{padding:50px 0 80px;background:var(--cream)}.cm-official-wrap{max-width:940px}.cm-official-head{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:24px}.cm-official-head h1{font-family:Georgia,"Times New Roman",serif;color:var(--navy);font-size:2.8rem;margin:4px 0 8px}.cm-security-note{padding:14px 16px;border:1px solid #c8d8cf;background:#f3fbf6;border-radius:12px;color:#315c49;margin:18px 0 24px}.cm-official-question{border:1px solid #dfe3e8;border-radius:16px;background:#fff;padding:20px;margin:0 0 16px}.cm-official-question legend{font-weight:800;color:var(--navy);padding:0 6px;display:flex;gap:10px}.cm-official-question legend span{width:28px;height:28px;border-radius:50%;background:#eef1f4;display:inline-grid;place-items:center;flex:none}.cm-official-option{display:grid;grid-template-columns:auto 30px 1fr;gap:10px;align-items:center;border:1px solid #e3e7eb;border-radius:12px;padding:11px 12px;margin:10px 0;cursor:pointer;background:#fff}.cm-official-option:hover{border-color:#c4a461}.cm-official-option>span{width:28px;height:28px;border-radius:50%;background:#f2f4f6;display:grid;place-items:center;font-weight:800}.cm-official-option p{margin:0}.cm-writing{background:#fff;border:1px solid #dfe3e8;border-radius:16px;padding:22px;margin:18px 0}.cm-writing textarea{width:100%;min-height:190px;border:1px solid #cbd2da;border-radius:12px;padding:14px;margin-top:8px}.cm-live-error{padding:12px 14px;border-radius:10px;background:#fff0f0;color:#8b3232;margin:12px 0}.cm-result{padding:34px;text-align:center}.cm-result-score{font-family:Georgia,"Times New Roman",serif;font-size:5rem;color:var(--navy);line-height:1}.cm-result.passed{border:1px solid #bad7c8}.cm-result.failed{border:1px solid #efcaca}.cm-issued{display:grid;gap:8px;text-align:left;background:#f7f1e4;border:1px solid #e2c991;border-radius:12px;padding:15px;margin:20px 0}.cm-issued a{color:var(--navy);font-weight:750;text-decoration:none}.cm-result-actions{display:flex;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:20px}.cm-status,.cm-verify-badge{display:inline-block;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:900;border-radius:999px;padding:7px 10px;margin-bottom:12px}.cm-status.active,.cm-verify-badge{background:#e6f4eb;color:#245b43}.cm-status.revoked,.cm-status.reissued,.cm-verify-badge.invalid{background:#fff0f0;color:#8b3232}.cm-credential-card{display:flex;flex-direction:column}.cm-credential-card .btn{margin-top:auto}.cm-verification{background:#fff;border:1px solid #dfe3e8;border-radius:22px;padding:32px;box-shadow:var(--shadow-sm)}.cm-verification.valid{border-color:#bad7c8}.cm-verification.invalid{border-color:#efcaca}.cm-verification h1{font-size:2.8rem;color:var(--navy);margin:12px 0}.cm-live-card h1{color:var(--navy)}.cm-public-evidence{margin-top:24px;padding-top:22px;border-top:1px solid #e0e5e8}.cm-public-evidence h3{color:var(--navy);margin:22px 0 10px}.cm-public-skills{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.cm-public-skills>div{display:grid;grid-template-columns:1fr auto;gap:4px;background:#f5f7f8;border-radius:10px;padding:10px}.cm-public-skills small{grid-column:1/-1;color:#697580}
-      @media(max-width:700px){.cm-public-skills{grid-template-columns:1fr}.cm-official-head{display:block}.cm-official-head .btn{margin-top:12px}.cm-official-head h1,.cm-verification h1{font-size:2.1rem}.cm-result-score{font-size:4rem}}
+      .cm-official-context{margin:10px 0 12px;padding:12px 14px;border-left:4px solid var(--gold);background:#fbf7ee;color:#4e5966;border-radius:8px}.cm-official-table-wrap{overflow:auto;margin:12px 0}.cm-official-table{width:100%;border-collapse:collapse;font-size:.86rem}.cm-official-table th,.cm-official-table td{border:1px solid #d9e0e7;padding:9px 10px;text-align:right}.cm-official-table th:first-child,.cm-official-table td:first-child{text-align:left}.cm-official-numeric{display:block;margin-top:14px;font-weight:750;color:var(--navy)}.cm-official-numeric span{display:block;margin-bottom:6px}.cm-official-numeric input{width:min(100%,320px);padding:12px;border:1px solid #bcc9d5;border-radius:9px;background:#fff;color:var(--navy);font-size:1rem}.cm-official-question-numeric{background:linear-gradient(180deg,#fff,#fbfcfd)}
+            @media(max-width:700px){.cm-public-skills{grid-template-columns:1fr}.cm-official-head{display:block}.cm-official-head .btn{margin-top:12px}.cm-official-head h1,.cm-verification h1{font-size:2.1rem}.cm-result-score{font-size:4rem}}
     `;
     document.head.appendChild(style);
   }
