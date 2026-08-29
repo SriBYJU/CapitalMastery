@@ -5,6 +5,8 @@
   const V2_API = window.CAPITAL_MASTERY_V2_API_URL || API;
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const PASS = 80;
+  let authWaitSince = 0;
+  let authRetryTimer = null;
 
   const API_ALIASES = {
     fpa: 'fp-and-a',
@@ -56,7 +58,7 @@
     return data;
   }
 
-  function renderLoading(label='Loading secure assessment…') {
+  function renderLoading(label='Loading secure assessmentâ¦') {
     const el = main();
     if (!el) return;
     el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-live-card"><div class="eyebrow">SECURE CAPITAL MASTERY</div><h1 class="serif">${esc(label)}</h1><p>The official result is checked by the Capital Mastery API and stored in the authoritative credential database.</p></div></div></section>`;
@@ -65,7 +67,26 @@
   function renderAuthRequired() {
     const el = main();
     if (!el) return;
-    el.innerHTML = `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-live-card"><div class="eyebrow">OFFICIAL ASSESSMENT</div><h1 class="serif">Sign in required.</h1><p>Official scores and verified credentials are tied to your Firebase account.</p><a class="btn btn-primary" href="#/login">Sign in →</a></div></div></section>`;
+    el.innerHTML = `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-live-card"><div class="eyebrow">OFFICIAL ASSESSMENT</div><h1 class="serif">Sign in required.</h1><p>Official scores and verified credentials are tied to your Firebase account.</p><a class="btn btn-primary" href="#/login">Sign in â</a></div></div></section>`;
+  }
+
+  function waitForAuthReady(label='Checking your accountâ¦') {
+    if (!authWaitSince) authWaitSince = Date.now();
+    renderLoading(label);
+    if (authRetryTimer) clearTimeout(authRetryTimer);
+    if (Date.now() - authWaitSince < 10000) {
+      authRetryTimer = setTimeout(() => route(), 250);
+    } else {
+      const el = main();
+      if (el) el.innerHTML = `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-live-card"><div class="eyebrow">SECURE CAPITAL MASTERY</div><h1 class="serif">Account check is taking longer than expected.</h1><p>Your work is safe. Retry the secure assessment without leaving the pathway.</p><button class="btn btn-primary" type="button" id="cm-auth-retry">Retry account check</button></div></div></section>`;
+      document.getElementById('cm-auth-retry')?.addEventListener('click', () => { authWaitSince = 0; route(); });
+    }
+  }
+
+  function clearAuthWait() {
+    authWaitSince = 0;
+    if (authRetryTimer) clearTimeout(authRetryTimer);
+    authRetryTimer = null;
   }
 
   function questionTableHtml(rows) {
@@ -84,9 +105,10 @@
 
   async function renderAssessment(pathwayId, itemId) {
     if (!authReady()) {
-      renderLoading('Checking your account…');
+      waitForAuthReady('Checking your accountâ¦');
       return;
     }
+    clearAuthWait();
     if (!signedIn()) {
       renderAuthRequired();
       return;
@@ -100,7 +122,7 @@
       const isSimulation = itemId === 'simulation';
       const isFinal = itemId === 'final';
       const label = isSimulation ? 'OFFICIAL JOB SIMULATION' : isFinal ? 'FINAL EXAMINATION' : `OFFICIAL ${itemId.toUpperCase()} ASSESSMENT`;
-      el.innerHTML = `<section class="cm-official-shell"><div class="container cm-official-wrap"><div class="cm-official-head"><div><div class="eyebrow">${label}</div><h1>${esc(data.pathway.title)}</h1><p>${data.questionCount} questions${isSimulation ? ' + written recommendation' : ''} · ${data.masteryScore}% required · Server graded</p></div><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Exit</a></div><div class="cm-security-note"><strong>Verified assessment:</strong> answers are graded by the Cloudflare Worker and official scores are stored in D1. Browser-edited scores cannot issue a credential.</div><form id="cm-official-form">${data.questions.map(questionHtml).join('')}${data.writingPrompt ? `<div class="cm-writing"><h3>Written recommendation</h3><p>${esc(data.writingPrompt)}</p><textarea name="writing" maxlength="5000" required placeholder="Write a concise, evidence-based recommendation…"></textarea></div>` : ''}<button class="btn btn-primary btn-block" type="submit">Submit Official ${isFinal ? 'Final Exam' : isSimulation ? 'Simulation' : 'Assessment'}</button></form></div></section>`;
+      el.innerHTML = `<section class="cm-official-shell"><div class="container cm-official-wrap"><div class="cm-official-head"><div><div class="eyebrow">${label}</div><h1>${esc(data.pathway.title)}</h1><p>${data.questionCount} questions${isSimulation ? ' + written recommendation' : ''} Â· ${data.masteryScore}% required Â· Server graded</p></div><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Exit</a></div><div class="cm-security-note"><strong>Verified assessment:</strong> answers are graded by the Cloudflare Worker and official scores are stored in D1. Browser-edited scores cannot issue a credential.</div><form id="cm-official-form">${data.questions.map(questionHtml).join('')}${data.writingPrompt ? `<div class="cm-writing"><h3>Written recommendation</h3><p>${esc(data.writingPrompt)}</p><textarea name="writing" maxlength="5000" required placeholder="Write a concise, evidence-based recommendationâ¦"></textarea></div>` : ''}<button class="btn btn-primary btn-block" type="submit">Submit Official ${isFinal ? 'Final Exam' : isSimulation ? 'Simulation' : 'Assessment'}</button></form></div></section>`;
 
       document.getElementById('cm-official-form')?.addEventListener('submit', async event => {
         event.preventDefault();
@@ -117,7 +139,7 @@
         const writing = String(new FormData(form).get('writing') || '');
         try {
           button.disabled = true;
-          button.textContent = 'Grading securely…';
+          button.textContent = 'Grading securelyâ¦';
           const result = await apiFetch('/assessment/submit', {
             method: 'POST',
             body: JSON.stringify({ pathwayId: apiPathway(pathwayId), itemId, answers, writing })
@@ -131,7 +153,7 @@
         }
       });
     } catch (error) {
-      el.innerHTML = `<section class="section"><div class="container" style="max-width:820px"><div class="card cm-live-card"><div class="eyebrow">OFFICIAL ASSESSMENT</div><h1 class="serif">Not available yet.</h1><p>${esc(error.message)}</p><a class="btn btn-primary" href="#/career/${encodeURIComponent(pathwayId)}">Back to pathway →</a></div></div></section>`;
+      el.innerHTML = `<section class="section"><div class="container" style="max-width:820px"><div class="card cm-live-card"><div class="eyebrow">OFFICIAL ASSESSMENT</div><h1 class="serif">Not available yet.</h1><p>${esc(error.message)}</p><a class="btn btn-primary" href="#/career/${encodeURIComponent(pathwayId)}">Back to pathway â</a></div></div></section>`;
     }
   }
 
@@ -193,31 +215,32 @@
     const el = main();
     if (!el) return;
     const issued = result.issuedCredentials || [];
-    el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-result ${result.passed ? 'passed' : 'failed'}"><div class="eyebrow">SERVER-GRADED RESULT</div><div class="cm-result-score">${Number(result.score)}%</div><h1 class="serif">${result.passed ? 'Official pass recorded.' : 'Not yet.'}</h1><p>${result.passed ? 'Your result has been stored in the authoritative D1 progress record.' : `You need ${PASS}% to pass. Review the material and try again.`}</p>${result.objectiveTotal ? `<p class="muted">Objective questions: ${result.objectiveCorrect}/${result.objectiveTotal}${result.writingScore !== null && result.writingScore !== undefined ? ` · Writing: ${result.writingScore}/30` : ''}</p>` : ''}${issued.length ? `<div class="cm-issued"><strong>Credential${issued.length > 1 ? 's' : ''} automatically issued:</strong>${issued.map(c => `<a href="#/verify/${encodeURIComponent(c.publicToken)}">${esc(c.title)} →</a>`).join('')}</div>` : ''}<div class="cm-result-actions"><a class="btn ${result.passed ? 'btn-gold' : 'btn-primary'}" href="${nextHref(pathwayId, itemId, result.passed)}">${result.passed ? (itemId === 'final' ? 'View Verified Credentials' : 'Continue') : 'Try Again'} →</a><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
+    el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-result ${result.passed ? 'passed' : 'failed'}"><div class="eyebrow">SERVER-GRADED RESULT</div><div class="cm-result-score">${Number(result.score)}%</div><h1 class="serif">${result.passed ? 'Official pass recorded.' : 'Not yet.'}</h1><p>${result.passed ? 'Your result has been stored in the authoritative D1 progress record.' : `You need ${PASS}% to pass. Review the material and try again.`}</p>${result.objectiveTotal ? `<p class="muted">Objective questions: ${result.objectiveCorrect}/${result.objectiveTotal}${result.writingScore !== null && result.writingScore !== undefined ? ` Â· Writing: ${result.writingScore}/30` : ''}</p>` : ''}${issued.length ? `<div class="cm-issued"><strong>Credential${issued.length > 1 ? 's' : ''} automatically issued:</strong>${issued.map(c => `<a href="#/verify/${encodeURIComponent(c.publicToken)}">${esc(c.title)} â</a>`).join('')}</div>` : ''}<div class="cm-result-actions"><a class="btn ${result.passed ? 'btn-gold' : 'btn-primary'}" href="${nextHref(pathwayId, itemId, result.passed)}">${result.passed ? (itemId === 'final' ? 'View Verified Credentials' : 'Continue') : 'Try Again'} â</a><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
   }
 
   async function renderCredentials() {
     if (!authReady()) {
-      renderLoading('Checking your account…');
+      waitForAuthReady('Checking your accountâ¦');
       return;
     }
+    clearAuthWait();
     if (!signedIn()) {
       renderAuthRequired();
       return;
     }
-    renderLoading('Loading verified credentials…');
+    renderLoading('Loading verified credentialsâ¦');
     const el = main();
     try {
       const data = await apiFetch('/credentials/me');
       const credentials = data.credentials || [];
-      el.innerHTML = `<section class="page-hero"><div class="container"><div class="eyebrow">VERIFIED CREDENTIALS</div><h1>Your Capital Mastery credentials.</h1><p>These records come directly from the authoritative D1 credential database.</p></div></section><section class="section-tight"><div class="container">${credentials.length ? `<div class="grid grid-3">${credentials.map(c => `<article class="card cm-credential-card"><span class="cm-status ${esc(c.status)}">${esc(c.status)}</span><div class="eyebrow">${esc(c.credential_level)}</div><h3>${esc(c.credential_title)}</h3><p><strong>Credential ID</strong><br><span class="small">${esc(c.credential_id)}</span></p><p><strong>Issued</strong><br>${formatDate(c.issued_at)}</p>${c.status === 'active' ? `<a class="btn btn-primary btn-block" href="#/verify/${encodeURIComponent(c.public_token)}">Verify Credential →</a>` : `<div class="cm-live-error">This credential is ${esc(c.status)}.</div>`}</article>`).join('')}</div>` : `<div class="card"><h2>No verified credentials yet.</h2><p>Complete official assessments at 80% or higher to earn credentials automatically.</p><a class="btn btn-primary" href="#/careers">Explore pathways →</a></div>`}</div></section>`;
+      el.innerHTML = `<section class="page-hero"><div class="container"><div class="eyebrow">VERIFIED CREDENTIALS</div><h1>Your Capital Mastery credentials.</h1><p>These records come directly from the authoritative D1 credential database.</p></div></section><section class="section-tight"><div class="container">${credentials.length ? `<div class="grid grid-3">${credentials.map(c => `<article class="card cm-credential-card"><span class="cm-status ${esc(c.status)}">${esc(c.status)}</span><div class="eyebrow">${esc(c.credential_level)}</div><h3>${esc(c.credential_title)}</h3><p><strong>Credential ID</strong><br><span class="small">${esc(c.credential_id)}</span></p><p><strong>Issued</strong><br>${formatDate(c.issued_at)}</p>${c.status === 'active' ? `<a class="btn btn-primary btn-block" href="#/verify/${encodeURIComponent(c.public_token)}">Verify Credential â</a>` : `<div class="cm-live-error">This credential is ${esc(c.status)}.</div>`}</article>`).join('')}</div>` : `<div class="card"><h2>No verified credentials yet.</h2><p>Complete official assessments at 80% or higher to earn credentials automatically.</p><a class="btn btn-primary" href="#/careers">Explore pathways â</a></div>`}</div></section>`;
     } catch (error) {
       el.innerHTML = errorCard('Could not load credentials.', error.message);
     }
   }
 
   async function renderVerify(publicToken) {
-    renderLoading('Verifying credential…');
+    renderLoading('Verifying credentialâ¦');
     const el = main();
     try {
       let data;
@@ -232,8 +255,8 @@
       const competency=evidence.find(x=>x.type==='competency_profile');
       const competencies=competency?.competencies||[];
       const workEvidence=evidence.filter(x=>['assessment','role_lab','readiness'].includes(x.type));
-      const evidenceHtml=(workEvidence.length||competencies.length)?`<div class="cm-public-evidence"><div class="eyebrow">WHAT THIS CREDENTIAL PROVES</div>${workEvidence.length?`<div class="grid grid-3">${workEvidence.map(x=>`<div class="card"><strong>${esc(x.title||x.type)}</strong><p>${x.score!=null?`${Number(x.score)}%`:x.overallScore!=null?`${Number(x.overallScore)}% readiness`:'Verified evidence'}</p>${x.evidenceCoverage!=null?`<small>${Number(x.evidenceCoverage)}% evidence coverage</small>`:''}</div>`).join('')}</div>`:''}${competencies.length?`<h3>Measured competencies</h3><div class="cm-public-skills">${competencies.map(x=>`<div><span>${esc(x.name)}${x.critical?' · Critical':''}</span><b>${Number(x.score)}%</b><small>Target ${Number(x.minimumScore)}% · ${Number(x.evidenceCount)} evidence</small></div>`).join('')}</div>`:''}</div>`:'';
-      el.innerHTML = `<section class="section"><div class="container" style="max-width:980px"><div class="cm-verification ${data.valid ? 'valid' : 'invalid'}"><span class="cm-verify-badge">${data.valid ? 'VERIFIED ACTIVE CREDENTIAL ✓' : 'NOT ACTIVE'}</span><div class="eyebrow">CAPITAL MASTERY CREDENTIAL</div><h1 class="serif">${esc(c.title)}</h1><p>Issued to <strong>${esc(c.holderName)}</strong></p>${c.description?`<p>${esc(c.description)}</p>`:''}<div class="grid grid-2"><div class="card"><strong>Credential ID</strong><p>${esc(c.credentialId)}</p></div><div class="card"><strong>Issued</strong><p>${formatDate(c.issuedAt)}</p></div><div class="card"><strong>Level</strong><p>${esc(String(c.level||'').replace(/_/g,' '))}</p></div><div class="card"><strong>Standard</strong><p>${esc(c.standardVersion||'1.0 legacy')}</p></div></div>${evidenceHtml}<div class="cm-security-note"><strong>Verification source:</strong> Capital Mastery secure API → Cloudflare Worker → D1 authoritative credential and evidence records. Public verification excludes private account identifiers and assessment answers.</div></div></div></section>`;
+      const evidenceHtml=(workEvidence.length||competencies.length)?`<div class="cm-public-evidence"><div class="eyebrow">WHAT THIS CREDENTIAL PROVES</div>${workEvidence.length?`<div class="grid grid-3">${workEvidence.map(x=>`<div class="card"><strong>${esc(x.title||x.type)}</strong><p>${x.score!=null?`${Number(x.score)}%`:x.overallScore!=null?`${Number(x.overallScore)}% readiness`:'Verified evidence'}</p>${x.evidenceCoverage!=null?`<small>${Number(x.evidenceCoverage)}% evidence coverage</small>`:''}</div>`).join('')}</div>`:''}${competencies.length?`<h3>Measured competencies</h3><div class="cm-public-skills">${competencies.map(x=>`<div><span>${esc(x.name)}${x.critical?' Â· Critical':''}</span><b>${Number(x.score)}%</b><small>Target ${Number(x.minimumScore)}% Â· ${Number(x.evidenceCount)} evidence</small></div>`).join('')}</div>`:''}</div>`:'';
+      el.innerHTML = `<section class="section"><div class="container" style="max-width:980px"><div class="cm-verification ${data.valid ? 'valid' : 'invalid'}"><span class="cm-verify-badge">${data.valid ? 'VERIFIED ACTIVE CREDENTIAL â' : 'NOT ACTIVE'}</span><div class="eyebrow">CAPITAL MASTERY CREDENTIAL</div><h1 class="serif">${esc(c.title)}</h1><p>Issued to <strong>${esc(c.holderName)}</strong></p>${c.description?`<p>${esc(c.description)}</p>`:''}<div class="grid grid-2"><div class="card"><strong>Credential ID</strong><p>${esc(c.credentialId)}</p></div><div class="card"><strong>Issued</strong><p>${formatDate(c.issuedAt)}</p></div><div class="card"><strong>Level</strong><p>${esc(String(c.level||'').replace(/_/g,' '))}</p></div><div class="card"><strong>Standard</strong><p>${esc(c.standardVersion||'1.0 legacy')}</p></div></div>${evidenceHtml}<div class="cm-security-note"><strong>Verification source:</strong> Capital Mastery secure API â Cloudflare Worker â D1 authoritative credential and evidence records. Public verification excludes private account identifiers and assessment answers.</div></div></div></section>`;
     } catch (error) {
       el.innerHTML = `<section class="section"><div class="container" style="max-width:780px"><div class="card"><span class="cm-verify-badge invalid">NOT VERIFIED</span><h1 class="serif">Credential not found.</h1><p>${esc(error.message)}</p></div></div></section>`;
     }

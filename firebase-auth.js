@@ -39,14 +39,21 @@
 
   async function verifyWithWorker(user) {
     if (!user || !API_URL) return null;
-    const token = await user.getIdToken(true);
-    const response = await fetch(`${API_URL}/auth-check`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.ok) throw new Error(data.error || 'Backend verification failed.');
-    return data;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    try {
+      const token = await user.getIdToken(true);
+      const response = await fetch(`${API_URL}/auth-check`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || 'Backend verification failed.');
+      return data;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   async function boot() {
@@ -63,7 +70,7 @@
       auth = authApi.getAuth(firebaseApp);
 
       CM_AUTH.googleSignIn = async () => {
-        setMessage('Opening Google sign-in…');
+        setMessage('Opening Google sign-inâ¦');
         const provider = new authApi.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         const result = await authApi.signInWithPopup(auth, provider);
@@ -71,13 +78,13 @@
       };
 
       CM_AUTH.emailSignIn = async (email, password) => {
-        setMessage('Signing in…');
+        setMessage('Signing inâ¦');
         const result = await authApi.signInWithEmailAndPassword(auth, email, password);
         return result.user;
       };
 
       CM_AUTH.emailCreate = async (name, email, password) => {
-        setMessage('Creating your account…');
+        setMessage('Creating your accountâ¦');
         const result = await authApi.createUserWithEmailAndPassword(auth, email, password);
         if (name && name.trim()) await authApi.updateProfile(result.user, { displayName: name.trim() });
         await result.user.reload();
@@ -95,34 +102,45 @@
         setMessage('Password-reset email sent.', 'good');
       };
 
-      authApi.onAuthStateChanged(auth, async user => {
+      authApi.onAuthStateChanged(auth, user => {
         currentUser = user;
         workerIdentity = null;
         CM_AUTH.user = user;
         CM_AUTH.isAdmin = false;
         CM_AUTH.backendVerified = false;
-
-        if (user) {
-          try {
-            workerIdentity = await verifyWithWorker(user);
-            CM_AUTH.isAdmin = workerIdentity.isAdmin === true;
-            CM_AUTH.backendVerified = true;
-            if (!message || message === 'Signing in…' || message === 'Opening Google sign-in…' || message === 'Creating your account…') {
-              message = 'Signed in and verified.';
-              messageType = 'good';
-            }
-          } catch (error) {
-            console.error('Capital Mastery backend verification failed:', error);
-            message = 'Signed in to Firebase, but secure backend verification failed.';
-            messageType = 'bad';
-          }
-        }
-
         CM_AUTH.ready = true;
+
+        // Firebase has resolved the signed-in state, so learner routes can render immediately.
+        // Protected API calls still verify the Firebase ID token server-side before D1 access.
         document.dispatchEvent(new CustomEvent('cm-auth-changed', {
-          detail: { user, isAdmin: CM_AUTH.isAdmin, backendVerified: CM_AUTH.backendVerified }
+          detail: { user, isAdmin: false, backendVerified: false }
         }));
         enhanceUi(true);
+
+        if (!user) return;
+        verifyWithWorker(user).then(identity => {
+          if (currentUser?.uid !== user.uid) return;
+          workerIdentity = identity;
+          CM_AUTH.isAdmin = identity?.isAdmin === true;
+          CM_AUTH.backendVerified = true;
+          if (!message || message === 'Signing in…' || message === 'Opening Google sign-in…' || message === 'Creating your account…') {
+            message = 'Signed in and verified.';
+            messageType = 'good';
+          }
+          document.dispatchEvent(new CustomEvent('cm-auth-changed', {
+            detail: { user, isAdmin: CM_AUTH.isAdmin, backendVerified: true }
+          }));
+          enhanceUi(true);
+        }).catch(error => {
+          if (currentUser?.uid !== user.uid) return;
+          console.error('Capital Mastery backend verification failed:', error);
+          message = 'Signed in. Secure role verification will retry when needed.';
+          messageType = 'bad';
+          document.dispatchEvent(new CustomEvent('cm-auth-changed', {
+            detail: { user, isAdmin: false, backendVerified: false }
+          }));
+          enhanceUi(true);
+        });
       });
     } catch (error) {
       console.error(error);
@@ -132,7 +150,7 @@
 
   function accountHtml() {
     if (!CM_AUTH.ready) {
-      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ACCOUNT</div><h1 class="serif">Connecting securely…</h1><p>Loading Firebase Authentication and the Capital Mastery secure backend.</p></div></div></section>`;
+      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ACCOUNT</div><h1 class="serif">Connecting securelyâ¦</h1><p>Loading Firebase Authentication and the Capital Mastery secure backend.</p></div></div></section>`;
     }
 
     if (currentUser) {
@@ -144,13 +162,13 @@
         ${message ? `<div class="cm-auth-message ${esc(messageType)}">${esc(message)}</div>` : ''}
         <div class="cm-account-grid">
           <div><span>Email</span><strong>${esc(currentUser.email || 'Not provided')}</strong></div>
-          <div><span>Backend</span><strong>${CM_AUTH.backendVerified ? 'Verified ✓' : 'Not verified'}</strong></div>
+          <div><span>Backend</span><strong>${CM_AUTH.backendVerified ? 'Verified â' : 'Not verified'}</strong></div>
           <div><span>Role</span><strong>${CM_AUTH.isAdmin ? 'Administrator' : 'Learner'}</strong></div>
           <div><span>User ID</span><strong class="cm-uid">${esc(currentUser.uid)}</strong></div>
         </div>
         <div class="cm-auth-actions">
-          <a class="btn btn-primary" href="#/passport">My Learning →</a>
-          ${CM_AUTH.isAdmin ? '<a class="btn btn-gold" href="#/admin-preview">Admin →</a>' : ''}
+          <a class="btn btn-primary" href="#/passport">My Learning â</a>
+          ${CM_AUTH.isAdmin ? '<a class="btn btn-gold" href="#/admin-preview">Admin â</a>' : ''}
           <button class="btn btn-outline" type="button" data-cm-auth-action="signout">Sign out</button>
         </div>
       </div></div></section>`;
@@ -189,7 +207,7 @@
 
   function adminBlockedHtml() {
     if (!currentUser) {
-      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ADMIN</div><h1 class="serif">Sign in required.</h1><p>The Capital Mastery admin area is protected by the secure backend.</p><a class="btn btn-primary" href="#/login">Sign in →</a></div></div></section>`;
+      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ADMIN</div><h1 class="serif">Sign in required.</h1><p>The Capital Mastery admin area is protected by the secure backend.</p><a class="btn btn-primary" href="#/login">Sign in â</a></div></div></section>`;
     }
     return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ADMIN</div><h1 class="serif">Access denied.</h1><p>Your Firebase account is authenticated, but the secure Capital Mastery API did not authorize this account as an administrator.</p><a class="btn btn-primary" href="#/">Return home</a></div></div></section>`;
   }
@@ -222,7 +240,7 @@
       const stamp = `admin-block:${CM_AUTH.ready}:${currentUser?.uid || 'out'}:${CM_AUTH.isAdmin}`;
       if (force || main.dataset.cmAuthView !== stamp) {
         main.dataset.cmAuthView = stamp;
-        main.innerHTML = CM_AUTH.ready ? adminBlockedHtml() : `<section class="section"><div class="container"><div class="card"><h1>Checking administrator access…</h1></div></div></section>`;
+        main.innerHTML = CM_AUTH.ready ? adminBlockedHtml() : `<section class="section"><div class="container"><div class="card"><h1>Checking administrator accessâ¦</h1></div></div></section>`;
       }
     }
   }
