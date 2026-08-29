@@ -1479,7 +1479,8 @@ export default {
                 )
             `).bind(orgId).first()
           ]);
-          return json({ ok: true, summary: { cohorts: Number(cohorts?.n || 0), assignments: Number(assignments?.n || 0), learners: Number(learners?.n || 0), averageReadiness: readiness?.avg_score == null ? null : Number(readiness.avg_score), readinessSnapshots: Number(readiness?.n || 0) } }, 200, env);
+          const canViewLearnerData=membership.role!=='content_manager';
+          return json({ ok: true, summary: { cohorts: Number(cohorts?.n || 0), assignments: Number(assignments?.n || 0), learners: canViewLearnerData ? Number(learners?.n || 0) : null, averageReadiness: canViewLearnerData && readiness?.avg_score != null ? Number(readiness.avg_score) : null, readinessSnapshots: canViewLearnerData ? Number(readiness?.n || 0) : null, learnerDataRestricted: !canViewLearnerData } }, 200, env);
         }
 
         if (parts.length === 4 && parts[3] === "cohorts") {
@@ -2031,7 +2032,7 @@ export default {
         const credential=await env.DB.prepare(`SELECT * FROM credentials WHERE credential_id=? LIMIT 1`).bind(credentialId).first();
         if(!credential) throw new HttpError(404,'Credential not found');
         let allowed=credential.uid===user.sub;
-        if(!allowed && credential.org_id){try{await requireOrgRole(env,user.sub,credential.org_id,ENTERPRISE_EMPLOYER_ROLES);allowed=true;}catch{}}
+        if(!allowed && credential.org_id){try{await requireOrgRole(env,user.sub,credential.org_id,['owner','training_admin','manager','viewer']);allowed=true;}catch{}}
         if(!allowed && user.sub===env.ADMIN_UID) allowed=true;
         if(!allowed) throw new HttpError(403,'Credential evidence access required');
         const evidence=await env.DB.prepare(`SELECT id,evidence_type,evidence_ref,title,evidence_json,created_at FROM credential_evidence_items WHERE credential_id=? ORDER BY created_at,id`).bind(credentialId).all();
@@ -2074,7 +2075,7 @@ export default {
       }
 
       if (request.method === 'GET' && parts[0]==='enterprise' && parts[1]==='organizations' && parts[3]==='reviews' && parts.length===4) {
-        const user=await requireUser(request,env),orgId=cleanId(parts[2]); await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES);
+        const user=await requireUser(request,env),orgId=cleanId(parts[2]); await requireOrgRole(env,user.sub,orgId,["owner","training_admin","manager","viewer"]);
         const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null; const learnerUid=url.searchParams.get('learnerUid')?cleanString(url.searchParams.get('learnerUid'),180):null;
         let sql=`SELECT * FROM manager_reviews WHERE org_id=?`, binds=[orgId]; if(assignmentId){sql+=' AND assignment_id=?';binds.push(assignmentId);} if(learnerUid){sql+=' AND learner_uid=?';binds.push(learnerUid);} sql+=' ORDER BY created_at DESC LIMIT 200';
         const rows=await env.DB.prepare(sql).bind(...binds).all(); return json({ok:true,reviews:(rows.results||[]).map(managerReviewPublic)},200,env);
@@ -2105,7 +2106,7 @@ export default {
 
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'organizations' && parts[3] === 'members' && parts.length === 4) {
         const user=await requireUser(request,env); const orgId=cleanId(parts[2]);
-        await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES);
+        await requireOrgRole(env,user.sub,orgId,['owner','training_admin']);
         const rows=await env.DB.prepare(`
           SELECT m.uid,m.role,m.status,m.joined_at AS created_at,m.updated_at,
                  MAX(i.email_normalized) AS email,
@@ -2142,7 +2143,7 @@ export default {
 
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'organizations' && parts[3] === 'readiness-report' && parts.length === 4) {
         const user=await requireUser(request,env); const orgId=cleanId(parts[2]);
-        await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES);
+        await requireOrgRole(env,user.sub,orgId,['owner','training_admin','manager','viewer']);
         const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null;
         let assignment=null;
         if(assignmentId){assignment=await env.DB.prepare(`SELECT a.*,c.name AS cohort_name FROM program_assignments a JOIN cohorts c ON c.id=a.cohort_id WHERE a.id=? AND a.org_id=? LIMIT 1`).bind(assignmentId,orgId).first();if(!assignment) throw new HttpError(404,'Assignment not found');}

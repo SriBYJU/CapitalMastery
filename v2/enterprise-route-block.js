@@ -56,7 +56,8 @@
                 )
             `).bind(orgId).first()
           ]);
-          return json({ ok: true, summary: { cohorts: Number(cohorts?.n || 0), assignments: Number(assignments?.n || 0), learners: Number(learners?.n || 0), averageReadiness: readiness?.avg_score == null ? null : Number(readiness.avg_score), readinessSnapshots: Number(readiness?.n || 0) } }, 200, env);
+          const canViewLearnerData=membership.role!=='content_manager';
+          return json({ ok: true, summary: { cohorts: Number(cohorts?.n || 0), assignments: Number(assignments?.n || 0), learners: canViewLearnerData ? Number(learners?.n || 0) : null, averageReadiness: canViewLearnerData && readiness?.avg_score != null ? Number(readiness.avg_score) : null, readinessSnapshots: canViewLearnerData ? Number(readiness?.n || 0) : null, learnerDataRestricted: !canViewLearnerData } }, 200, env);
         }
 
         if (parts.length === 4 && parts[3] === "cohorts") {

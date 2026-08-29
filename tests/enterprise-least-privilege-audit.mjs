@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+function ok(v,m){if(!v)throw new Error(m)}
+const ui=fs.readFileSync('enterprise-v2.js','utf8');
+const w=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
+const report=fs.readFileSync('v2/enterprise-report-routes.js','utf8');
+const creds=fs.readFileSync('v2/v2-credential-assessment-routes.js','utf8');
+ok(ui.includes("viewReports:['owner','training_admin','manager','viewer'].includes(r)"),'UI report capability must exclude content_manager');
+ok(ui.includes('if(!caps.viewReports) return setMain') && ui.includes('Learner reporting is not part of'),'direct report route needs least-privilege denial');
+ok(ui.includes("if(caps.viewReports){steps.push("),'interactive guide must omit learner-report coaching steps for content managers');
+ok(ui.includes("${caps.viewReports?`<a class=\"btn btn-outline\" href=\"#/employer/${encodeURIComponent(orgId)}/reports\">Readiness Reports</a>`:''}"),'command center report link must be capability-gated');
+ok(ui.includes('LEAST-PRIVILEGE DATA BOUNDARY') && ui.includes('Learner performance is intentionally restricted.'),'content-manager dashboard must explain privacy boundary');
+ok(ui.includes("<strong>Scoped</strong><span>Learner data access</span>"),'content-manager KPIs must not display fake learner zeros');
+ok(w.includes("parts[3] === 'readiness-report'") && w.includes("await requireOrgRole(env,user.sub,orgId,['owner','training_admin','manager','viewer']);"),'readiness API must exclude content_manager');
+ok(w.includes("parts[3]==='reviews'") && w.includes("requireOrgRole(env,user.sub,orgId,[\"owner\",\"training_admin\",\"manager\",\"viewer\"]);"),'review read API must exclude content_manager');
+ok(w.includes("parts[3] === 'members'") && w.includes("await requireOrgRole(env,user.sub,orgId,['owner','training_admin']);"),'member list must be people-admin only');
+ok(w.includes("credential.org_id,['owner','training_admin','manager','viewer']"),'private credential evidence must exclude content_manager');
+ok(w.includes("learnerDataRestricted: !canViewLearnerData"),'dashboard response must explicitly mark learner-data restriction');
+ok(/requireOrgRole\(env,user\.sub,orgId,\[(?:\"|')owner(?:\"|'),(?:\"|')training_admin(?:\"|'),(?:\"|')manager(?:\"|'),(?:\"|')viewer(?:\"|')\]\)/.test(report),'modular report source must preserve report roles');
+ok(creds.includes("credential.org_id,['owner','training_admin','manager','viewer']"),'modular credential source must preserve evidence roles');
+ok(!report.includes("assessment_key='ib-professional-final'"),'modular report final lookup must not be IB-only');
+console.log('ENTERPRISE LEAST-PRIVILEGE AUDIT PASS: content admin, learner evidence, reviews and member data are correctly separated');

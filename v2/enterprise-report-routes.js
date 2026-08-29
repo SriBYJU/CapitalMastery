@@ -4,7 +4,7 @@
 
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'organizations' && parts[3] === 'members' && parts.length === 4) {
         const user=await requireUser(request,env); const orgId=cleanId(parts[2]);
-        await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES);
+        await requireOrgRole(env,user.sub,orgId,['owner','training_admin']);
         const rows=await env.DB.prepare(`
           SELECT m.uid,m.role,m.status,m.joined_at AS created_at,m.updated_at,
                  MAX(i.email_normalized) AS email,
@@ -41,7 +41,7 @@
 
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'organizations' && parts[3] === 'readiness-report' && parts.length === 4) {
         const user=await requireUser(request,env); const orgId=cleanId(parts[2]);
-        await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES);
+        await requireOrgRole(env,user.sub,orgId,["owner","training_admin","manager","viewer"]);
         const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null;
         let assignment=null;
         if(assignmentId){assignment=await env.DB.prepare(`SELECT a.*,c.name AS cohort_name FROM program_assignments a JOIN cohorts c ON c.id=a.cohort_id WHERE a.id=? AND a.org_id=? LIMIT 1`).bind(assignmentId,orgId).first();if(!assignment) throw new HttpError(404,'Assignment not found');}
@@ -63,7 +63,7 @@
             const readiness=await env.DB.prepare(`SELECT * FROM readiness_snapshots WHERE uid=? AND assignment_id=? ORDER BY created_at DESC LIMIT 1`).bind(l.uid,a.id).first();
             const diagnostic=await env.DB.prepare(`SELECT score,submitted_at FROM diagnostic_attempts WHERE uid=? AND assignment_id=? ORDER BY submitted_at ASC LIMIT 1`).bind(l.uid,a.id).first();
             const lab=await env.DB.prepare(`SELECT id,status,score,revision_count,completed_at FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(l.uid,a.id).first();
-            const final=await env.DB.prepare(`SELECT score,passed,submitted_at FROM v2_assessment_attempts WHERE uid=? AND assignment_id=? AND assessment_key='ib-professional-final' ORDER BY score DESC,submitted_at DESC LIMIT 1`).bind(l.uid,a.id).first();
+            const final=await env.DB.prepare(`SELECT va.score,va.passed,va.submitted_at FROM v2_assessment_attempts va LEFT JOIN v2_assessment_definitions vd ON vd.assessment_key=va.assessment_key AND vd.version=va.assessment_version WHERE va.uid=? AND va.assignment_id=? AND (vd.stage='final' OR va.assessment_key LIKE '%professional-final') ORDER BY va.score DESC,va.submitted_at DESC LIMIT 1`).bind(l.uid,a.id).first();
             const readinessCredential=await env.DB.prepare(`SELECT credential_id,status,issued_at FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' ORDER BY issued_at DESC LIMIT 1`).bind(l.uid,a.id).first();
             const due=a.due_at?Date.parse(a.due_at):null;
             const complete=!!(readinessCredential&&readinessCredential.status==='active');
@@ -89,7 +89,7 @@
         const credentials=(await env.DB.prepare(`SELECT credential_id,public_token,credential_level,credential_title,status,standard_version,issued_at,assignment_id FROM credentials WHERE uid=? AND pathway_id=? ORDER BY issued_at`).bind(user.sub,pathway.id).all()).results||[];
         const diagnostic=await env.DB.prepare(`SELECT score,submitted_at FROM diagnostic_attempts WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? ORDER BY submitted_at ASC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
         const lab=await env.DB.prepare(`SELECT id,lab_key,lab_version,status,score,revision_count,completed_at FROM role_lab_runs WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? ORDER BY started_at DESC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
-        const finalAssessment=await env.DB.prepare(`SELECT assessment_key,assessment_version,score,passed,submitted_at FROM v2_assessment_attempts WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? AND assessment_key='ib-professional-final' ORDER BY score DESC,submitted_at DESC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
+        const finalAssessment=await env.DB.prepare(`SELECT va.assessment_key,va.assessment_version,va.score,va.passed,va.submitted_at FROM v2_assessment_attempts va LEFT JOIN v2_assessment_definitions vd ON vd.assessment_key=va.assessment_key AND vd.version=va.assessment_version WHERE va.uid=? AND va.pathway_id=? AND COALESCE(va.assignment_id,'public')=? AND (vd.stage='final' OR va.assessment_key LIKE '%professional-final') ORDER BY va.score DESC,va.submitted_at DESC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
         return json({ok:true,generatedAt:new Date().toISOString(),pathway:{id:pathway.id,title:pathway.title,role:pathway.role},assignment:assignment?{id:assignment.id,orgId,cohortId:assignment.cohort_id,dueAt:assignment.due_at,curriculumVersion:assignment.curriculum_version}:null,diagnostic:diagnostic?{score:Number(diagnostic.score),submittedAt:diagnostic.submitted_at}:null,readiness:readiness?{overallScore:Number(readiness.overall_score),status:readiness.status,baselineScore:readiness.baseline_score==null?null:Number(readiness.baseline_score),improvement:readiness.improvement==null?null:Number(readiness.improvement),evidenceCoverage:Math.round(Number(readiness.evidence_coverage||0)*100),evidencePhase:readiness.evidence_phase,createdAt:readiness.created_at}:null,competencies:skills.map(s=>({id:s.competency_id,name:s.name,category:s.category,score:Number(s.score),evidenceCount:Number(s.evidence_count||0),weight:Number(s.weight||0),minimumScore:Number(s.minimum_score||0),critical:Number(s.critical)===1})),roleLab:lab?{id:lab.id,key:lab.lab_key,version:lab.lab_version,status:lab.status,score:lab.score==null?null:Number(lab.score),revisions:Number(lab.revision_count||0),completedAt:lab.completed_at}:null,finalAssessment:finalAssessment?{key:finalAssessment.assessment_key,version:finalAssessment.assessment_version,score:Number(finalAssessment.score),passed:Number(finalAssessment.passed)===1,submittedAt:finalAssessment.submitted_at}:null,credentials:credentials.map(c=>({credentialId:c.credential_id,publicToken:c.public_token,level:c.credential_level,title:c.credential_title,status:c.status,standardVersion:c.standard_version,issuedAt:c.issued_at,assignmentId:c.assignment_id||null}))},200,env);
       }
 

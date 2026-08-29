@@ -13,7 +13,7 @@ ok(e.includes("caps.manageAssignments?`<a class=\"btn btn-primary\"") ,'Quick As
 ok(e.includes("caps.manageAssignments?`<a href=\"#/employer/${encodeURIComponent(orgId)}/quick-assign\">+ New</a>") ,'cohort create action must be hidden for non-assignment roles');
 ok(e.includes('Assignment management is not part of ${esc(caps.role.replace')&&e.includes('Cohort creation and assignment publishing are limited to Owners and Training Admins.'),'direct Quick Assign route must be role-guarded');
 ok(e.includes("canManageContent=orgCapabilities(membershipRole).manageContent"),'Firm Layer controls must use shared capability model');
-ok(e.includes("canReview=orgCapabilities(orgData.membership?.role).reviewLearners"),'manager-review controls must use shared capability model');
+ok(e.includes("const caps=orgCapabilities(orgData.membership?.role)")&&e.includes("const canReview=caps.reviewLearners")&&e.includes("if(!caps.viewReports) return setMain"),'report/review controls must use shared capability model');
 ok(e.includes("title:caps.manageAssignments?'Create a cohort & assign a role':'Inspect assigned programs'"),'guide must adapt to read-only roles');
 ok(e.includes("href:caps.managePeople?`#/employer/${orgId}/team`:'#/trust'"),'governance guide must not send read-only roles to Team admin');
 ok(e.includes('YOUR WORKSPACE ROLE')&&css.includes('.cmv2-role-capability-strip'),'command center must explain current role capabilities');

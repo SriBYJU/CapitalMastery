@@ -62,7 +62,7 @@
         const credential=await env.DB.prepare(`SELECT * FROM credentials WHERE credential_id=? LIMIT 1`).bind(credentialId).first();
         if(!credential) throw new HttpError(404,'Credential not found');
         let allowed=credential.uid===user.sub;
-        if(!allowed && credential.org_id){try{await requireOrgRole(env,user.sub,credential.org_id,ENTERPRISE_EMPLOYER_ROLES);allowed=true;}catch{}}
+        if(!allowed && credential.org_id){try{await requireOrgRole(env,user.sub,credential.org_id,['owner','training_admin','manager','viewer']);allowed=true;}catch{}}
         if(!allowed && user.sub===env.ADMIN_UID) allowed=true;
         if(!allowed) throw new HttpError(403,'Credential evidence access required');
         const evidence=await env.DB.prepare(`SELECT id,evidence_type,evidence_ref,title,evidence_json,created_at FROM credential_evidence_items WHERE credential_id=? ORDER BY created_at,id`).bind(credentialId).all();
