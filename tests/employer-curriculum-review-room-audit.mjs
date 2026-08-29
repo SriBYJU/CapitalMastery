@@ -9,7 +9,7 @@ for(const x of ['privateEquitySurface','ventureSurface','corpDevSurface']) ok(v.
 ok(e.includes('INTERACTIVE CURRICULUM REVIEW ROOM'),'employer curriculum must include interactive review room');
 ok(e.includes('cmv2-review-career')&&e.includes('catalog.pathways.map'),'review room must allow cross-career inspection before rollout');
 ok(e.includes('No learner state changes')&&e.includes('No answer keys exposed'),'review room must state safety boundaries');
-ok(e.includes("canManageContent=['owner','training_admin','content_manager'].includes(membershipRole)"),'curriculum mutations must be role-aware in the UI');
+ok(e.includes("canManageContent=orgCapabilities(membershipRole).manageContent"),'curriculum mutations must use centralized role capabilities');
 ok(e.includes("READ ONLY")&&e.includes('data-content-history'),'read-only roles should retain inspection/history without mutation controls');
 ok(c.includes('.cmv2-curriculum-review-room')&&c.includes('.cm-review-rolelab'),'review room must have production styling');
 console.log('EMPLOYER CURRICULUM REVIEW ROOM AUDIT PASS: safe deep preview + role-aware controls verified');
