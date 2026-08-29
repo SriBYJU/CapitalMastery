@@ -175,12 +175,17 @@
       const cs = state.careers[pathwayId];
       cs.completedParts ||= [];
       cs.quizScores ||= {};
-      const n = /^part-(\d)$/.exec(itemId)?.[1];
-      if (n) {
-        const part = Number(n);
-        if (part <= 4) cs.quizScores[part] = Math.max(Number(cs.quizScores[part] || 0), Number(score || 0));
-        if (part === 5) cs.simulationKnowledge = Math.max(Number(cs.simulationKnowledge || 0), Number(score || 0));
-        if (passed && !cs.completedParts.includes(part)) cs.completedParts.push(part);
+      cs.learningComplete ||= [];
+      const partMatch = /^part-(\d+)$/.exec(itemId);
+      if (partMatch) {
+        const part = Number(partMatch[1]);
+        if (part <= 4) {
+          cs.quizScores[part] = Math.max(Number(cs.quizScores[part] || 0), Number(score || 0));
+          if (passed && !cs.completedParts.includes(part)) cs.completedParts.push(part);
+        } else if (part === 5) {
+          cs.simulationKnowledge = Math.max(Number(cs.simulationKnowledge || 0), Number(score || 0));
+        }
+        if (passed && !cs.learningComplete.includes(part)) cs.learningComplete.push(part);
       }
       if (itemId === 'simulation') {
         cs.simulationScore = Math.max(Number(cs.simulationScore || 0), Number(score || 0));
