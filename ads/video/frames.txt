@@ -1,0 +1,17 @@
+file 'frames/01.png'
+duration 1.8
+file 'frames/02.png'
+duration 1.8
+file 'frames/03.png'
+duration 1.8
+file 'frames/04.png'
+duration 1.8
+file 'frames/05.png'
+duration 1.8
+file 'frames/06.png'
+duration 1.8
+file 'frames/07.png'
+duration 1.8
+file 'frames/08.png'
+duration 2.4
+file 'frames/08.png'
