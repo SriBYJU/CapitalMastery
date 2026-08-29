@@ -652,19 +652,24 @@ window.CM_DATA = {
         "pitch"
       ],
       "toolkit": [
-        "Model a three-statement forecast",
-        "Build a comps table",
-        "Construct a DCF sensitivity",
-        "Read a 10-K/10-Q efficiently",
-        "Turn analysis into a pitchbook page",
-        "Audit formulas and formatting"
+        "Excel workflow, shortcuts & model hygiene",
+        "Navigate SEC filings and source transaction data",
+        "Build and link a three-statement operating model",
+        "Build a trading-comparables valuation",
+        "Build a DCF with sensitivities",
+        "Build M&A sources & uses and accretion/dilution",
+        "Audit a financial model and catch errors",
+        "Turn analysis into client-ready PowerPoint materials"
       ],
       "applied": [
-        "Select the defensible peer set for a software target.",
-        "Repair a DCF with inconsistent WACC and terminal assumptions.",
-        "Extract revenue, EBITDA, cash and debt from public filings.",
-        "Assess an acquisition premium and synergy case.",
-        "Write an associate-ready recommendation slide."
+        "Build a clean operating case from historical financials.",
+        "Extract and cite decision-critical data from filings.",
+        "Select and defend a peer set, then build the comps valuation bridge.",
+        "Build a DCF and explain the WACC/terminal-value sensitivity.",
+        "Translate an offer price into purchase equity value, enterprise value and sources & uses.",
+        "Diagnose planted model errors before Associate review.",
+        "Update the analysis after revised management guidance.",
+        "Write a concise Associate update and decision-oriented valuation slide."
       ],
       "sim_title": "Project Northstar — M&A Analyst Readiness",
       "sim_context": "You are a first-year Investment Banking Analyst on an Industrials M&A team advising Apex Systems on a potential acquisition of Northstar Components. You own the first-pass transaction analysis, valuation cross-checks, model QA and Associate update.",
@@ -722,6 +727,21 @@ window.CM_DATA = {
           "name": "Morgan Stanley Investment Banking",
           "url": "https://www.morganstanley.com/what-we-do/investment-banking",
           "type": "Public professional/employer material"
+        },
+        {
+          "name": "Jefferies — Students & Graduates Analyst Training",
+          "url": "https://www.jefferies.com/careers/students-and-graduates/",
+          "type": "Public analyst-training benchmark"
+        },
+        {
+          "name": "Wall Street Prep — Investment Banking Training",
+          "url": "https://www.wallstreetprep.com/corporate/investment-banking/",
+          "type": "Public professional-training benchmark"
+        },
+        {
+          "name": "Training The Street — Investment Banking Training",
+          "url": "https://trainingthestreet.com/training-solutions/",
+          "type": "Public professional-training benchmark"
         }
       ]
     },

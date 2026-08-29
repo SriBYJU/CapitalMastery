@@ -150,3 +150,14 @@ The temporary UI-audit organization was then removed from D1 in foreign-key-safe
 The final Phase 1 consistency pass also upgraded the eight Investment Banking learning concepts (financial statements, accounting quality, trading comps, precedent transactions, DCF, M&A mechanics, accretion/dilution and client-ready pitching) from short legacy summaries to work-oriented analyst explanations, process guidance and realistic examples. Public Investment Banking simulation metadata was aligned with the production Project Northstar / Apex Systems case so the learning curriculum and secure Role Lab no longer describe different transactions.
 
 **Phase 1 release status: COMPLETE after the final GitHub commit and Pages build containing this closure section and the aligned Investment Banking curriculum pass.**
+
+## User-reported final UI/curriculum closure
+
+A final production review identified and addressed three release-quality issues before Phase 1 sign-off:
+
+- Employer landing-page **Preview Career Training** secondary CTA contrast was hardened so it cannot render white text on a white button/background combination.
+- The server-verified Capital Mastery administrator can use **QA Preview Mode** to inspect Part 1–5 and Final assessment UI without satisfying learner prerequisites. This is deliberately local/non-authoritative: it does not submit official scores, write D1 progress or issue credentials. Normal learners remain subject to server-enforced prerequisites.
+- Investment Banking Part 3 was expanded into a visual **Analyst Toolkit** with interactive Excel workflow, filings/research, three-statement, trading comps, DCF, M&A mechanics, model-QA and pitchbook-QA labs. The pathway toolkit/applications were expanded to match this sequence and public analyst-training benchmarks.
+
+These additions reflect public training expectations around accounting, Excel, financial modeling, valuation, M&A, error checking and case-based application while using synthetic Capital Mastery data rather than proprietary firm templates.
+

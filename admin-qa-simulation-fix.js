@@ -67,6 +67,15 @@
         if (p) p.innerHTML = 'Set local IB demo scores to 79, 80 or 100 for UI boundary testing. These buttons automatically enable QA Preview Mode; authoritative D1 scores are unchanged.';
       }
 
+      if (heading === 'Boundary Tests') {
+        if (!card.querySelector('.cm-admin-assessment-note')) {
+          const note = document.createElement('div');
+          note.className = 'cm-admin-official-note cm-admin-assessment-note';
+          note.innerHTML = '<strong>Assessment preview:</strong> while QA Preview Mode is enabled, open any pathway Part 1–5 quiz or Final from the normal pathway UI. Your admin account bypasses learner prerequisites locally, but no authoritative D1 score or credential is created.';
+          card.appendChild(note);
+        }
+      }
+
       if (heading === 'Simulation Lab') {
         const p = card.querySelector('p');
         if (p) p.innerHTML = '<b>Admin-only preview.</b> Open the practical simulation without completing prerequisites. This preview is local only and cannot issue an official score or credential.';

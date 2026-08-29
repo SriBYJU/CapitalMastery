@@ -66,6 +66,7 @@ node tests/logic-audit.mjs
 node tests/runtime-smoke.mjs
 node tests/enterprise-v2-audit.mjs
 node tests/enterprise-v2-runtime-smoke.mjs
+node tests/ib-reference-audit.mjs
 ```
 
 The current suites cover the legacy 79%/80% mastery boundary, **189 existing application routes**, and **17 additional Enterprise V2 routes**, plus V2 sequencing, no-delete Firm Layer rules, role-based authorization, readiness/evidence features, accessibility hooks, and credential verification wiring.

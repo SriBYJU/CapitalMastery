@@ -1,0 +1,14 @@
+import fs from 'node:fs';
+const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
+const data=read('data.js'), live=read('capital-mastery-live.js'), admin=read('admin-qa-simulation-fix.js'), ib=read('ib-analyst-toolkit.js'), ecss=read('enterprise-v2.css'), index=read('index.html');
+const must=(ok,msg)=>{if(!ok)throw new Error(msg)};
+must(ecss.includes('.cmv2-employer-hero .hero-actions .btn-outline'),'Employer Preview Career Training contrast override missing');
+must(live.includes("adminQaPreview && (root === 'quiz' || root === 'final')"),'Admin QA assessment preview fallback missing');
+must(admin.includes('Assessment preview:'),'Admin Release Lab assessment guidance missing');
+for(const name of ['Excel Workflow Lab','Filings & Research Drill','Three-Statement Bridge','Trading Comps Builder','DCF Sensitivity Lab','M&A Mechanics Lab','Model QA — Find the Errors','Pitchbook QA — Think Like a Reviewer']) must(ib.includes(name),`IB interactive module missing: ${name}`);
+for(const topic of ['Excel workflow, shortcuts & model hygiene','Navigate SEC filings and source transaction data','Build and link a three-statement operating model','Build a DCF with sensitivities','Build M&A sources & uses and accretion/dilution','Audit a financial model and catch errors']) must(data.includes(topic),`IB curriculum mapping missing: ${topic}`);
+must(index.includes('ib-analyst-toolkit.js'),'IB toolkit not loaded by production shell');
+must(data.includes('Jefferies — Students & Graduates Analyst Training'),'Jefferies training benchmark source missing');
+must(data.includes('Wall Street Prep — Investment Banking Training'),'Wall Street Prep training benchmark source missing');
+must(data.includes('Training The Street — Investment Banking Training'),'Training The Street benchmark source missing');
+console.log('IB REFERENCE PATHWAY AUDIT PASS: contrast, admin preview, 8 interactive analyst-tool labs, curriculum mapping and benchmark sources verified.');

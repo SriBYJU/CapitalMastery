@@ -65,6 +65,8 @@ Convert the other 15 careers to the same Phase 1 architecture: career-specific c
 
 Role Labs must model the actual work products and changing-information workflows of each job rather than generic finance quizzes.
 
+Each career also receives a role-specific **Professional Toolkit** equivalent to the Investment Banking reference implementation: visual, interactive teaching for the software/models/research inputs/work products actually used in that role, not just conceptual reading. Tool instruction must precede any simulation that expects the learner to use that tool.
+
 ## 4. Credential and Academy expansion
 
 - Complete the five-level stackable credential model across all careers.
