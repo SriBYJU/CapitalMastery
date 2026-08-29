@@ -35,3 +35,7 @@ Demo creation, reset, learner-state controls and permission matrix are restricte
 ## Data export
 
 Signed-in users can export their Capital Mastery enterprise data. Secure answer keys and hidden grading rules are intentionally excluded.
+
+## Self-service deletion
+
+Signed-in users can permanently delete their personal Capital Mastery evidence, credentials, learner progress, notifications, memberships, Firestore sync documents and Firebase Auth identity. The Worker blocks the platform administrator and any sole active employer-workspace owner. Shared employer records are retained only after creator identifiers are pseudonymized so another authorized owner does not lose organizational history.

@@ -22,6 +22,7 @@
     async emailCreate() { throw new Error('Authentication is still loading.'); },
     async signOut() { throw new Error('Authentication is still loading.'); },
     async resetPassword() { throw new Error('Authentication is still loading.'); },
+    async deleteAccount() { throw new Error('Authentication is still loading.'); },
     async getIdToken() { return currentUser ? currentUser.getIdToken() : null; }
   };
 
@@ -102,6 +103,39 @@
         setMessage('Password-reset email sent.', 'good');
       };
 
+
+      CM_AUTH.deleteAccount = async () => {
+        const user = auth.currentUser;
+        if (!user) throw new Error('Sign in before deleting your account.');
+        setMessage('Deleting your Capital Mastery data…');
+        const uid = user.uid;
+        const token = await user.getIdToken(true);
+        const response = await fetch(`${API_URL}/account/delete-data`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Could not delete your Capital Mastery data.');
+        const fs = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-firestore.js`);
+        const db = fs.getFirestore();
+        await fs.deleteDoc(fs.doc(db, 'users', uid, 'progress', 'state'));
+        await fs.deleteDoc(fs.doc(db, 'users', uid));
+        localStorage.removeItem(`capitalMasteryUserStateV1:${uid}`);
+        localStorage.removeItem('capitalMasteryActiveUidV1');
+        localStorage.removeItem('capitalMasteryLocalStateV1');
+        try {
+          await authApi.deleteUser(user);
+        } catch (error) {
+          if (error?.code === 'auth/requires-recent-login') {
+            throw new Error('Your Capital Mastery data was removed. For security, sign out, sign back in, then delete the remaining Firebase account identity.');
+          }
+          throw error;
+        }
+        message = 'Account and synced learning data deleted.';
+        messageType = 'good';
+        location.hash = '#/';
+      };
+
       authApi.onAuthStateChanged(auth, user => {
         currentUser = user;
         workerIdentity = null;
@@ -171,6 +205,7 @@
           ${CM_AUTH.isAdmin ? '<a class="btn btn-gold" href="#/admin-preview">Admin â</a>' : ''}
           <button class="btn btn-outline" type="button" data-cm-auth-action="signout">Sign out</button>
         </div>
+        <div class="cm-account-privacy"><div><b>Privacy & account data</b><p>Export your enterprise data, or permanently remove your personal Capital Mastery data and Firebase account. Sole workspace owners must transfer ownership first.</p></div><div><a class="btn btn-outline btn-sm" href="#/my-data">Export My Data</a><button class="btn btn-danger btn-sm" type="button" data-cm-auth-action="delete-account">Delete Account & Data</button></div></div>
       </div></div></section>`;
     }
 
@@ -259,7 +294,8 @@
       .cm-auth-message{padding:11px 13px;border-radius:10px;background:#eef2f6;color:var(--navy);font-size:.88rem;margin:14px 0}.cm-auth-message.good{background:#eaf6ef;color:#245b43}.cm-auth-message.bad{background:#fff0f0;color:#8b3232}
       .cm-google{background:white}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 0 0;text-decoration:underline;cursor:pointer}
       .cm-account-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.cm-account-grid>div{background:#f5f7f9;border:1px solid #e3e7eb;border-radius:12px;padding:14px}.cm-account-grid span{display:block;color:#77818d;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.cm-account-grid strong{display:block;color:var(--navy);margin-top:5px;word-break:break-word}.cm-uid{font-size:.78rem}.cm-auth-actions{display:flex;flex-wrap:wrap;gap:10px}
-      @media(max-width:760px){.cm-auth-layout,.cm-account-grid{grid-template-columns:1fr}.cm-auth-card h1{font-size:2.2rem}}
+      .cm-account-privacy{margin-top:22px;padding:16px;border:1px solid #ead1d1;background:#fff8f8;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}.cm-account-privacy b{color:#7d2727}.cm-account-privacy p{margin:5px 0 0;color:#6d6262;font-size:.82rem;line-height:1.45}.cm-account-privacy>div:last-child{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn-danger{background:#8b2f2f;color:#fff;border-color:#8b2f2f}.btn-danger:hover{background:#702626}
+      @media(max-width:760px){.cm-auth-layout,.cm-account-grid{grid-template-columns:1fr}.cm-account-privacy{align-items:stretch;flex-direction:column}.cm-account-privacy>div:last-child{justify-content:flex-start}.cm-auth-card h1{font-size:2.2rem}}
     `;
     document.head.appendChild(style);
   }
@@ -272,6 +308,13 @@
       button.disabled = true;
       if (action === 'google') await CM_AUTH.googleSignIn();
       if (action === 'signout') await CM_AUTH.signOut();
+      if (action === 'delete-account') {
+        const first = confirm('Permanently delete your Capital Mastery personal data, credentials, synced progress, memberships and Firebase account? This cannot be undone.');
+        if (!first) return;
+        const typed = prompt('Type DELETE to confirm permanent account deletion.');
+        if (typed !== 'DELETE') throw new Error('Account deletion cancelled. Type DELETE exactly to confirm.');
+        await CM_AUTH.deleteAccount();
+      }
       if (action === 'reset') {
         const email = document.querySelector('#cm-signin-form input[name="email"]')?.value.trim();
         await CM_AUTH.resetPassword(email);

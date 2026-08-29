@@ -1,0 +1,20 @@
+import fs from 'node:fs';
+const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
+const auth=fs.readFileSync('firebase-auth.js','utf8');
+const app=fs.readFileSync('app.js','utf8');
+const index=fs.readFileSync('index.html','utf8');
+const fail=[]; const ok=(v,m)=>{if(!v)fail.push(m)};
+ok(worker.includes('url.pathname === "/account/delete-data"'),'self-service server deletion route missing');
+ok(worker.includes('user.sub === env.ADMIN_UID'),'platform admin self-deletion must be blocked');
+ok(worker.includes("m2.role='owner' AND m2.status='active'"),'sole-owner transfer guard missing');
+for(const table of ['credential_evidence_items','credential_events','role_lab_submissions','manager_reviews','enterprise_notifications','v2_assessment_attempts','diagnostic_attempts','competency_evidence','competency_scores','readiness_snapshots','role_lab_runs','credentials','assessment_attempts','official_progress','request_log','cohort_members','employer_profiles','organization_invites','organization_members']) ok(worker.includes(`DELETE FROM ${table}`),`D1 deletion missing ${table}`);
+ok(worker.includes("const markerUid='deleted_user'"),'shared employer record pseudonymization marker missing');
+ok(auth.includes("fs.deleteDoc(fs.doc(db, 'users', uid, 'progress', 'state'))"),'Firestore progress deletion missing');
+ok(auth.includes("fs.deleteDoc(fs.doc(db, 'users', uid))"),'Firestore root profile deletion missing');
+ok(auth.includes('await authApi.deleteUser(user)'),'Firebase Auth deletion missing');
+ok(auth.includes("typed !== 'DELETE'"),'typed destructive confirmation missing');
+ok(auth.includes('Sole workspace owners must transfer ownership first.'),'account UI ownership warning missing');
+ok(app.includes('permanently delete their personal Capital Mastery data'),'Privacy policy deletion disclosure missing');
+ok(index.includes('firebase-auth.js?v=20260829-phase2privacy1'),'auth deletion feature cache-bust missing');
+if(fail.length){console.error('ACCOUNT DELETION AUDIT FAILED\n - '+fail.join('\n - '));process.exit(1)}
+console.log('ACCOUNT DELETION AUDIT PASS: D1, Firestore, Firebase identity, confirmation, owner/admin guards and privacy disclosure verified');

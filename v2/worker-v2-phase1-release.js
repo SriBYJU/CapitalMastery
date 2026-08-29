@@ -644,6 +644,66 @@ export default {
       }
 
       // --------------------------------------------------
+      // SELF-SERVICE ACCOUNT + PERSONAL DATA DELETION
+      // Shared employer records are retained only after creator IDs are pseudonymized.
+      // --------------------------------------------------
+
+      if (request.method === "POST" && url.pathname === "/account/delete-data") {
+        const user = await requireUser(request, env);
+        if (user.sub === env.ADMIN_UID) throw new HttpError(409, "The platform administrator account cannot be deleted from self-service settings");
+
+        const soleOwnerRows = await env.DB.prepare(`
+          SELECT o.id,o.name
+          FROM organization_members m
+          JOIN organizations o ON o.id=m.org_id
+          WHERE m.uid=? AND m.role='owner' AND m.status='active' AND o.status='active'
+            AND NOT EXISTS (
+              SELECT 1 FROM organization_members m2
+              WHERE m2.org_id=m.org_id AND m2.uid<>? AND m2.role='owner' AND m2.status='active'
+            )
+          ORDER BY o.name
+        `).bind(user.sub,user.sub).all();
+        const soleOwnerOrgs=soleOwnerRows.results||[];
+        if(soleOwnerOrgs.length){
+          throw new HttpError(409,`Transfer ownership before deleting this account: ${soleOwnerOrgs.map(x=>x.name).join(', ')}`);
+        }
+
+        const email=String(user.email||'').trim().toLowerCase();
+        const markerUid='deleted_user';
+        await env.DB.batch([
+          env.DB.prepare(`DELETE FROM credential_evidence_items WHERE credential_id IN (SELECT credential_id FROM credentials WHERE uid=?)`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM credential_events WHERE credential_id IN (SELECT credential_id FROM credentials WHERE uid=?)`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM role_lab_submissions WHERE run_id IN (SELECT id FROM role_lab_runs WHERE uid=?)`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM manager_reviews WHERE learner_uid=? OR created_by_uid=?`).bind(user.sub,user.sub),
+          env.DB.prepare(`DELETE FROM enterprise_notifications WHERE recipient_uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM v2_assessment_attempts WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM diagnostic_attempts WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM competency_evidence WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM competency_scores WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM readiness_snapshots WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM role_lab_runs WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM credentials WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM assessment_attempts WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM official_progress WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM request_log WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM cohort_members WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM employer_profiles WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM organization_invites WHERE accepted_by_uid=? OR (?<>'' AND email_normalized=?)`).bind(user.sub,email,email),
+          env.DB.prepare(`DELETE FROM organization_members WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`UPDATE organization_invites SET created_by_uid=? WHERE created_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE standard_content_preferences SET updated_by_uid=? WHERE updated_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE firm_content_versions SET created_by_uid=? WHERE created_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE firm_content SET created_by_uid=? WHERE created_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE cohorts SET created_by_uid=? WHERE created_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE program_assignments SET created_by_uid=? WHERE created_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE organizations SET created_by_uid=? WHERE created_by_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE enterprise_audit_events SET actor_uid=? WHERE actor_uid=?`).bind(markerUid,user.sub),
+          env.DB.prepare(`UPDATE credential_events SET actor_uid=? WHERE actor_uid=?`).bind(markerUid,user.sub)
+        ]);
+        return json({ok:true,personalDataDeleted:true,sharedEmployerRecordsPseudonymized:true},200,env);
+      }
+
+      // --------------------------------------------------
       // ADMIN AUTH CHECK
       // --------------------------------------------------
 

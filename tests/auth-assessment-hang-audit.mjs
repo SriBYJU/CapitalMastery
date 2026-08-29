@@ -12,6 +12,6 @@ ok(live.includes("setTimeout(() => route(), 250)"),'assessment route must automa
 console.log('AUTH/ASSESSMENT HANG REGRESSION PASS');
 
 const index=fs.readFileSync('index.html','utf8');
-ok(index.includes('firebase-auth.js?v=20260829-authfix1'),'firebase auth hotfix must be cache-busted');
+ok(/firebase-auth\.js\?v=[A-Za-z0-9._-]+/.test(index),'firebase auth asset must be cache-busted');
 ok(/capital-mastery-live\.js\?v=[A-Za-z0-9._-]+/.test(index),'secure assessment script must be cache-busted');
 console.log('AUTH ASSET CACHE-BUST PASS');
