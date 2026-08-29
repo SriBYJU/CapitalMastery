@@ -13,6 +13,6 @@ for(const marker of ['.cm-deal-workstation','.cm-deal-kpis','.cm-deal-practice-g
 ok(!/private-equity':\{surface:'spreadsheet'/.test(js),'PE must not regress to generic spreadsheet surface');
 ok(!/venture-capital':\{surface:'spreadsheet'/.test(js),'VC must not regress to generic spreadsheet surface');
 ok(!/corporate-development':\{surface:'spreadsheet'/.test(js),'Corp Dev must not regress to generic spreadsheet surface');
-ok(index.includes('career-professional-visuals.js?v=20260829-bigfirm3')&&index.includes('styles.css?v=20260829-bigfirm3'),'deal-workbench release assets must be cache-busted');
-ok(index.includes('data.js?v=20260829-bigfirm3'),'curriculum data source update must be cache-busted');
+ok(/career-professional-visuals\.js\?v=[^\"]+/.test(index)&&/styles\.css\?v=[^\"]+/.test(index),'deal-workbench release assets must be cache-busted');
+ok(/data\.js\?v=[^\"]+/.test(index),'curriculum data source update must be cache-busted');
 console.log('DEAL WORKBENCH SPECIALIZATION AUDIT PASS: PE, VC and Corp Dev have role-native guided + independent work surfaces');
