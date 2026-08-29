@@ -3152,6 +3152,10 @@ function stageQuestions(p, stage) {
   if (p.id === "investment-banking" && [2,3,4].includes(stage)) {
     return ibAppliedStageQuestions(stage);
   }
+  if (p.id !== "investment-banking" && [3,4].includes(stage)) {
+    const mixed = careerAppliedStageQuestions(p, stage);
+    if (mixed) return mixed;
+  }
 
   const otherRoles =
     otherValues(p, "role", 3);
@@ -3669,6 +3673,66 @@ function stageQuestions(p, stage) {
     400,
     "Invalid pathway stage"
   );
+}
+
+
+function careerWorkbenchSourceTable(workbench) {
+  const table = [["Source", "Metric / line", "Value / detail"]];
+  for (const file of (workbench?.files || [])) {
+    for (const row of (file.rows || [])) {
+      if (!Array.isArray(row) || !row.length) continue;
+      const metric = String(row[0] ?? "");
+      const detail = row.slice(1).map(v => String(v ?? "")).join(" · ");
+      table.push([String(file.label || file.name || "Case file"), metric, detail]);
+    }
+  }
+  return table.slice(0, 28);
+}
+
+function careerAppliedStageQuestions(pathway, stage) {
+  const wb = CAREER_WORKBENCHES[pathway.id];
+  if (!wb) return null;
+  const numeric = (wb.tasks || []).filter(t => t.type === 'numeric').slice(0, 3);
+  const written = (wb.tasks || []).find(t => t.type === 'text');
+  if (numeric.length < 3 || !written) return null;
+  const sourceTable = careerWorkbenchSourceTable(wb);
+  const prefix = `p${stage}`;
+  const questions = numeric.map((t, i) => numericQuestion(
+    `${prefix}-work-${i+1}`,
+    t.prompt,
+    t.answer,
+    t.tolerance,
+    `${wb.project} · ${wb.role}. Use the synthetic source packet below and show the same calculation discipline taught in the Professional Toolkit.`,
+    sourceTable,
+    t.unit || ''
+  ));
+  questions.push({
+    id: `${prefix}-work-note`,
+    type: 'text',
+    prompt: written.prompt,
+    context: `${wb.project} · Write the short professional note you would place in the workpaper or send to ${wb.reviewer}.`,
+    table: sourceTable,
+    keywords: written.keywords || [],
+    minHits: Number(written.minHits || 2),
+    minWords: Math.max(18, Number(written.minWords || 18)),
+    answer: null
+  });
+  const common = stage === 3 ? [
+    contextualQuestion(`${prefix}-q5`, 'A reviewer cannot reproduce one of your key outputs. What should you do?', 'Trace the source, input, formula and assumption until the output is reproducible', ['Tell the reviewer to trust the number','Replace the workpaper with a screenshot','Remove the output from the deliverable'], `You are preparing ${wb.project} for ${wb.reviewer}.`),
+    contextualQuestion(`${prefix}-q6`, 'Which source practice is strongest before a number enters a professional work product?', 'Record the authoritative source, period, units and any adjustment or assumption', ['Use the first number that looks reasonable','Mix periods if the values are close','Remove source notes to make the file cleaner'], `The work may be reviewed or updated by another analyst.`),
+    contextualQuestion(`${prefix}-q7`, 'A material assumption changes after your first build. What should happen?', 'Update the affected inputs, rerun dependent outputs and explain what changed', ['Freeze the original output','Change only the written conclusion','Hide the new information until the final exam'], `New information arrives while you are working on ${wb.project}.`),
+    contextualQuestion(`${prefix}-q8`, 'What is the strongest pre-submission quality-control habit?', 'Reconcile sources, units, calculations, assumptions, checks and presentation before senior review', ['Submit as soon as the first result appears','Delete downside or exception cases','Assume the manager will find any errors'], `Your work is about to go to ${wb.reviewer}.`),
+    contextualQuestion(`${prefix}-q9`, `Which deliverable is most consistent with the ${pathway.title} role being trained?`, pathway.deliverables[0], otherArrayValues(pathway,'deliverables',3), wb.objective),
+    contextualQuestion(`${prefix}-q10`, 'What makes a junior work product decision-useful?', 'It connects sourced evidence and correct analysis to a conclusion, risk and next step', ['It contains the most formulas possible','It avoids stating a recommendation','It shows only evidence supporting the preferred answer'], `The reviewer needs to understand what the analysis means, not just the number.`)
+  ] : [
+    contextualQuestion(`${prefix}-q5`, 'A manager identifies a material error after your first submission. What is the strongest response?', 'Correct it, rerun every affected output, quantify the impact and resubmit with a clear change note', ['Change formatting only','Ignore it if the recommendation is unchanged','Delete the manager comment'], `This is a revision cycle inside ${wb.project}.`),
+    contextualQuestion(`${prefix}-q6`, 'Two reliable sources disagree materially. What should the analyst do?', 'Reconcile definitions and timing, document the difference and explain its impact on the analysis', ['Use whichever number produces the preferred result','Average them without investigating','Delete both sources'], `The discrepancy could change a decision.`),
+    contextualQuestion(`${prefix}-q7`, 'A downside or stress case is materially weaker than the base case. What should the final work product do?', 'State the recommendation while clearly showing the downside, assumptions and conditions that could change it', ['Delete the downside case','Present the base case as guaranteed','Avoid making any recommendation'], wb.objective),
+    contextualQuestion(`${prefix}-q8`, 'What is strongest evidence of applied mastery?', 'A reproducible work product that links correct analysis, source discipline, judgment and professional communication', ['Completing the page quickly','Using the longest workpaper','Copying a sample answer without checking assumptions'], `Capital Mastery is measuring whether the learner can transfer the taught workflow into independent work.`),
+    contextualQuestion(`${prefix}-q9`, `Which risk deserves explicit attention in ${pathway.title} applied work?`, pathway.risk, otherValues(pathway,'risk',3), wb.objective),
+    contextualQuestion(`${prefix}-q10`, 'What should be preserved when professional work is revised?', 'An audit trail of material assumptions, changes, sources and reasoning', ['Only the final number','No record of prior assumptions','Only comments that support the final conclusion'], `The work may be reviewed later by a manager or another analyst.`)
+  ];
+  return [...questions, ...common];
 }
 
 function numericQuestion(id, prompt, answer, tolerance, context = '', table = null, unit = '') {

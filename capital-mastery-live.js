@@ -101,8 +101,10 @@
     const table = questionTableHtml(q.table);
     const response = q.type === 'numeric'
       ? `<label class="cm-official-numeric"><span>Your calculated answer${q.unit?` (${esc(q.unit)})`:''}</span><input type="number" step="any" name="${esc(q.id)}" required inputmode="decimal" placeholder="Enter your result"></label>`
-      : (q.options || []).map((option, j) => `<label class="cm-official-option"><input type="radio" name="${esc(q.id)}" value="${esc(option)}"><span>${String.fromCharCode(65+j)}</span><p>${esc(option)}</p></label>`).join('');
-    return `<fieldset class="cm-official-question ${q.type==='numeric'?'cm-official-question-numeric':''}"><legend><span>${i+1}</span>${esc(q.prompt)}</legend>${context}${table}${response}</fieldset>`;
+      : q.type === 'text'
+        ? `<label class="cm-official-written"><span>Your professional response</span><textarea name="${esc(q.id)}" required maxlength="3000" placeholder="Write the concise workpaper / reviewer note you would actually submit…"></textarea></label>`
+        : (q.options || []).map((option, j) => `<label class="cm-official-option"><input type="radio" name="${esc(q.id)}" value="${esc(option)}"><span>${String.fromCharCode(65+j)}</span><p>${esc(option)}</p></label>`).join('');
+    return `<fieldset class="cm-official-question ${q.type==='numeric'?'cm-official-question-numeric':q.type==='text'?'cm-official-question-written':''}"><legend><span>${i+1}</span>${esc(q.prompt)}</legend>${context}${table}${response}</fieldset>`;
   }
 
 

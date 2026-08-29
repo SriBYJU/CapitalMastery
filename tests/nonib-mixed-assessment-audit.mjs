@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
+const live=fs.readFileSync('capital-mastery-live.js','utf8');
+const css=fs.readFileSync('styles.css','utf8');
+const index=fs.readFileSync('index.html','utf8');
+function ok(v,m){if(!v) throw new Error(m)}
+ok(worker.includes("if (p.id !== \"investment-banking\" && [3,4].includes(stage))"),'non-IB stages 3-4 must route through mixed professional assessment engine');
+ok(worker.includes('function careerAppliedStageQuestions(pathway, stage)'),'career mixed-assessment generator missing');
+ok(worker.includes(".filter(t => t.type === 'numeric').slice(0, 3)"),'mixed assessment must include workbench numeric outputs');
+ok(worker.includes("type: 'text'"),'mixed assessment must include a professional written workpaper/reviewer note');
+ok(worker.includes('careerWorkbenchSourceTable(workbench)'),'mixed questions must carry synthetic career case/source data');
+ok(worker.includes('keywords: written.keywords'),'professional note rubric must remain server-side');
+ok(live.includes("q.type === 'text'") && live.includes('cm-official-written'),'official renderer must support professional written responses');
+ok(live.includes("if (q.type === 'numeric') answers[q.id]") && live.includes("else if (q.type === 'text') answers[q.id]"),'official submit must capture both numeric and written responses');
+ok(css.includes('.cm-official-written') && css.includes('.cm-official-question-written'),'written assessment styling missing');
+ok(index.includes('capital-mastery-live.js?v=20260829-firmready2'),'mixed professional assessment renderer must be cache-busted');
+const pubStart=worker.indexOf('function publicQuestion(q)');
+const pubEnd=worker.indexOf('\nfunction otherValues(',pubStart);
+const pub=worker.slice(pubStart,pubEnd);
+ok(pub && !pub.includes('answer:') && !pub.includes('tolerance:') && !pub.includes('keywords:'),'public assessment payload must not expose answers, tolerances or text rubric keywords');
+console.log('NON-IB MIXED PROFESSIONAL ASSESSMENT AUDIT PASS: numeric + source-table + written + judgment questions, secure rubric isolation');
