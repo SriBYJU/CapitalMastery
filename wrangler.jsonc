@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "capital-mastery-api",
+  "main": "v2/worker-v2-phase1-release.js",
+  "compatibility_date": "2026-08-28",
+  "keep_vars": true,
+  "vars": {
+    "ALLOWED_ORIGIN": "https://sribyju.github.io",
+    "FIREBASE_PROJECT_ID": "capital-mastery26"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "capital-mastery-prod",
+      "database_id": "d007e8e7-8540-47dc-89b1-1aec4154b69b"
+    }
+  ],
+  "secrets": {
+    "required": ["ADMIN_UID"]
+  }
+}
