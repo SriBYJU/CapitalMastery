@@ -9,6 +9,6 @@ ok(app.includes('Take Final Examination'),'passed simulation must expose final e
 ok(app.includes('function refreshLocalState(){ state=loadState(); }'),'app must expose an in-memory state refresh');
 ok(app.includes('refreshLocalState,resetState'),'refreshLocalState must be exported through CM');
 ok(live.includes('window.CM?.refreshLocalState?.();'),'official result mirror must refresh in-memory app state');
-ok(index.includes('app.js?v=20260829-finalgate1'),'app final-gate fix must be cache-busted');
+ok(index.includes('app.js?v=20260829-phase2proof1'),'app Phase 2 release must be cache-busted');
 ok(index.includes('capital-mastery-live.js?v=20260829-finalgate1'),'live result mirror final-gate fix must be cache-busted');
 console.log('FINAL EXAM SURFACE + IN-MEMORY SYNC PASS');

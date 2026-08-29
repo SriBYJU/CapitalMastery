@@ -1,0 +1,21 @@
+import fs from 'node:fs';
+const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
+const ent=fs.readFileSync('enterprise-v2.js','utf8');
+const app=fs.readFileSync('app.js','utf8');
+const css=fs.readFileSync('styles.css','utf8')+fs.readFileSync('enterprise-v2.css','utf8');
+const idx=fs.readFileSync('index.html','utf8');
+const fail=[]; const ok=(v,m)=>{if(!v)fail.push(m)};
+ok((worker.match(/credential_id NOT LIKE 'DEMO-%'/g)||[]).length>=2,'both public verification routes must exclude DEMO credentials');
+ok(worker.includes('/enterprise/admin/demo') && worker.includes('const admin=await requireAdmin(request,env)'), 'admin demo routes must exist and use server-side admin identity');
+ok(worker.includes("await requireOrgRole(env,user.sub,orgId,['owner','training_admin','manager'])"),'manager review write must require employer role');
+ok(worker.includes("reviewStatus=enterpriseEnum"),'manager review status must be enumerated server-side');
+ok(worker.includes("artifactType=enterpriseEnum"),'manager review artifact type must be enumerated server-side');
+ok(!/request\.method\s*===\s*[\"']DELETE[\"']/.test(worker),'V2 Worker must not expose employer DELETE handlers');
+ok(ent.includes('role="status" aria-live="polite"'),'dynamic employer calculator output needs a polite live region');
+ok(idx.includes('class="skip-link"'),'skip-to-content link missing');
+ok(css.includes(':focus-visible'),'visible keyboard focus styles missing');
+ok(css.includes('prefers-reduced-motion:reduce'),'reduced-motion support missing');
+ok(app.includes('target="_blank" rel="noopener"'),'homepage public-source links need noopener');
+ok(ent.includes('target="_blank" rel="noopener"'),'employer public-source links need noopener');
+if(fail.length){console.error('PHASE 2 SECURITY/A11Y AUDIT FAILED\n - '+fail.join('\n - '));process.exit(1)}
+console.log('PHASE 2 SECURITY/A11Y AUDIT PASS: demo verification boundary, RBAC, non-destructive operations, keyboard/reduced-motion and source-link safety verified');

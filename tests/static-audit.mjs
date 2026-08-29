@@ -18,7 +18,7 @@ for(const c of d.careers){
   ok(c.sources.length>=4,`${c.id}: insufficient source mapping`);
 }
 const index=fs.readFileSync(new URL('../index.html',import.meta.url),'utf8');
-ok(index.includes('45+ Free Finance Credentials | Made by Shriyan Avadhanula'),'SEO title missing founder/free-credential language');
+ok(index.includes('80+ Free Finance Credentials | Made by Shriyan Avadhanula'),'SEO title missing updated founder/free-credential language');
 const app=fs.readFileSync(new URL('../app.js',import.meta.url),'utf8');
 ok(app.includes('const PASS = 80'),'80% mastery threshold missing');
 ok(app.includes("const need=final?20:10"),'10-question / 20-question assessment logic missing');

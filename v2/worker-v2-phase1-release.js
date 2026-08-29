@@ -554,7 +554,9 @@ const PATHWAYS = {
 const PATHWAY_ALIASES = {
   fpa: "fp-and-a",
   "fp-a": "fp-and-a",
-  "fp&a": "fp-and-a"
+  "fp&a": "fp-and-a",
+  "quant-finance": "quantitative-finance",
+  quant: "quantitative-finance"
 };
 
 const ALL_PATHWAYS = Object.values(PATHWAYS);
@@ -661,6 +663,51 @@ export default {
 
       const parts = url.pathname.split("/").filter(Boolean);
 
+      if (request.method === "GET" && url.pathname === "/enterprise/admin/demo") {
+        const admin=await requireAdmin(request,env);
+        const rows=await env.DB.prepare(`SELECT o.id,o.name,o.created_at,COUNT(DISTINCT cm.uid) AS learners,COUNT(DISTINCT a.id) AS assignments FROM organizations o LEFT JOIN cohort_members cm ON cm.org_id=o.id LEFT JOIN program_assignments a ON a.org_id=o.id WHERE o.id LIKE 'demo_org_%' GROUP BY o.id,o.name,o.created_at ORDER BY o.created_at DESC`).all();
+        return json({ok:true,synthetic:true,demos:rows.results||[],presets:DEMO_PRESETS},200,env);
+      }
+      if (request.method === "POST" && url.pathname === "/enterprise/admin/demo/create") {
+        const admin=await requireAdmin(request,env); const body=await readJson(request); const demo=await createEnterpriseDemo(env,admin,body);
+        return json({ok:true,demo},201,env);
+      }
+      if (request.method === "POST" && url.pathname === "/enterprise/admin/demo/reset") {
+        const admin=await requireAdmin(request,env); const result=await resetEnterpriseDemos(env,admin);
+        return json({ok:true,synthetic:true,...result},200,env);
+      }
+      if (request.method === "GET" && parts[0]==='enterprise' && parts[1]==='admin' && parts[2]==='demo' && parts[3] && parts[4]==='learners' && parts.length===5) {
+        await requireAdmin(request,env); const orgId=cleanId(parts[3]); if(!orgId.startsWith('demo_org_')) throw new HttpError(400,'Synthetic demo organization required');
+        const rows=await env.DB.prepare(`SELECT cm.uid,MAX(i.email_normalized) AS email,MAX(cr.holder_name) AS holder_name FROM cohort_members cm LEFT JOIN organization_invites i ON i.org_id=cm.org_id AND i.accepted_by_uid=cm.uid LEFT JOIN credentials cr ON cr.uid=cm.uid AND cr.org_id=cm.org_id WHERE cm.org_id=? GROUP BY cm.uid ORDER BY COALESCE(MAX(cr.holder_name),MAX(i.email_normalized),cm.uid)`).bind(orgId).all();
+        return json({ok:true,synthetic:true,orgId,learners:rows.results||[]},200,env);
+      }
+      if (request.method === "POST" && url.pathname === "/enterprise/admin/demo/learner-state") {
+        const admin=await requireAdmin(request,env); const body=await readJson(request); const result=await setEnterpriseDemoLearnerState(env,admin,body); return json({ok:true,synthetic:true,...result},200,env);
+      }
+      if (request.method === "GET" && url.pathname === "/enterprise/admin/demo/permission-matrix") {
+        await requireAdmin(request,env); return json({ok:true,roles:ENTERPRISE_PERMISSION_LAB,actions:[...new Set(Object.values(ENTERPRISE_PERMISSION_LAB).flat())]},200,env);
+      }
+
+      // --------------------------------------------------
+      // CONTEXTUAL INVITATION PREVIEW (token-holder only)
+      // --------------------------------------------------
+      if (request.method === "GET" && parts[0] === "enterprise" && parts[1] === "invites" && parts[2] === "preview" && parts.length === 4) {
+        const token = cleanString(decodeURIComponent(parts[3] || ''), 500);
+        if (!token) throw new HttpError(400, "Invitation token required");
+        const tokenHash = await sha256Hex(token);
+        const invite = await env.DB.prepare(`
+          SELECT i.status,i.expires_at,i.role,o.name AS organization_name,c.name AS cohort_name,c.pathway_id
+          FROM organization_invites i
+          JOIN organizations o ON o.id=i.org_id
+          LEFT JOIN cohorts c ON c.id=i.cohort_id
+          WHERE i.token_hash=? LIMIT 1
+        `).bind(tokenHash).first();
+        if (!invite || invite.status !== 'pending') throw new HttpError(404, "Invitation is unavailable");
+        if (Date.parse(invite.expires_at) <= Date.now()) throw new HttpError(410, "Invitation has expired");
+        const pathway = invite.pathway_id ? getPathway(invite.pathway_id) : null;
+        return json({ok:true,invite:{organizationName:invite.organization_name,cohortName:invite.cohort_name||null,pathwayId:pathway?.id||null,pathwayTitle:pathway?.title||null,role:invite.role,expiresAt:invite.expires_at}},200,env);
+      }
+
       // --------------------------------------------------
       // GET OFFICIAL ASSESSMENT
       //
@@ -699,7 +746,8 @@ export default {
             questionCount: assessment.questions.length,
             questions: assessment.questions.map(publicQuestion),
             writingPrompt: assessment.writingPrompt || null,
-            assessmentVersion: "1.0"
+            simulationProfile: assessment.simulationProfile || null,
+            assessmentVersion: assessment.version || "1.0"
           },
           200,
           env
@@ -954,7 +1002,7 @@ export default {
               issued_at,
               revoked_at
             FROM credentials
-            WHERE public_token = ?
+            WHERE public_token = ? AND credential_id NOT LIKE 'DEMO-%'
             LIMIT 1
           `)
           .bind(publicToken)
@@ -1305,7 +1353,28 @@ export default {
           WHERE m.uid = ? AND m.status = 'active' AND o.status = 'active'
           ORDER BY o.name
         `).bind(user.sub).all();
-        return json({ ok: true, organizations: memberships.results || [] }, 200, env);
+        const profiles = await env.DB.prepare(`SELECT org_id,full_name,employer_role,cohort_size_band,onboarding_complete FROM employer_profiles WHERE uid=?`).bind(user.sub).all();
+        return json({ ok: true, organizations: memberships.results || [], employerProfiles: profiles.results || [] }, 200, env);
+      }
+
+      if (request.method === "POST" && url.pathname === "/enterprise/employer-onboarding") {
+        const user = await requireUser(request, env);
+        const body = await readJson(request);
+        const fullName = cleanString(body.fullName || user.name || '', 120);
+        const companyName = cleanString(body.companyName, 120);
+        const employerRole = enterpriseEnum(body.employerRole || 'other',['training_lead','founder_partner','manager','recruiter_hr','other'],'employer role');
+        const cohortSizeBand = enterpriseEnum(body.cohortSizeBand || 'unspecified',['unspecified','1_10','11_25','26_50','51_100','100_plus'],'cohort size');
+        if (fullName.length < 2) throw new HttpError(400,'Full name is required');
+        if (companyName.length < 2) throw new HttpError(400,'Company / firm name is required');
+        const id = `org_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
+        const slug = `${slugifyEnterprise(companyName).slice(0,42)}-${id.slice(-6)}`;
+        await env.DB.batch([
+          env.DB.prepare(`INSERT INTO organizations (id,slug,name,created_by_uid) VALUES (?,?,?,?)`).bind(id,slug,companyName,user.sub),
+          env.DB.prepare(`INSERT INTO organization_members (org_id,uid,role) VALUES (?,?,'owner')`).bind(id,user.sub),
+          env.DB.prepare(`INSERT INTO employer_profiles (uid,org_id,full_name,employer_role,cohort_size_band,onboarding_complete) VALUES (?,?,?,?,?,1)`).bind(user.sub,id,fullName,employerRole,cohortSizeBand),
+          enterpriseAuditStatement(env,id,user.sub,'employer.onboarding_completed','organization',id,{companyName,employerRole,cohortSizeBand})
+        ]);
+        return json({ok:true,organization:{id,slug,name:companyName,role:'owner'},profile:{fullName,employerRole,cohortSizeBand,onboardingComplete:true}},201,env);
       }
 
       if (request.method === "POST" && url.pathname === "/enterprise/organizations") {
@@ -1466,6 +1535,23 @@ export default {
             ]);
             return json({ ok: true, content: { id, assignmentId, pathwayId: pathway.id, contentType: type, title, positionKey, visibility: "visible", currentVersion: 1 } }, 201, env);
           }
+        }
+
+        if (parts.length === 5 && parts[3] === "firm-content" && parts[4] === "reorder" && request.method === "POST") {
+          await requireOrgRole(env,user.sub,orgId,['owner','training_admin','content_manager']); const body=await readJson(request); const assignmentId=cleanId(body.assignmentId); const order=Array.isArray(body.order)?body.order.map(cleanId):[];
+          if(!order.length||order.length>300||new Set(order).size!==order.length) throw new HttpError(400,'A unique content order is required');
+          const rows=(await env.DB.prepare(`SELECT * FROM firm_content WHERE org_id=? AND assignment_id=? ORDER BY position_key,created_at`).bind(orgId,assignmentId).all()).results||[]; const ids=rows.map(x=>x.id);
+          if(ids.length!==order.length||ids.some(id=>!order.includes(id))) throw new HttpError(409,'Reorder must include every Firm Layer item in the selected assignment');
+          const byId=new Map(rows.map(x=>[x.id,x])); const statements=[];
+          order.forEach((id,index)=>{const x=byId.get(id),positionKey=`firm-${String(index+1).padStart(4,'0')}`,nextVersion=Number(x.current_version||1)+1,snapshot=JSON.stringify({title:x.title,body:v2ParseJson(x.body_json,{}),positionKey,visibility:x.visibility,contentType:x.content_type,sourceStandardContentId:x.source_standard_content_id});statements.push(env.DB.prepare(`UPDATE firm_content SET position_key=?,current_version=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND org_id=?`).bind(positionKey,nextVersion,id,orgId),env.DB.prepare(`INSERT INTO firm_content_versions (id,content_id,version,snapshot_json,created_by_uid) VALUES (?,?,?,?,?)`).bind(crypto.randomUUID(),id,nextVersion,snapshot,user.sub));});
+          statements.push(enterpriseAuditStatement(env,orgId,user.sub,'firm_content.reordered','assignment',assignmentId,{order})); await env.DB.batch(statements); return json({ok:true,assignmentId,order},200,env);
+        }
+
+        if (parts.length === 6 && parts[3] === "firm-content" && parts[5] === "versions" && request.method === "GET") {
+          await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES); const contentId=cleanId(parts[4]);
+          const existing=await env.DB.prepare(`SELECT id,title,current_version FROM firm_content WHERE id=? AND org_id=? LIMIT 1`).bind(contentId,orgId).first(); if(!existing) throw new HttpError(404,'Firm content not found');
+          const rows=await env.DB.prepare(`SELECT id,version,snapshot_json,created_by_uid,created_at FROM firm_content_versions WHERE content_id=? ORDER BY version DESC`).bind(contentId).all();
+          return json({ok:true,content:{id:existing.id,title:existing.title,currentVersion:Number(existing.current_version||1)},versions:(rows.results||[]).map(v=>({id:v.id,version:Number(v.version),snapshot:v2ParseJson(v.snapshot_json,{}),createdByUid:v.created_by_uid,createdAt:v.created_at}))},200,env);
         }
 
         if (parts.length === 5 && parts[3] === "firm-content" && request.method === "PATCH") {
@@ -1686,8 +1772,9 @@ export default {
         const user = await requireUser(request, env);
         const pathway = getPathway(parts[2]);
         const rows = await env.DB.prepare(`SELECT * FROM diagnostic_questions WHERE pathway_id=? AND version='2.0' AND status='active' ORDER BY position`).bind(pathway.id).all();
-        if (!(rows.results || []).length) throw new HttpError(404, "Diagnostic not available yet");
-        return json({ ok:true, pathway:{id:pathway.id,title:pathway.title}, version:'2.0', credentialWeight:0, questions:(rows.results||[]).map(v2PublicDiagnosticQuestion), note:'The diagnostic measures your starting point and does not count against credential eligibility.' },200,env);
+        const diagnosticRows=(rows.results||[]).length?(rows.results||[]):v2DynamicDiagnosticQuestions(pathway);
+        if (!diagnosticRows.length) throw new HttpError(404, "Diagnostic not available yet");
+        return json({ ok:true, pathway:{id:pathway.id,title:pathway.title}, version:'2.0', credentialWeight:0, questions:diagnosticRows.map(v2PublicDiagnosticQuestion), note:'The diagnostic measures your starting point and does not count against credential eligibility.' },200,env);
       }
 
       if (request.method === "POST" && url.pathname === "/enterprise/diagnostic/submit") {
@@ -1703,7 +1790,7 @@ export default {
           orgId=a.org_id; cohortId=a.cohort_id; curriculumVersion=a.curriculum_version || '2.0';
         }
         const qRes=await env.DB.prepare(`SELECT * FROM diagnostic_questions WHERE pathway_id=? AND version='2.0' AND status='active' ORDER BY position`).bind(pathway.id).all();
-        const qs=qRes.results||[]; if(!qs.length) throw new HttpError(404,'Diagnostic not available yet');
+        const qs=(qRes.results||[]).length?(qRes.results||[]):v2DynamicDiagnosticQuestions(pathway); if(!qs.length) throw new HttpError(404,'Diagnostic not available yet');
         const answers=body.answers && typeof body.answers==='object' ? body.answers : {};
         let correct=0;
         const byComp={};
@@ -1746,12 +1833,14 @@ export default {
       if (request.method === "GET" && parts[0] === "enterprise" && parts[1] === "role-labs" && parts.length === 3) {
         await requireUser(request,env); const pathway=getPathway(parts[2]);
         const rows=await env.DB.prepare(`SELECT lab_key,version,pathway_id,title,role_title,client_name,scenario_json,pass_score FROM role_lab_definitions WHERE pathway_id=? AND status='active' ORDER BY version DESC`).bind(pathway.id).all();
-        return json({ok:true,labs:(rows.results||[]).map(r=>({labKey:r.lab_key,version:r.version,pathwayId:r.pathway_id,title:r.title,roleTitle:r.role_title,clientName:r.client_name,scenario:v2ParseJson(r.scenario_json,{}),passScore:Number(r.pass_score)}))},200,env);
+        let labRows=rows.results||[]; if(!labRows.length){const dyn=v2DynamicLab(pathway);if(dyn)labRows=[dyn.definition];}
+        return json({ok:true,labs:labRows.map(r=>({labKey:r.lab_key,version:r.version,pathwayId:r.pathway_id,title:r.title,roleTitle:r.role_title,clientName:r.client_name,scenario:v2ParseJson(r.scenario_json,{}),passScore:Number(r.pass_score)}))},200,env);
       }
 
       if (request.method === "POST" && parts[0] === "enterprise" && parts[1] === "role-labs" && parts[3] === "start" && parts.length === 4) {
         const user=await requireUser(request,env); const labKey=cleanId(parts[2]); const body=await readJson(request);
-        const lab=await env.DB.prepare(`SELECT * FROM role_lab_definitions WHERE lab_key=? AND status='active' ORDER BY version DESC LIMIT 1`).bind(labKey).first(); if(!lab) throw new HttpError(404,'Role Lab not found');
+        let lab=await env.DB.prepare(`SELECT * FROM role_lab_definitions WHERE lab_key=? AND status='active' ORDER BY version DESC LIMIT 1`).bind(labKey).first();
+        if(!lab){const dyn=v2DynamicLabByKey(labKey);lab=dyn?.definition||null;} if(!lab) throw new HttpError(404,'Role Lab not found');
         const assignmentId=body.assignmentId?cleanId(body.assignmentId):null; let orgId=null,cohortId=null;
         if(assignmentId){const a=await v2RequireAssignmentAccess(env,user.sub,assignmentId,lab.pathway_id); if(a.accessRole==='learner'&&!['published','completed'].includes(a.status)) throw new HttpError(403,'Assignment is not active'); orgId=a.org_id;cohortId=a.cohort_id;}
         const essentials=await v2ActiveCredential(env,user.sub,lab.pathway_id,'essentials');
@@ -1768,7 +1857,7 @@ export default {
 
       if (request.method === "GET" && parts[0] === "enterprise" && parts[1] === "role-lab-runs" && parts.length === 3) {
         const user=await requireUser(request,env); const runId=cleanId(parts[2]); const run=await env.DB.prepare(`SELECT * FROM role_lab_runs WHERE id=? AND uid=? LIMIT 1`).bind(runId,user.sub).first(); if(!run) throw new HttpError(404,'Role Lab run not found');
-        const lab=await env.DB.prepare(`SELECT * FROM role_lab_definitions WHERE lab_key=? AND version=?`).bind(run.lab_key,run.lab_version).first(); const state=await v2RunState(env,run);
+        let lab=await env.DB.prepare(`SELECT * FROM role_lab_definitions WHERE lab_key=? AND version=?`).bind(run.lab_key,run.lab_version).first(); if(!lab){const dyn=v2DynamicLabByKey(run.lab_key);lab=dyn?.definition||null;} if(!lab) throw new HttpError(404,'Role Lab definition unavailable'); const state=await v2RunState(env,run);
         const completed=state.latest.map(s=>({taskId:s.task_id,attemptNo:Number(s.attempt_no),score:Number(v2ParseJson(s.score_json,{}).score||0),feedback:v2ParseJson(s.feedback_json,{})}));
         return json({ok:true,run:{id:run.id,status:run.status,pathwayId:run.pathway_id,labKey:run.lab_key,labVersion:run.lab_version,assignmentId:run.assignment_id,startedAt:run.started_at,score:run.score==null?state.overall:Number(run.score)},lab:{title:lab.title,roleTitle:lab.role_title,clientName:lab.client_name,scenario:v2ParseJson(lab.scenario_json,{}),passScore:Number(lab.pass_score)},currentTask:state.current?v2PublicLabTask(state.current):null,completed,overallScore:state.overall,complete:state.complete},200,env);
       }
@@ -1802,31 +1891,48 @@ export default {
       }
 
       // ==================================================
+      // CAPITAL MASTERY ACADEMY — CROSS-CAREER EVIDENCE ROLLUPS
+      // ==================================================
+      if (request.method === 'GET' && url.pathname === '/enterprise/academy/catalog') {
+        return json({ok:true,standardVersion:'2.0-academy',awards:ACADEMY_AWARDS.map(x=>({id:x.id,pathwayId:x.pathwayId,level:x.level,title:x.title,kind:x.kind||'academy',required:x.required||null,pool:x.pool||null,minimum:x.minimum||null})),note:'Academy credentials are evidence roll-ups of authoritative Capital Mastery career credentials; they are not separate professional licenses or employer endorsements.'},200,env);
+      }
+      if (request.method === 'GET' && url.pathname === '/enterprise/academy/me') {
+        const user=await requireUser(request,env); const state=await academyCredentialState(env,user.sub);
+        const statuses=ACADEMY_AWARDS.map(def=>{const eligibility=academyEligibility(def,state);const credential=state.rows.find(x=>x.pathway_id===def.pathwayId&&x.credential_level===def.level)||null;return {definition:{id:def.id,pathwayId:def.pathwayId,level:def.level,title:def.title},eligible:eligibility.eligible,summary:eligibility.summary,missing:eligibility.missing,credential:credential?academySafeCredential(credential):null,supporting:eligibility.supporting.map(academySafeCredential)};});
+        return json({ok:true,statuses},200,env);
+      }
+      if (request.method === 'POST' && url.pathname === '/enterprise/academy/refresh') {
+        const user=await requireUser(request,env); const results=await academyRefresh(env,user); return json({ok:true,results:results.map(x=>({definition:x.definition,eligible:x.eligibility.eligible,summary:x.eligibility.summary,missing:x.eligibility.missing,issued:x.issued===true,existing:x.existing===true,credential:x.credential?{credentialId:x.credential.credential_id||x.credential.credentialId,publicToken:x.credential.public_token||x.credential.publicToken,title:x.credential.credential_title||x.credential.title,level:x.credential.credential_level||x.credential.level,pathwayId:x.credential.pathway_id||x.credential.pathwayId,status:x.credential.status}:null}))},200,env);
+      }
+
+      // ==================================================
       // CAPITAL MASTERY V2 — ASSESSMENTS + CREDENTIAL EVIDENCE
       // ==================================================
 
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'assessments' && parts.length === 3) {
         const user=await requireUser(request,env);
         const key=cleanId(parts[2]);
-        const assessment=await env.DB.prepare(`SELECT * FROM v2_assessment_definitions WHERE assessment_key=? AND status='active' ORDER BY version DESC LIMIT 1`).bind(key).first();
+        let assessment=await env.DB.prepare(`SELECT * FROM v2_assessment_definitions WHERE assessment_key=? AND status='active' ORDER BY version DESC LIMIT 1`).bind(key).first();
+        let dynamic=null; if(!assessment){dynamic=v2DynamicAssessmentFromKey(key);assessment=dynamic?.definition||null;}
         if(!assessment) throw new HttpError(404,'Assessment not available');
         const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null;
         await v2AssessmentAccess(env,user,assessment,assignmentId);
-        const qres=await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? AND status='active' ORDER BY position`).bind(assessment.assessment_key,assessment.version).all();
+        const qres=dynamic?{results:dynamic.questions}:await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? AND status='active' ORDER BY position`).bind(assessment.assessment_key,assessment.version).all();
         return json({ok:true,assessment:{key:assessment.assessment_key,version:assessment.version,pathwayId:assessment.pathway_id,stage:assessment.stage,title:assessment.title,description:assessment.description,scenario:v2ParseJson(assessment.scenario_json,{}),passScore:Number(assessment.pass_score)},questions:(qres.results||[]).map(v2PublicAssessmentQuestion)},200,env);
       }
 
       if (request.method === 'POST' && parts[0] === 'enterprise' && parts[1] === 'assessments' && parts[3] === 'submit' && parts.length === 4) {
         const user=await requireUser(request,env);
         const key=cleanId(parts[2]);
-        const assessment=await env.DB.prepare(`SELECT * FROM v2_assessment_definitions WHERE assessment_key=? AND status='active' ORDER BY version DESC LIMIT 1`).bind(key).first();
+        let assessment=await env.DB.prepare(`SELECT * FROM v2_assessment_definitions WHERE assessment_key=? AND status='active' ORDER BY version DESC LIMIT 1`).bind(key).first();
+        let dynamic=null; if(!assessment){dynamic=v2DynamicAssessmentFromKey(key);assessment=dynamic?.definition||null;}
         if(!assessment) throw new HttpError(404,'Assessment not available');
         const body=await readJson(request);
         const assignmentId=body.assignmentId?cleanId(body.assignmentId):null;
         await v2EnforceAssessmentRate(env,user.sub,assessment.pathway_id,assessment.assessment_key,assignmentId);
         const access=await v2AssessmentAccess(env,user,assessment,assignmentId);
         const answers=body.answers&&typeof body.answers==='object'&&!Array.isArray(body.answers)?body.answers:{};
-        const result=await v2GradeAssessment(env,{user,assessment,answers,assignmentId,orgId:access.orgId,cohortId:access.cohortId,curriculumVersion:access.curriculumVersion});
+        const result=await v2GradeAssessment(env,{user,assessment,answers,assignmentId,orgId:access.orgId,cohortId:access.cohortId,curriculumVersion:access.curriculumVersion,dynamicQuestions:dynamic?.questions||null});
         const pathway=getPathway(assessment.pathway_id);
         const refreshed=result.passed?await v2RefreshCredentials(env,{user,pathway,orgId:access.orgId,assignmentId}):[];
         return json({ok:true,assessmentKey:key,version:assessment.version,passScore:Number(assessment.pass_score),...result,issuedCredentials:refreshed.filter(x=>x.issued).map(x=>x.credential),credentialRefresh:refreshed.map(x=>({level:x.level,issued:x.issued===true,eligible:x.eligible===true,missing:x.missing||x.eligibility?.missing||[]}))},200,env);
@@ -1874,19 +1980,63 @@ export default {
 
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'verify' && parts.length === 3) {
         const publicToken=cleanString(parts[2],200);
-        const credential=await env.DB.prepare(`SELECT credential_id,public_token,holder_name,pathway_id,credential_level,credential_title,status,issued_at,revoked_at,standard_version,credential_definition_id,evidence_summary_json FROM credentials WHERE public_token=? LIMIT 1`).bind(publicToken).first();
+        const credential=await env.DB.prepare(`SELECT credential_id,public_token,holder_name,pathway_id,credential_level,credential_title,status,issued_at,revoked_at,standard_version,credential_definition_id,evidence_summary_json FROM credentials WHERE public_token=? AND credential_id NOT LIKE 'DEMO-%' LIMIT 1`).bind(publicToken).first();
         if(!credential) return json({ok:false,valid:false,error:'Credential not found'},404,env);
         const definition=credential.credential_definition_id?await env.DB.prepare(`SELECT description,requirements_json,track,learner_level FROM credential_definitions WHERE id=? LIMIT 1`).bind(credential.credential_definition_id).first():null;
-        const items=await env.DB.prepare(`SELECT evidence_type,title,evidence_json FROM credential_evidence_items WHERE credential_id=? AND evidence_type IN ('assessment','role_lab','readiness','competency_profile','curriculum') ORDER BY created_at,id`).bind(credential.credential_id).all();
+        const items=await env.DB.prepare(`SELECT evidence_type,title,evidence_json FROM credential_evidence_items WHERE credential_id=? AND evidence_type IN ('credential','assessment','role_lab','readiness','competency_profile','curriculum') ORDER BY created_at,id`).bind(credential.credential_id).all();
         const publicEvidence=(items.results||[]).map(x=>{
           const data=v2ParseJson(x.evidence_json,{});
           if(x.evidence_type==='competency_profile') return {type:x.evidence_type,title:x.title,competencies:(data.competencies||[]).map(c=>({name:c.name,category:c.category,score:Number(c.score),minimumScore:Number(c.minimum_score||0),critical:Number(c.critical)===1,evidenceCount:Number(c.evidence_count||0)}))};
           if(x.evidence_type==='readiness') return {type:x.evidence_type,title:x.title,overallScore:data.overallScore,status:data.status,evidenceCoverage:data.evidenceCoverage,criticalFloorsMet:data.criticalFloorsMet,improvement:data.improvement};
           if(x.evidence_type==='assessment') return {type:x.evidence_type,title:x.title,key:data.key,version:data.version,score:data.score,passed:data.passed,submittedAt:data.submittedAt};
           if(x.evidence_type==='role_lab') return {type:x.evidence_type,title:x.title,key:data.key,version:data.version,score:data.score,completedAt:data.completedAt};
+          if(x.evidence_type==='credential') return {type:x.evidence_type,title:x.title,credentialId:data.credentialId,pathwayId:data.pathwayId,level:data.level,issuedAt:data.issuedAt};
           return {type:x.evidence_type,title:x.title,standardVersion:credential.standard_version};
         });
         return json({ok:true,valid:credential.status==='active',credential:{credentialId:credential.credential_id,holderName:credential.holder_name,pathwayId:credential.pathway_id,level:credential.credential_level,title:credential.credential_title,status:credential.status,issuedAt:credential.issued_at,revokedAt:credential.revoked_at||null,standardVersion:credential.standard_version||'1.0-legacy',description:definition?.description||null,track:definition?.track||'legacy',learnerLevel:definition?.learner_level||'legacy'},evidence:publicEvidence},200,env);
+      }
+
+      // ==================================================
+      // CAPITAL MASTERY V2 — MANAGER REVIEWS + NOTIFICATIONS
+      // ==================================================
+      if (request.method === 'POST' && url.pathname === '/enterprise/notifications/refresh') {
+        const user=await requireUser(request,env); const result=await refreshEnterpriseNotifications(env,user); return json({ok:true,...result},200,env);
+      }
+      if (request.method === 'GET' && url.pathname === '/enterprise/notifications') {
+        const user=await requireUser(request,env); await refreshEnterpriseNotifications(env,user);
+        const rows=await env.DB.prepare(`SELECT id,org_id,assignment_id,category,severity,title,body,action_hash,status,created_at,updated_at FROM enterprise_notifications WHERE recipient_uid=? AND status!='archived' ORDER BY CASE severity WHEN 'urgent' THEN 0 WHEN 'attention' THEN 1 WHEN 'positive' THEN 2 ELSE 3 END, created_at DESC LIMIT 100`).bind(user.sub).all();
+        return json({ok:true,notifications:(rows.results||[]).map(x=>({id:x.id,orgId:x.org_id,assignmentId:x.assignment_id,category:x.category,severity:x.severity,title:x.title,body:x.body,actionHash:x.action_hash,status:x.status,createdAt:x.created_at,updatedAt:x.updated_at}))},200,env);
+      }
+      if (request.method === 'PATCH' && parts[0]==='enterprise' && parts[1]==='notifications' && parts.length===3) {
+        const user=await requireUser(request,env); const id=cleanId(parts[2]); const body=await readJson(request); const status=enterpriseEnum(body.status||'read',['read','archived'],'notification status');
+        const result=await env.DB.prepare(`UPDATE enterprise_notifications SET status=?,read_at=CASE WHEN ?='read' THEN CURRENT_TIMESTAMP ELSE read_at END,updated_at=CURRENT_TIMESTAMP WHERE id=? AND recipient_uid=?`).bind(status,status,id,user.sub).run();
+        if(!Number(result.meta?.changes||0)) throw new HttpError(404,'Notification not found'); return json({ok:true,id,status},200,env);
+      }
+
+      if (request.method === 'GET' && parts[0]==='enterprise' && parts[1]==='organizations' && parts[3]==='reviews' && parts.length===4) {
+        const user=await requireUser(request,env),orgId=cleanId(parts[2]); await requireOrgRole(env,user.sub,orgId,ENTERPRISE_EMPLOYER_ROLES);
+        const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null; const learnerUid=url.searchParams.get('learnerUid')?cleanString(url.searchParams.get('learnerUid'),180):null;
+        let sql=`SELECT * FROM manager_reviews WHERE org_id=?`, binds=[orgId]; if(assignmentId){sql+=' AND assignment_id=?';binds.push(assignmentId);} if(learnerUid){sql+=' AND learner_uid=?';binds.push(learnerUid);} sql+=' ORDER BY created_at DESC LIMIT 200';
+        const rows=await env.DB.prepare(sql).bind(...binds).all(); return json({ok:true,reviews:(rows.results||[]).map(managerReviewPublic)},200,env);
+      }
+      if (request.method === 'POST' && parts[0]==='enterprise' && parts[1]==='organizations' && parts[3]==='reviews' && parts.length===4) {
+        const user=await requireUser(request,env),orgId=cleanId(parts[2]); await requireOrgRole(env,user.sub,orgId,['owner','training_admin','manager']); const body=await readJson(request);
+        const assignmentId=cleanId(body.assignmentId),learnerUid=cleanString(body.learnerUid,180),artifactType=enterpriseEnum(body.artifactType||'general',['readiness','role_lab','assessment','credential','general'],'artifact type'),reviewStatus=enterpriseEnum(body.reviewStatus||'note',['note','needs_attention','resolved','commended'],'review status'),comment=cleanString(body.comment,2400),artifactRef=body.artifactRef?cleanString(body.artifactRef,180):null; const rating=body.rating==null?null:Number(body.rating);
+        if(comment.length<3) throw new HttpError(400,'Review comment is required'); if(rating!=null&&(!Number.isInteger(rating)||rating<1||rating>5)) throw new HttpError(400,'Rating must be 1–5');
+        const a=await env.DB.prepare(`SELECT a.pathway_id,a.cohort_id FROM program_assignments a JOIN cohort_members cm ON cm.cohort_id=a.cohort_id AND cm.org_id=a.org_id WHERE a.id=? AND a.org_id=? AND cm.uid=? LIMIT 1`).bind(assignmentId,orgId,learnerUid).first(); if(!a) throw new HttpError(404,'Learner assignment not found');
+        const id=`review_${crypto.randomUUID().replace(/-/g,'').slice(0,20)}`; const noteId=`note_${crypto.randomUUID().replace(/-/g,'').slice(0,20)}`;
+        await env.DB.batch([
+          env.DB.prepare(`INSERT INTO manager_reviews (id,org_id,assignment_id,learner_uid,pathway_id,artifact_type,artifact_ref,review_status,rating,comment,created_by_uid) VALUES (?,?,?,?,?,?,?,?,?,?,?)`).bind(id,orgId,assignmentId,learnerUid,a.pathway_id,artifactType,artifactRef,reviewStatus,rating,comment,user.sub),
+          env.DB.prepare(`INSERT INTO enterprise_notifications (id,recipient_uid,org_id,assignment_id,category,severity,title,body,action_hash,dedupe_key,status) VALUES (?,?,?,?,?,?,?,?,?,?,'unread') ON CONFLICT(recipient_uid,dedupe_key) DO UPDATE SET severity=excluded.severity,title=excluded.title,body=excluded.body,action_hash=excluded.action_hash,status='unread',updated_at=CURRENT_TIMESTAMP`).bind(noteId,learnerUid,orgId,assignmentId,'manager_review',reviewStatus==='needs_attention'?'attention':reviewStatus==='commended'?'positive':'info','New manager review',comment,`#/readiness/${encodeURIComponent(a.pathway_id)}?assignment=${encodeURIComponent(assignmentId)}`,`manager_review:${id}`),
+          enterpriseAuditStatement(env,orgId,user.sub,'manager_review.created','manager_review',id,{assignmentId,learnerUid,artifactType,reviewStatus,rating})
+        ]);
+        return json({ok:true,review:{id,orgId,assignmentId,learnerUid,pathwayId:a.pathway_id,artifactType,artifactRef,reviewStatus,rating,comment,createdByUid:user.sub}},201,env);
+      }
+      if (request.method === 'PATCH' && parts[0]==='enterprise' && parts[1]==='organizations' && parts[3]==='reviews' && parts[4] && parts.length===5) {
+        const user=await requireUser(request,env),orgId=cleanId(parts[2]),id=cleanId(parts[4]); await requireOrgRole(env,user.sub,orgId,['owner','training_admin','manager']); const existing=await env.DB.prepare(`SELECT * FROM manager_reviews WHERE id=? AND org_id=?`).bind(id,orgId).first(); if(!existing) throw new HttpError(404,'Manager review not found'); const body=await readJson(request);
+        const reviewStatus=body.reviewStatus===undefined?existing.review_status:enterpriseEnum(body.reviewStatus,['note','needs_attention','resolved','commended'],'review status'), comment=body.comment===undefined?existing.comment:cleanString(body.comment,2400), rating=body.rating===undefined?existing.rating:(body.rating==null?null:Number(body.rating));
+        if(rating!=null&&(!Number.isInteger(rating)||rating<1||rating>5)) throw new HttpError(400,'Rating must be 1–5');
+        await env.DB.batch([env.DB.prepare(`UPDATE manager_reviews SET review_status=?,rating=?,comment=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND org_id=?`).bind(reviewStatus,rating,comment,id,orgId),enterpriseAuditStatement(env,orgId,user.sub,'manager_review.updated','manager_review',id,{reviewStatus,rating})]); return json({ok:true,review:{id,reviewStatus,rating,comment}},200,env);
       }
 
       // ==================================================
@@ -1954,11 +2104,12 @@ export default {
             const readiness=await env.DB.prepare(`SELECT * FROM readiness_snapshots WHERE uid=? AND assignment_id=? ORDER BY created_at DESC LIMIT 1`).bind(l.uid,a.id).first();
             const diagnostic=await env.DB.prepare(`SELECT score,submitted_at FROM diagnostic_attempts WHERE uid=? AND assignment_id=? ORDER BY submitted_at ASC LIMIT 1`).bind(l.uid,a.id).first();
             const lab=await env.DB.prepare(`SELECT id,status,score,revision_count,completed_at FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(l.uid,a.id).first();
-            const final=await env.DB.prepare(`SELECT score,passed,submitted_at FROM v2_assessment_attempts WHERE uid=? AND assignment_id=? AND assessment_key='ib-professional-final' ORDER BY score DESC,submitted_at DESC LIMIT 1`).bind(l.uid,a.id).first();
+            const final=await env.DB.prepare(`SELECT va.score,va.passed,va.submitted_at FROM v2_assessment_attempts va LEFT JOIN v2_assessment_definitions vd ON vd.assessment_key=va.assessment_key AND vd.version=va.assessment_version WHERE va.uid=? AND va.assignment_id=? AND (vd.stage='final' OR va.assessment_key LIKE '%professional-final') ORDER BY va.score DESC,va.submitted_at DESC LIMIT 1`).bind(l.uid,a.id).first();
             const readinessCredential=await env.DB.prepare(`SELECT credential_id,status,issued_at FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' ORDER BY issued_at DESC LIMIT 1`).bind(l.uid,a.id).first();
+            const managerReview=await env.DB.prepare(`SELECT * FROM manager_reviews WHERE org_id=? AND assignment_id=? AND learner_uid=? ORDER BY created_at DESC LIMIT 1`).bind(orgId,a.id,l.uid).first();
             const due=a.due_at?Date.parse(a.due_at):null;
             const complete=!!(readinessCredential&&readinessCredential.status==='active');
-            learnerRows.push({uid:l.uid,name:l.holder_name||null,email:l.email||null,diagnostic:diagnostic?{score:Number(diagnostic.score),submittedAt:diagnostic.submitted_at}:null,readiness:readiness?{overallScore:Number(readiness.overall_score),status:readiness.status,baselineScore:readiness.baseline_score==null?null:Number(readiness.baseline_score),improvement:readiness.improvement==null?null:Number(readiness.improvement),evidenceCoverage:Math.round(Number(readiness.evidence_coverage||0)*100),evidencePhase:readiness.evidence_phase,competencies:v2ParseJson(readiness.competency_scores_json,{})}:null,roleLab:lab?{id:lab.id,status:lab.status,score:lab.score==null?null:Number(lab.score),revisions:Number(lab.revision_count||0),completedAt:lab.completed_at}:null,final:final?{score:Number(final.score),passed:Number(final.passed)===1,submittedAt:final.submitted_at}:null,credential:readinessCredential?{credentialId:readinessCredential.credential_id,status:readinessCredential.status,issuedAt:readinessCredential.issued_at}:null,complete,overdue:!!(due&&due<Date.now()&&!complete)});
+            learnerRows.push({uid:l.uid,name:l.holder_name||null,email:l.email||null,diagnostic:diagnostic?{score:Number(diagnostic.score),submittedAt:diagnostic.submitted_at}:null,readiness:readiness?{overallScore:Number(readiness.overall_score),status:readiness.status,baselineScore:readiness.baseline_score==null?null:Number(readiness.baseline_score),improvement:readiness.improvement==null?null:Number(readiness.improvement),evidenceCoverage:Math.round(Number(readiness.evidence_coverage||0)*100),evidencePhase:readiness.evidence_phase,competencies:v2ParseJson(readiness.competency_scores_json,{})}:null,roleLab:lab?{id:lab.id,status:lab.status,score:lab.score==null?null:Number(lab.score),revisions:Number(lab.revision_count||0),completedAt:lab.completed_at}:null,final:final?{score:Number(final.score),passed:Number(final.passed)===1,submittedAt:final.submitted_at}:null,credential:readinessCredential?{credentialId:readinessCredential.credential_id,status:readinessCredential.status,issuedAt:readinessCredential.issued_at}:null,managerReview:managerReview?managerReviewPublic(managerReview):null,complete,overdue:!!(due&&due<Date.now()&&!complete)});
           }
           const latestScores={};
           for(const l of learnerRows){for(const [cid,c] of Object.entries(l.readiness?.competencies||{})){if(c?.score==null)continue;(latestScores[cid] ||= {name:c.name,scores:[],minimum:Number(c.minimum||0),critical:c.critical===true}).scores.push(Number(c.score));}}
@@ -1980,7 +2131,7 @@ export default {
         const credentials=(await env.DB.prepare(`SELECT credential_id,public_token,credential_level,credential_title,status,standard_version,issued_at,assignment_id FROM credentials WHERE uid=? AND pathway_id=? ORDER BY issued_at`).bind(user.sub,pathway.id).all()).results||[];
         const diagnostic=await env.DB.prepare(`SELECT score,submitted_at FROM diagnostic_attempts WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? ORDER BY submitted_at ASC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
         const lab=await env.DB.prepare(`SELECT id,lab_key,lab_version,status,score,revision_count,completed_at FROM role_lab_runs WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? ORDER BY started_at DESC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
-        const finalAssessment=await env.DB.prepare(`SELECT assessment_key,assessment_version,score,passed,submitted_at FROM v2_assessment_attempts WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? AND assessment_key='ib-professional-final' ORDER BY score DESC,submitted_at DESC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
+        const finalAssessment=await env.DB.prepare(`SELECT va.assessment_key,va.assessment_version,va.score,va.passed,va.submitted_at FROM v2_assessment_attempts va LEFT JOIN v2_assessment_definitions vd ON vd.assessment_key=va.assessment_key AND vd.version=va.assessment_version WHERE va.uid=? AND va.pathway_id=? AND COALESCE(va.assignment_id,'public')=? AND (vd.stage='final' OR va.assessment_key LIKE '%professional-final') ORDER BY va.score DESC,va.submitted_at DESC LIMIT 1`).bind(user.sub,pathway.id,skillsScope).first();
         return json({ok:true,generatedAt:new Date().toISOString(),pathway:{id:pathway.id,title:pathway.title,role:pathway.role},assignment:assignment?{id:assignment.id,orgId,cohortId:assignment.cohort_id,dueAt:assignment.due_at,curriculumVersion:assignment.curriculum_version}:null,diagnostic:diagnostic?{score:Number(diagnostic.score),submittedAt:diagnostic.submitted_at}:null,readiness:readiness?{overallScore:Number(readiness.overall_score),status:readiness.status,baselineScore:readiness.baseline_score==null?null:Number(readiness.baseline_score),improvement:readiness.improvement==null?null:Number(readiness.improvement),evidenceCoverage:Math.round(Number(readiness.evidence_coverage||0)*100),evidencePhase:readiness.evidence_phase,createdAt:readiness.created_at}:null,competencies:skills.map(s=>({id:s.competency_id,name:s.name,category:s.category,score:Number(s.score),evidenceCount:Number(s.evidence_count||0),weight:Number(s.weight||0),minimumScore:Number(s.minimum_score||0),critical:Number(s.critical)===1})),roleLab:lab?{id:lab.id,key:lab.lab_key,version:lab.lab_version,status:lab.status,score:lab.score==null?null:Number(lab.score),revisions:Number(lab.revision_count||0),completedAt:lab.completed_at}:null,finalAssessment:finalAssessment?{key:finalAssessment.assessment_key,version:finalAssessment.assessment_version,score:Number(finalAssessment.score),passed:Number(finalAssessment.passed)===1,submittedAt:finalAssessment.submitted_at}:null,credentials:credentials.map(c=>({credentialId:c.credential_id,publicToken:c.public_token,level:c.credential_level,title:c.credential_title,status:c.status,standardVersion:c.standard_version,issuedAt:c.issued_at,assignmentId:c.assignment_id||null}))},200,env);
       }
 
@@ -2107,6 +2258,148 @@ async function requireUser(request, env) {
       "Invalid or expired authentication"
     );
   }
+}
+
+
+const DEMO_PRESETS = ['new_cohort','mixed_cohort','completed_cohort','weak_modeling','overdue_cohort','revision_cycle'];
+const DEMO_NAMES = ['Avery Morgan','Jordan Lee','Maya Patel','Ethan Brooks','Sofia Rivera','Noah Bennett','Chloe Kim','Liam Carter','Priya Shah','Lucas Nguyen','Mia Thompson','Owen Garcia','Nora Williams','Leo Martinez','Zoe Robinson','Arjun Mehta','Ella Davis','Henry Clark','Ivy Chen','Caleb Wilson','Nina Foster','Ryan Park','Grace Evans','Theo Adams','Layla Reed','Julian Scott','Emma Turner','Aiden Lewis','Sana Khan','Miles Cooper'];
+
+function demoSlugPart(value='demo') { return String(value).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,36) || 'demo'; }
+function demoUid(orgId,index,name){ return `demo_uid_${orgId.slice(-8)}_${String(index+1).padStart(2,'0')}_${demoSlugPart(name).replace(/-/g,'_')}`; }
+function demoEmail(name,index){ return `${demoSlugPart(name).replace(/-/g,'.')}.${index+1}@demo.invalid`; }
+function demoCompetencies(overall, weakModeling=false) {
+  const base=Math.max(45,Math.min(98,Number(overall||0)));
+  const rows=[
+    ['demo_finance','Financial analysis',Math.min(100,base+2),75,true],
+    ['demo_modeling','Modeling & tool accuracy',weakModeling?62:Math.max(40,base-3),75,true],
+    ['demo_research','Research & source discipline',Math.min(100,base+1),70,false],
+    ['demo_judgment','Professional judgment',Math.max(40,base-1),70,false],
+    ['demo_quality','Quality control',weakModeling?66:base,75,true],
+    ['demo_comm','Communication',Math.min(100,base+3),70,false]
+  ];
+  return Object.fromEntries(rows.map(([id,name,score,minimum,critical])=>[id,{name,score,minimum,critical,evidenceCount:score?4:0}]));
+}
+function demoProfile(preset,index,size) {
+  if(preset==='new_cohort') return {stage:'new',baseline:null,readiness:null,evidence:0,roleLab:null,revisions:0,final:null,complete:false};
+  if(preset==='completed_cohort') { const score=86+(index%10); return {stage:'ready',baseline:68+(index%12),readiness:score,evidence:100,roleLab:84+(index%13),revisions:index%3===0?1:0,final:86+(index%12),complete:true}; }
+  if(preset==='weak_modeling') { const score=76+(index%8); return {stage:index%4===0?'revision':'rolelab',baseline:70+(index%10),readiness:score,evidence:80,roleLab:68+(index%9),revisions:2+(index%2),final:index%3===0?null:82+(index%8),complete:false,weakModeling:true}; }
+  if(preset==='overdue_cohort') { const score=60+(index%18); return {stage:index%3===0?'new':index%3===1?'baseline':'rolelab',baseline:index%3===0?null:score,readiness:index%3===0?null:score+4,evidence:index%3===0?0:index%3===1?25:70,roleLab:index%3===2?72+(index%6):null,revisions:index%3===2?1:0,final:null,complete:false}; }
+  if(preset==='revision_cycle') { const score=72+(index%12); return {stage:'revision',baseline:70+(index%8),readiness:score,evidence:90,roleLab:70+(index%9),revisions:2+(index%3),final:null,complete:false}; }
+  const pattern=index%6;
+  if(pattern===0) return {stage:'new',baseline:null,readiness:null,evidence:0,roleLab:null,revisions:0,final:null,complete:false};
+  if(pattern===1) return {stage:'baseline',baseline:58+(index%10),readiness:60+(index%8),evidence:20,roleLab:null,revisions:0,final:null,complete:false};
+  if(pattern===2) return {stage:'learning',baseline:67+(index%10),readiness:72+(index%8),evidence:45,roleLab:null,revisions:0,final:null,complete:false};
+  if(pattern===3) return {stage:'revision',baseline:72,readiness:76,evidence:80,roleLab:72,revisions:2,final:null,complete:false};
+  if(pattern===4) return {stage:'final',baseline:75,readiness:84,evidence:95,roleLab:86,revisions:1,final:82,complete:false};
+  return {stage:'ready',baseline:76,readiness:90+(index%6),evidence:100,roleLab:91,revisions:0,final:92,complete:true};
+}
+
+function demoStateProfile(state) {
+  if(state==='new') return {baseline:null,readiness:null,evidence:0,roleLab:null,revisions:0,final:null,complete:false};
+  if(state==='baseline') return {baseline:68,readiness:68,evidence:20,roleLab:null,revisions:0,final:null,complete:false};
+  if(state==='learning') return {baseline:70,readiness:74,evidence:45,roleLab:null,revisions:0,final:null,complete:false};
+  if(state==='revision') return {baseline:72,readiness:77,evidence:82,roleLab:71,revisions:2,final:null,complete:false};
+  if(state==='final') return {baseline:74,readiness:84,evidence:95,roleLab:86,revisions:1,final:83,complete:false};
+  if(state==='ready') return {baseline:76,readiness:91,evidence:100,roleLab:92,revisions:0,final:94,complete:true};
+  throw new HttpError(400,'Unknown demo learner state');
+}
+const ENTERPRISE_PERMISSION_LAB = {
+  owner:['workspace.manage','cohort.manage','assignment.manage','content.manage','member.manage','report.view','audit.view'],
+  training_admin:['cohort.manage','assignment.manage','member.invite','report.view','audit.view'],
+  content_manager:['content.manage','report.view'],
+  manager:['report.view'],
+  viewer:['report.view'],
+  learner:['own_training.view','own_work.submit','own_report.view']
+};
+
+async function setEnterpriseDemoLearnerState(env, admin, body={}) {
+  const orgId=cleanId(body.orgId), uid=cleanString(body.uid,180), state=cleanString(body.state,40);
+  if(!orgId.startsWith('demo_org_')||!uid.startsWith('demo_uid_')) throw new HttpError(400,'Only synthetic demo learners can be changed');
+  const row=await env.DB.prepare(`SELECT cm.uid,c.pathway_id,a.id AS assignment_id,c.id AS cohort_id FROM cohort_members cm JOIN cohorts c ON c.id=cm.cohort_id JOIN program_assignments a ON a.cohort_id=c.id AND a.org_id=c.org_id WHERE cm.org_id=? AND cm.uid=? LIMIT 1`).bind(orgId,uid).first();
+  if(!row) throw new HttpError(404,'Synthetic learner not found');
+  const pathway=getPathway(row.pathway_id); const p=demoStateProfile(state); const comps=demoCompetencies(p.readiness||p.baseline||55,state==='revision'); const tag=crypto.randomUUID().replace(/-/g,'').slice(0,8);
+  const oldCreds=(await env.DB.prepare(`SELECT credential_id FROM credentials WHERE org_id=? AND uid=?`).bind(orgId,uid).all()).results||[];
+  const statements=[];
+  for(const c of oldCreds){statements.push(env.DB.prepare(`DELETE FROM credential_evidence_items WHERE credential_id=?`).bind(c.credential_id),env.DB.prepare(`DELETE FROM credential_events WHERE credential_id=?`).bind(c.credential_id));}
+  statements.push(
+    env.DB.prepare(`DELETE FROM credentials WHERE org_id=? AND uid=?`).bind(orgId,uid),
+    env.DB.prepare(`DELETE FROM role_lab_submissions WHERE run_id IN (SELECT id FROM role_lab_runs WHERE org_id=? AND uid=?)`).bind(orgId,uid),
+    env.DB.prepare(`DELETE FROM role_lab_runs WHERE org_id=? AND uid=?`).bind(orgId,uid),
+    env.DB.prepare(`DELETE FROM v2_assessment_attempts WHERE org_id=? AND uid=?`).bind(orgId,uid),
+    env.DB.prepare(`DELETE FROM diagnostic_attempts WHERE org_id=? AND uid=?`).bind(orgId,uid),
+    env.DB.prepare(`DELETE FROM competency_evidence WHERE org_id=? AND uid=?`).bind(orgId,uid),
+    env.DB.prepare(`DELETE FROM competency_scores WHERE uid=? AND org_scope=?`).bind(uid,orgId),
+    env.DB.prepare(`DELETE FROM readiness_snapshots WHERE org_id=? AND uid=?`).bind(orgId,uid)
+  );
+  if(p.baseline!=null) statements.push(env.DB.prepare(`INSERT INTO diagnostic_attempts (id,uid,org_id,cohort_id,assignment_id,pathway_id,version,score,competency_scores_json) VALUES (?,?,?,?,?,?, '2.0',?,?)`).bind(`demo_diag_${tag}`,uid,orgId,row.cohort_id,row.assignment_id,pathway.id,p.baseline,JSON.stringify(comps)));
+  if(p.readiness!=null) statements.push(env.DB.prepare(`INSERT INTO readiness_snapshots (id,uid,org_id,cohort_id,assignment_id,pathway_id,overall_score,status,competency_scores_json,baseline_score,improvement,curriculum_version,evidence_coverage,evidence_phase) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(`demo_ready_${tag}`,uid,orgId,row.cohort_id,row.assignment_id,pathway.id,p.readiness,p.complete?'ready':p.readiness>=85?'ready_with_development':p.readiness>=75?'near_ready':'developing',JSON.stringify(comps),p.baseline,p.readiness-p.baseline,'2.0',p.evidence/100,p.evidence>=100?'final_evidence':p.evidence>=70?'role_lab_evidence':p.evidence>0?'applied_evidence':'baseline'));
+  if(p.roleLab!=null) statements.push(env.DB.prepare(`INSERT INTO role_lab_runs (id,uid,org_id,cohort_id,assignment_id,pathway_id,lab_key,lab_version,status,score,revision_count,submitted_at,completed_at) VALUES (?,?,?,?,?,?,?, '2.0',?,?,?,?,?)`).bind(`demo_lab_${tag}`,uid,orgId,row.cohort_id,row.assignment_id,pathway.id,v2CareerRoleLabKey(pathway.id),p.complete?'passed':p.revisions>0?'revision_required':'in_progress',p.roleLab,p.revisions,new Date().toISOString(),p.complete?new Date().toISOString():null));
+  if(p.final!=null) statements.push(env.DB.prepare(`INSERT INTO v2_assessment_attempts (id,uid,org_id,cohort_id,assignment_id,pathway_id,assessment_key,assessment_version,score,passed,answers_json,result_json) VALUES (?,?,?,?,?,?,?, '2.0',?,?, '{}','{}')`).bind(`demo_final_${tag}`,uid,orgId,row.cohort_id,row.assignment_id,pathway.id,v2CareerAssessmentKey(pathway.id,'final'),p.final,p.final>=80?1:0));
+  if(p.complete) statements.push(env.DB.prepare(`INSERT INTO credentials (credential_id,public_token,uid,holder_name,pathway_id,credential_level,credential_title,status,standard_version,credential_definition_id,org_id,assignment_id,evidence_summary_json) VALUES (?,?,?,?,?,'professional_readiness',?,'active','2.0',?,?,?,'{}')`).bind(`DEMO-${pathway.code}-${tag}`,`demo_verify_${tag}`,uid,'Synthetic Learner',pathway.id,`${pathway.title} Professional Readiness Certificate`,null,orgId,row.assignment_id));
+  statements.push(enterpriseAuditStatement(env,orgId,admin.sub,'demo.learner_state_changed','demo_learner',uid,{state,synthetic:true}));
+  await env.DB.batch(statements); return {orgId,uid,state,pathwayId:pathway.id};
+}
+
+
+async function createEnterpriseDemo(env, admin, body={}) {
+  const preset=DEMO_PRESETS.includes(body.preset)?body.preset:'mixed_cohort';
+  const size=Math.max(3,Math.min(30,Number(body.size||12)));
+  const pathway=getPathway(body.pathwayId||'investment-banking');
+  const stamp=crypto.randomUUID().replace(/-/g,'').slice(0,10);
+  const orgId=`demo_org_${stamp}`, cohortId=`demo_cohort_${stamp}`, assignmentId=`demo_assignment_${stamp}`;
+  const due = new Date(Date.now() + (preset==='overdue_cohort'?-3:30)*86400000).toISOString();
+  const orgName=`[DEMO] ${pathway.title} · ${preset.replace(/_/g,' ')}`;
+  const statements=[
+    env.DB.prepare(`INSERT INTO organizations (id,slug,name,status,created_by_uid) VALUES (?,?,?,'active',?)`).bind(orgId,`demo-${stamp}`,orgName,admin.sub),
+    env.DB.prepare(`INSERT INTO organization_members (org_id,uid,role,status) VALUES (?,?,'owner','active')`).bind(orgId,admin.sub),
+    env.DB.prepare(`INSERT INTO cohorts (id,org_id,name,pathway_id,program_level,status,deadline_at,created_by_uid) VALUES (?,?,?,?, 'professional','active',?,?)`).bind(cohortId,orgId,`Synthetic ${pathway.title} Cohort`,pathway.id,due,admin.sub),
+    env.DB.prepare(`INSERT INTO program_assignments (id,org_id,cohort_id,pathway_id,track,credential_target,status,due_at,curriculum_version,created_by_uid) VALUES (?,?,?,?, 'professional','professional_readiness','published',?,'2.0',?)`).bind(assignmentId,orgId,cohortId,pathway.id,due,admin.sub),
+    enterpriseAuditStatement(env,orgId,admin.sub,'demo.created','organization',orgId,{synthetic:true,preset,size,pathwayId:pathway.id})
+  ];
+  for(let i=0;i<size;i++){
+    const name=DEMO_NAMES[i%DEMO_NAMES.length], uid=demoUid(orgId,i,name), email=demoEmail(name,i), invId=`demo_inv_${stamp}_${i}`, token=`demo_token_${stamp}_${i}`;
+    const p=demoProfile(preset,i,size); const comps=demoCompetencies(p.readiness||p.baseline||55,p.weakModeling===true);
+    statements.push(
+      env.DB.prepare(`INSERT INTO organization_invites (id,org_id,cohort_id,email_normalized,token_hash,role,status,expires_at,created_by_uid,accepted_by_uid,accepted_at) VALUES (?,?,?,?,?,'learner','accepted',datetime('now','+365 days'),?,?,CURRENT_TIMESTAMP)`).bind(invId,orgId,cohortId,email,token,admin.sub,uid),
+      env.DB.prepare(`INSERT INTO cohort_members (cohort_id,org_id,uid,status) VALUES (?,?,?,'active')`).bind(cohortId,orgId,uid)
+    );
+    if(p.baseline!=null) statements.push(env.DB.prepare(`INSERT INTO diagnostic_attempts (id,uid,org_id,cohort_id,assignment_id,pathway_id,version,score,competency_scores_json) VALUES (?,?,?,?,?,?, '2.0',?,?)`).bind(`demo_diag_${stamp}_${i}`,uid,orgId,cohortId,assignmentId,pathway.id,p.baseline,JSON.stringify(comps)));
+    if(p.readiness!=null) statements.push(env.DB.prepare(`INSERT INTO readiness_snapshots (id,uid,org_id,cohort_id,assignment_id,pathway_id,overall_score,status,competency_scores_json,baseline_score,improvement,curriculum_version,evidence_coverage,evidence_phase) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(`demo_ready_${stamp}_${i}`,uid,orgId,cohortId,assignmentId,pathway.id,p.readiness,p.complete?'ready':p.readiness>=85?'ready_with_development':p.readiness>=75?'near_ready':'developing',JSON.stringify(comps),p.baseline,p.baseline==null?null:p.readiness-p.baseline,'2.0',Number(p.evidence||0)/100,p.evidence>=100?'final_evidence':p.evidence>=70?'role_lab_evidence':p.evidence>0?'applied_evidence':'baseline'));
+    if(p.roleLab!=null) statements.push(env.DB.prepare(`INSERT INTO role_lab_runs (id,uid,org_id,cohort_id,assignment_id,pathway_id,lab_key,lab_version,status,score,revision_count,submitted_at,completed_at) VALUES (?,?,?,?,?,?,?, '2.0',?,?,?,?,?)`).bind(`demo_lab_${stamp}_${i}`,uid,orgId,cohortId,assignmentId,pathway.id,pathway.id==='investment-banking'?'ib-project-northstar':`demo-${pathway.id}-role-lab`,p.complete?'passed':p.revisions>0?'revision_required':'in_progress',p.roleLab,p.revisions,new Date().toISOString(),p.complete?new Date().toISOString():null));
+    if(p.final!=null) statements.push(env.DB.prepare(`INSERT INTO v2_assessment_attempts (id,uid,org_id,cohort_id,assignment_id,pathway_id,assessment_key,assessment_version,score,passed,answers_json,result_json) VALUES (?,?,?,?,?,?,?, '2.0',?,?, '{}','{}')`).bind(`demo_final_${stamp}_${i}`,uid,orgId,cohortId,assignmentId,pathway.id,pathway.id==='investment-banking'?'ib-professional-final':`demo-${pathway.id}-professional-final`,p.final,p.final>=80?1:0));
+    if(p.complete){
+      statements.push(env.DB.prepare(`INSERT INTO credentials (credential_id,public_token,uid,holder_name,pathway_id,credential_level,credential_title,status,standard_version,credential_definition_id,org_id,assignment_id,evidence_summary_json) VALUES (?,?,?,?,?,'professional_readiness',?,'active','2.0',?,?,?,'{}')`).bind(`DEMO-${pathway.code||'CM'}-${stamp}-${i}`,`demo_verify_${stamp}_${i}`,uid,name,pathway.id,`${pathway.title} Professional Readiness Certificate`,pathway.id==='investment-banking'?'ib-professional-readiness-v2':null,orgId,assignmentId));
+    }
+  }
+  await env.DB.batch(statements);
+  return {orgId,cohortId,assignmentId,preset,size,pathway:{id:pathway.id,title:pathway.title},name:orgName,synthetic:true};
+}
+
+async function resetEnterpriseDemos(env, admin) {
+  const orgs=(await env.DB.prepare(`SELECT id FROM organizations WHERE id LIKE 'demo_org_%'`).all()).results||[];
+  if(!orgs.length) return {deletedOrganizations:0};
+  await env.DB.batch([
+    env.DB.prepare(`DELETE FROM credential_evidence_items WHERE credential_id IN (SELECT credential_id FROM credentials WHERE org_id LIKE 'demo_org_%')`),
+    env.DB.prepare(`DELETE FROM credential_events WHERE credential_id IN (SELECT credential_id FROM credentials WHERE org_id LIKE 'demo_org_%')`),
+    env.DB.prepare(`DELETE FROM credentials WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM role_lab_submissions WHERE run_id IN (SELECT id FROM role_lab_runs WHERE org_id LIKE 'demo_org_%')`),
+    env.DB.prepare(`DELETE FROM role_lab_runs WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM v2_assessment_attempts WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM diagnostic_attempts WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM competency_evidence WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM readiness_snapshots WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM standard_content_preferences WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM firm_content_versions WHERE content_id IN (SELECT id FROM firm_content WHERE org_id LIKE 'demo_org_%')`),
+    env.DB.prepare(`DELETE FROM firm_content WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM organization_invites WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM cohort_members WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM program_assignments WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM cohorts WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM enterprise_audit_events WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM organization_members WHERE org_id LIKE 'demo_org_%'`),
+    env.DB.prepare(`DELETE FROM organizations WHERE id LIKE 'demo_org_%'`)
+  ]);
+  return {deletedOrganizations:orgs.length};
 }
 
 async function requireAdmin(request, env) {
@@ -2286,6 +2579,448 @@ async function verifyFirebaseIdToken(
 // OFFICIAL ASSESSMENT GENERATION
 // ======================================================
 
+
+
+function simNum(id,label,answer,tolerance,unit,section,instruction,cell='') { return {id,type:'numeric',prompt:label,answer,tolerance,unit,workProduct:{section,label,cell,instruction}}; }
+function simText(id,label,keywords,minHits,minWords,section,instruction) { return {id,type:'text',prompt:label,keywords,minHits,minWords,workProduct:{section,label,instruction}}; }
+
+const CAREER_WORKBENCHES = {
+  'private-equity': {
+    project:'Project Harbor', role:'Private Equity Analyst — Buyout Investing', reviewer:'Elena Torres · Vice President', client:'Harbor Industrial Services', deadline:'Investment Committee pre-read · tomorrow 9:00 AM',
+    objective:'Build the first-pass LBO return case, stress the downside and prepare an IC recommendation.',
+    files:[
+      {id:'cim',name:'01_Harbor_CIM.xlsx',type:'CIM',label:'Operating case',rows:[['Metric','LTM'],['Revenue','$420m'],['EBITDA','$80m'],['EBITDA margin','19.0%'],['Top customer','28% of revenue']]},
+      {id:'terms',name:'02_Entry_Assumptions.xlsx',type:'Excel',label:'Entry case',rows:[['Entry EV / EBITDA','10.0x'],['Debt financing','$400m'],['Sponsor equity','Balance of purchase EV'],['Entry fees','Ignored for this simplified case']]},
+      {id:'exit',name:'03_Exit_Case.xlsx',type:'Excel',label:'Exit case',rows:[['Year-5 EBITDA','$100m'],['Exit multiple','10.0x'],['Debt at exit','$250m'],['Downside EBITDA','$90m'],['Downside exit multiple','9.0x'],['Downside debt at exit','$300m']]}
+    ],
+    tasks:[
+      simNum('pe-entry-equity','Sponsor equity required at entry',400,.25,'$m','model','Calculate purchase enterprise value, then subtract acquisition debt.','B14'),
+      simNum('pe-exit-equity','Base-case exit equity value',750,.5,'$m','returns','Calculate exit EV and subtract debt remaining at exit.','F24'),
+      simNum('pe-moic','Base-case MOIC',1.875,.01,'x','returns','Exit equity value divided by sponsor equity invested.','F26'),
+      simNum('pe-downside-moic','Downside MOIC',1.275,.01,'x','downside','Use downside EBITDA, exit multiple and debt at exit.','H26'),
+      simText('pe-diligence','Priority diligence note',['customer','contract','concentration','renew','revenue'],2,18,'diligence','Write the diligence issue you would put at the top of the IC tracker and explain why it can change underwriting.')
+    ],
+    writingPrompt:'Draft the IC pre-read recommendation. State invest / continue diligence / pass, cite base and downside returns, identify the most important diligence issue, and name the next analysis you want completed.'
+  },
+  'venture-capital': {
+    project:'Project Beacon', role:'Venture Capital Investment Analyst — Early Stage', reviewer:'Rina Shah · Principal', client:'Beacon AI', deadline:'Partner meeting · 4:00 PM',
+    objective:'Pressure-test market size, financing dilution and retention before writing an invest/pass memo.',
+    files:[
+      {id:'deck',name:'01_Beacon_Founder_Deck.pdf',type:'Deck',label:'Founder materials',rows:[['ARR','$12m'],['YoY growth','80%'],['Gross margin','75%'],['Cash','$15m'],['Monthly burn','$1.0m']]},
+      {id:'market',name:'02_Market_Build.xlsx',type:'Excel',label:'Bottom-up TAM',rows:[['Target customers','8,000'],['Average annual contract','$50k']]},
+      {id:'cap',name:'03_Cap_Table.xlsx',type:'Excel',label:'Series A',rows:[['Pre-money value','$40m'],['New money','$10m'],['Founders pre-round ownership','60%']]},
+      {id:'cohort',name:'04_Retention_Cohorts.xlsx',type:'Excel',label:'Retention',rows:[['Month','M0','M6','M12'],['2025 Q1','100%','82%','69%'],['2025 Q2','100%','80%','66%']]}
+    ],
+    tasks:[
+      simNum('vc-tam','Bottom-up TAM',400,.5,'$m','market','Customers × annual contract value.','D12'),
+      simNum('vc-runway','Current cash runway',15,.05,'months','model','Cash divided by monthly burn.','E18'),
+      simNum('vc-investor','New investor post-money ownership',20,.05,'%','cap-table','New money divided by post-money valuation.','F11'),
+      simNum('vc-founder','Founder ownership after the round',48,.05,'%','cap-table','Apply the round dilution to founder pre-round ownership.','F15'),
+      simText('vc-retention','Retention risk note',['retention','cohort','decline','66','69','churn'],2,18,'diligence','Explain the retention pattern you would challenge with the founder before relying on the growth plan.')
+    ],
+    writingPrompt:'Write the partner memo recommendation: invest / continue diligence / pass. Cite TAM, runway, dilution and retention evidence, identify the biggest unresolved risk, and name the next diligence step.'
+  },
+  'equity-research': {
+    project:'Project Signal', role:'Equity Research Associate — Software', reviewer:'Marcus Reed · Senior Analyst', client:'Orion Software', deadline:'Earnings flash · 45 minutes after call',
+    objective:'Update estimates after earnings, refresh valuation and draft a concise research-note conclusion.',
+    files:[
+      {id:'earnings',name:'01_Q2_Earnings_Release.pdf',type:'Filing',label:'Quarter results',rows:[['Revenue','$505m'],['Consensus revenue','$500m'],['EPS','$2.10'],['Consensus EPS','$2.00']]},
+      {id:'guide',name:'02_Management_Guidance.xlsx',type:'Excel',label:'New guidance',rows:[['FY revenue guidance','$2,080m'],['Prior FY revenue estimate','$2,000m'],['New FY EPS estimate','$2.40']]},
+      {id:'valuation',name:'03_Valuation.xlsx',type:'Excel',label:'Price target',rows:[['Selected P/E','18.0x'],['New FY EPS','$2.40']]}
+    ],
+    tasks:[
+      simNum('er-rev-beat','Quarterly revenue beat',1,.02,'%','earnings','Actual revenue versus consensus.','D9'),
+      simNum('er-eps-beat','Quarterly EPS beat',5,.02,'%','earnings','Actual EPS versus consensus.','D10'),
+      simNum('er-guide-revision','FY revenue estimate revision',4,.02,'%','estimates','New guidance relative to prior estimate.','G18'),
+      simNum('er-pt','Updated price target',43.2,.05,'$/share','valuation','Selected P/E multiple × new FY EPS.','J24'),
+      simText('er-quality','Earnings-quality note',['guidance','revenue','eps','quality','margin','cash'],2,18,'note','Explain whether the headline beat alone is enough to change the thesis and what quality check you would make.')
+    ],
+    writingPrompt:'Draft the earnings flash conclusion for the senior analyst: what changed, updated price target, thesis/catalyst implication, one material risk, and your rating recommendation.'
+  },
+  'asset-management': {
+    project:'Project Allocation', role:'Investment Research Analyst — Multi-Asset', reviewer:'Claire Benson · Portfolio Manager', client:'Balanced Growth Portfolio', deadline:'Rebalance meeting · 2:00 PM',
+    objective:'Measure concentration, rebalance to policy targets and explain the portfolio decision.',
+    files:[
+      {id:'holdings',name:'01_Portfolio_Holdings.xlsx',type:'Portfolio',label:'Current holdings',rows:[['Asset','Weight','Quarter return'],['US Equity','65%','8%'],['Bonds','25%','1%'],['Cash','10%','0%']]},
+      {id:'policy',name:'02_Target_Allocation.xlsx',type:'Policy',label:'Target',rows:[['US Equity','60%'],['Bonds','30%'],['Cash','10%'],['Portfolio value','$10m']]}
+    ],
+    tasks:[
+      simNum('am-equity-dollar','Current US equity exposure',6.5,.01,'$m','portfolio','Portfolio value × current equity weight.','C8'),
+      simNum('am-equity-trim','Equity amount to trim to target',.5,.01,'$m','rebalance','Current equity dollars less target equity dollars.','F12'),
+      simNum('am-bond-add','Bond amount to add to target',.5,.01,'$m','rebalance','Target bond dollars less current bond dollars.','F13'),
+      simNum('am-equity-contrib','US equity return contribution',5.2,.02,'%','attribution','Weight × return contribution.','H9'),
+      simText('am-risk','Concentration note',['equity','65','60','concentration','target','rebalance'],2,18,'review','Explain why the current portfolio needs a rebalance beyond simply saying equities rose.')
+    ],
+    writingPrompt:'Prepare the PM recommendation: hold / rebalance / change target. Cite concentration and attribution evidence, explain the proposed trades, and identify one portfolio risk to monitor.'
+  },
+  'hedge-funds': {
+    project:'Project Variant', role:'Public-Markets Investment Analyst — Long/Short Equity', reviewer:'David Kim · Portfolio Manager', client:'Variant Opportunities Fund', deadline:'Morning risk meeting · 8:30 AM',
+    objective:'Quantify position impact, pressure-test the downside and write a catalyst-driven position recommendation.',
+    files:[
+      {id:'book',name:'01_Position_Book.xlsx',type:'Portfolio',label:'Positions',rows:[['Position','Book weight','Scenario move'],['Long Alpha','5%','+20%'],['Short Beta','4%','+15% adverse move']]},
+      {id:'case',name:'02_Thesis_Cases.xlsx',type:'Excel',label:'Cases',rows:[['Alpha base value','$60'],['Alpha current price','$50'],['Alpha downside','$42'],['Beta current price','$30']]},
+      {id:'events',name:'03_Catalyst_Calendar.xlsx',type:'Calendar',label:'Catalysts',rows:[['Alpha product launch','30 days'],['Beta earnings','12 days'],['Beta short interest','High']]}
+    ],
+    tasks:[
+      simNum('hf-long-impact','Long Alpha portfolio contribution in upside case',1,.02,'%','pnl','Position weight × upside return.','D10'),
+      simNum('hf-short-loss','Short Beta portfolio loss if stock rises 15%',-.6,.02,'%','pnl','Short position loses weight × adverse stock move. Enter a negative number.','D11'),
+      simNum('hf-alpha-upside','Alpha price upside to base value',20,.05,'%','valuation','Base value relative to current price.','G16'),
+      simNum('hf-alpha-downside','Alpha downside to downside case',-16,.05,'%','risk','Downside value relative to current price. Enter a negative number.','G17'),
+      simText('hf-variant','Variant-perception statement',['market','expects','variant','catalyst','misprice','thesis'],2,20,'thesis','State what the market appears to expect and what your differentiated view is.')
+    ],
+    writingPrompt:'Send the PM a position recommendation: add / hold / trim / exit. Cite upside/downside, catalyst timing, short-specific or liquidity risk, and what evidence would invalidate the thesis.'
+  },
+  'sales-trading': {
+    project:'Project Pulse', role:'Sales & Trading Analyst — Markets', reviewer:'Alex Morgan · Desk VP', client:'Institutional Client A', deadline:'Client follow-up · 15 minutes',
+    objective:'Read the market, quantify execution/risk and send concise client-ready market color.',
+    files:[
+      {id:'market',name:'01_Live_Market_Snapshot.csv',type:'Market',label:'Quote',rows:[['Instrument','Bid','Ask','Size'],['XYZ Corp','99.80','100.20','250k x 180k']]},
+      {id:'risk',name:'02_Desk_Risk.xlsx',type:'Risk',label:'Limits',rows:[['Current position','$6.5m'],['Desk limit','$10m'],['Client order','$2.0m']]},
+      {id:'tape',name:'03_Market_Color.txt',type:'Feed',label:'Context',rows:[['Volatility','Rising'],['Liquidity','Thinner than normal'],['Catalyst','Macro data in 25 minutes']]}
+    ],
+    tasks:[
+      simNum('st-mid','Quoted midpoint',100,.01,'price','market','Average bid and ask.','Q1'),
+      simNum('st-spread','Bid/ask spread',.4,.01,'price','market','Ask minus bid.','Q2'),
+      simNum('st-util-before','Current limit utilization',65,.05,'%','risk','Current desk position divided by limit.','R7'),
+      simNum('st-util-after','Limit utilization if full client order is warehoused',85,.05,'%','risk','Current position plus order divided by limit.','R8'),
+      simText('st-execution','Execution plan',['limit','liquidity','volatility','size','risk','market'],2,18,'execution','Describe how thinner liquidity and the upcoming macro catalyst should affect execution approach.')
+    ],
+    writingPrompt:'Write the client follow-up: current market level/spread, execution consideration, one risk from the upcoming catalyst, and the next action you recommend. Do not promise execution or certainty.'
+  },
+  'quantitative-finance': {
+    project:'Project Vector', role:'Quantitative Analyst — Systematic Research', reviewer:'Nadia Chen · Quant Research Lead', client:'Systematic Equity Research', deadline:'Research review · tomorrow',
+    objective:'Audit a backtest, quantify net performance and write an out-of-sample research conclusion.',
+    files:[
+      {id:'data',name:'01_signal_dataset.parquet',type:'Data',label:'Dataset',rows:[['Rows','10,000'],['Train','6,000'],['Validation','2,000'],['Test','2,000']]},
+      {id:'backtest',name:'02_backtest_results.csv',type:'Backtest',label:'Results',rows:[['Gross annual return','12.0%'],['Annual trading costs','2.5%'],['Annual volatility','10.0%'],['Test-set return','6.0%']]},
+      {id:'audit',name:'03_research_notes.md',type:'Notebook',label:'Audit',rows:[['Finding','Feature normalization used full-sample mean before split'],['Finding','Hyperparameters tuned on validation set'],['Finding','Test set touched once at final review']]}
+    ],
+    tasks:[
+      simNum('q-train','Training-set share of observations',60,.01,'%','data','Train rows divided by total rows.','cell_1'),
+      simNum('q-test','Test-set share of observations',20,.01,'%','data','Test rows divided by total rows.','cell_2'),
+      simNum('q-net','Net annual return after trading costs',9.5,.02,'%','backtest','Gross annual return less annual trading costs.','cell_3'),
+      simNum('q-gross-sharpe','Simplified gross Sharpe (return / volatility)',1.2,.01,'x','backtest','Gross annual return divided by annual volatility.','cell_4'),
+      simText('q-bias','Research-bias finding',['full-sample','normalization','look-ahead','leakage','split','mean'],2,18,'audit','Identify the most serious research-process issue and why it contaminates the backtest.')
+    ],
+    writingPrompt:'Write the research-review conclusion: whether the signal is ready for further validation, what the net/out-of-sample evidence says, the key bias found, and the next robustness test you require.'
+  },
+  'private-credit': {
+    project:'Project Granite', role:'Private Credit Investment Analyst — Direct Lending', reviewer:'Morgan Ellis · Investment Director', client:'Granite Services', deadline:'Credit Committee · tomorrow 11:00 AM',
+    objective:'Underwrite leverage, coverage, downside protection and repayment capacity before a credit recommendation.',
+    files:[
+      {id:'financials',name:'01_Granite_Financials.xlsx',type:'Excel',label:'Borrower financials',rows:[['LTM EBITDA','$60m'],['Total debt','$300m'],['Cash interest','$30m'],['Annual FCF before debt paydown','$35m']]},
+      {id:'downside',name:'02_Downside_Case.xlsx',type:'Excel',label:'Downside',rows:[['Downside EBITDA','$45m'],['Debt after 1 year','$280m']]},
+      {id:'terms',name:'03_Draft_Term_Sheet.pdf',type:'Debt',label:'Terms',rows:[['Max leverage covenant','6.0x'],['Minimum interest coverage','1.5x']]}
+    ],
+    tasks:[
+      simNum('pc-leverage','LTM gross leverage',5,.01,'x','credit','Total debt divided by LTM EBITDA.','E10'),
+      simNum('pc-coverage','Interest coverage',2,.01,'x','credit','EBITDA divided by cash interest.','E11'),
+      simNum('pc-downside-lev','Downside leverage after one year',6.222,.02,'x','downside','Downside debt divided by downside EBITDA.','H14'),
+      simNum('pc-covenant','Downside leverage covenant headroom',-.222,.02,'x','downside','Covenant limit less downside leverage. Negative means breach.','H15'),
+      simText('pc-risk','Primary credit risk / mitigant note',['leverage','covenant','cash flow','repayment','downside','customer'],2,18,'memo','State the primary downside risk and one structure/condition that would improve lender protection.')
+    ],
+    writingPrompt:'Draft the Credit Committee recommendation: approve / approve with conditions / decline. Cite leverage, coverage and downside covenant outcome, then state key risks, mitigants and required conditions.'
+  },
+  'corporate-banking': {
+    project:'Project Meridian', role:'Corporate Banking / Credit Analyst', reviewer:'Taylor Brooks · Credit Officer', client:'Meridian Manufacturing', deadline:'Credit approval package · 3:00 PM',
+    objective:'Spread the borrower, assess debt capacity and prepare a concise approval recommendation.',
+    files:[
+      {id:'spread',name:'01_Meridian_Credit_Spread.xlsx',type:'Excel',label:'Borrower spread',rows:[['Revenue','$900m'],['EBITDA','$120m'],['Total debt','$420m'],['Cash interest','$42m'],['Proposed acquisition debt','$120m']]},
+      {id:'terms',name:'02_Facility_Request.pdf',type:'Loan',label:'Request',rows:[['Facility','5-year term loan'],['Use','Acquisition funding'],['Pro forma debt','$540m']]}
+    ],
+    tasks:[
+      simNum('cb-current-lev','Current leverage',3.5,.01,'x','spread','Current debt divided by EBITDA.','D12'),
+      simNum('cb-current-cov','Current interest coverage',2.857,.02,'x','spread','EBITDA divided by cash interest.','D13'),
+      simNum('cb-proforma-lev','Pro forma leverage after acquisition debt',4.5,.01,'x','structure','Pro forma debt divided by EBITDA.','F18'),
+      simNum('cb-debt-cap','Debt capacity at 4.0x leverage',480,.5,'$m','structure','Maximum debt at 4.0x EBITDA.','F19'),
+      simText('cb-monitor','Monitoring / covenant note',['leverage','covenant','acquisition','cash flow','monitor','coverage'],2,18,'memo','State the most important ongoing monitoring item and covenant/structure consideration.')
+    ],
+    writingPrompt:'Write the credit-approval recommendation for the Credit Officer: support / support with conditions / decline. Cite current and pro forma leverage, debt capacity, key risk and proposed covenant/monitoring action.'
+  },
+  'corporate-development': {
+    project:'Project Horizon', role:'Corporate Development Analyst — Strategy & M&A', reviewer:'Samantha Lee · VP Corporate Development', client:'Horizon Software', deadline:'Executive review · tomorrow',
+    objective:'Value the target, quantify synergies and prepare a go/no-go recommendation.',
+    files:[
+      {id:'target',name:'01_Target_Financials.xlsx',type:'Excel',label:'Target',rows:[['Target EBITDA','$50m'],['Standalone value multiple','10.0x'],['Target debt','$40m'],['Target cash','$10m']]},
+      {id:'synergy',name:'02_Synergy_Build.xlsx',type:'Excel',label:'Synergies',rows:[['Run-rate cost synergies','$12m'],['Probability-adjusted realization','75%'],['One-time implementation cost','$15m']]},
+      {id:'strategy',name:'03_Strategy_Screen.pptx',type:'Deck',label:'Strategic fit',rows:[['Customer overlap','High'],['Product adjacency','High'],['Integration complexity','Medium']]}
+    ],
+    tasks:[
+      simNum('cd-ev','Standalone target enterprise value',500,.5,'$m','valuation','Target EBITDA × standalone multiple.','D10'),
+      simNum('cd-equity','Standalone target equity value',470,.5,'$m','valuation','Enterprise value less debt plus cash.','D11'),
+      simNum('cd-riskadj-syn','Probability-adjusted run-rate synergies',9,.05,'$m','synergy','Run-rate synergies × realization probability.','G15'),
+      simNum('cd-synergy-value','Illustrative synergy value at 10.0x',90,.5,'$m','synergy','Probability-adjusted synergies × selected multiple.','G16'),
+      simText('cd-integration','Integration risk note',['integration','customer','product','execution','synergy','cost'],2,18,'diligence','Identify the integration issue most likely to change the synergy case or strategic recommendation.')
+    ],
+    writingPrompt:'Prepare the executive go/no-go note: recommendation, standalone value, probability-adjusted synergy value, strategic rationale, biggest integration risk, and next diligence step.'
+  },
+  'fp-and-a': {
+    project:'Project Compass', role:'FP&A Analyst — Corporate Finance', reviewer:'Jordan Ellis · FP&A Director', client:'Operating Leadership Team', deadline:'Forecast review · 1:00 PM',
+    objective:'Build a forecast update, explain variance drivers and prepare CFO-ready commentary.',
+    files:[
+      {id:'actual',name:'01_Monthly_Actuals.xlsx',type:'ERP',label:'Actuals',rows:[['Revenue actual','$48m'],['Revenue budget','$50m'],['Headcount actual','480'],['Headcount plan','500'],['Opex actual','$22m'],['Opex budget','$21m']]},
+      {id:'drivers',name:'02_Revenue_Drivers.xlsx',type:'Excel',label:'Drivers',rows:[['Volume variance','-$1.2m'],['Price variance','+$0.4m'],['Mix variance','-$1.2m']]},
+      {id:'forecast',name:'03_Reforecast.xlsx',type:'Planning',label:'Forecast',rows:[['Prior FY revenue','$600m'],['Updated run-rate reduction','$18m']]}
+    ],
+    tasks:[
+      simNum('fpa-rev-var','Revenue variance vs budget',-2,.01,'$m','variance','Actual revenue less budget. Enter negative for miss.','D9'),
+      simNum('fpa-rev-var-pct','Revenue variance vs budget',-4,.02,'%','variance','Revenue variance divided by budget.','D10'),
+      simNum('fpa-opex-var','Opex variance vs budget',1,.01,'$m','variance','Actual Opex less budget. Positive means overspend.','D11'),
+      simNum('fpa-reforecast','Updated FY revenue forecast',582,.25,'$m','forecast','Prior FY forecast less updated run-rate reduction.','G17'),
+      simText('fpa-comment','Variance commentary',['volume','price','mix','headcount','opex','forecast'],2,22,'commentary','Explain the revenue miss by drivers and connect it to the reforecast / cost picture.')
+    ],
+    writingPrompt:'Draft the CFO forecast commentary: actual vs budget, key price/volume/mix drivers, updated full-year outlook, cost/headcount observation, and management action to watch.'
+  },
+  'treasury': {
+    project:'Project Liquidity', role:'Treasury Analyst — Corporate Treasury', reviewer:'Dana Morris · Assistant Treasurer', client:'Global Treasury', deadline:'Daily liquidity call · 10:30 AM',
+    objective:'Consolidate cash, identify the low point, quantify the funding gap and recommend a treasury action.',
+    files:[
+      {id:'banks',name:'01_Bank_Balances.csv',type:'Bank',label:'Cash position',rows:[['Bank A','$18m'],['Bank B','$12m'],['Bank C','$5m'],['Restricted cash','$4m']]},
+      {id:'forecast',name:'02_13_Week_Cash_Forecast.xlsx',type:'TMS',label:'Liquidity forecast',rows:[['Opening usable cash','$31m'],['Minimum projected usable cash','$8m'],['Minimum liquidity policy','$15m']]},
+      {id:'fx',name:'03_FX_Exposure.xlsx',type:'FX',label:'Exposure',rows:[['EUR receivable','€10m'],['Hedge ratio target','70%']]}
+    ],
+    tasks:[
+      simNum('tr-total-cash','Total bank cash',35,.01,'$m','cash','Sum bank balances before restricted-cash adjustment.','C8'),
+      simNum('tr-usable-cash','Usable opening cash',31,.01,'$m','cash','Total cash less restricted cash.','C9'),
+      simNum('tr-gap','Projected liquidity gap vs policy minimum',7,.01,'$m','liquidity','Policy minimum less projected low point.','F14'),
+      simNum('tr-hedge','EUR amount to hedge at target ratio',7,.01,'€m','fx','Exposure × hedge ratio target.','H18'),
+      simText('tr-funding','Funding / liquidity recommendation',['revolver','liquidity','cash','timing','fund','forecast','buffer'],2,18,'recommendation','Recommend how treasury should cover the projected gap while preserving a policy buffer.')
+    ],
+    writingPrompt:'Prepare the Assistant Treasurer update: current usable cash, projected low point and gap, funding recommendation, FX hedge action, and the main forecast assumption to monitor.'
+  },
+  'wealth-management': {
+    project:'Project Legacy', role:'Wealth Management Analyst / Advisor Associate', reviewer:'Rachel Ford · Senior Advisor', client:'Synthetic Client Household', deadline:'Client review · tomorrow',
+    objective:'Translate client constraints into an allocation and a clear client-ready recommendation.',
+    files:[
+      {id:'profile',name:'01_Client_Discovery.pdf',type:'CRM',label:'Client profile',rows:[['Investable assets','$5.0m'],['Near-term liquidity need','$0.5m'],['Employer stock','$1.5m'],['Risk tolerance','Moderate']]},
+      {id:'policy',name:'02_Target_Allocation.xlsx',type:'Planning',label:'Target after reserve',rows:[['Equity','55%'],['Fixed income','35%'],['Cash','10%']]}
+    ],
+    tasks:[
+      simNum('wm-longterm','Long-term investable assets after liquidity reserve',4.5,.01,'$m','plan','Investable assets less near-term liquidity need.','C10'),
+      simNum('wm-equity-target','Target equity dollars',2.475,.01,'$m','allocation','Long-term assets × 55% equity target.','F13'),
+      simNum('wm-fixed-target','Target fixed-income dollars',1.575,.01,'$m','allocation','Long-term assets × 35% fixed-income target.','F14'),
+      simNum('wm-employer-conc','Employer-stock concentration of total assets',30,.02,'%','risk','Employer stock divided by total investable assets.','H10'),
+      simText('wm-client','Client explanation',['liquidity','concentration','employer stock','rebalance','risk','tax'],2,20,'client','Explain why the allocation should address liquidity and employer-stock concentration without sounding alarmist.')
+    ],
+    writingPrompt:'Draft the client-review recommendation: reserve liquidity, target allocation, concentration concern, implementation/rebalancing approach, and one question to confirm before making changes.'
+  },
+  'risk-management': {
+    project:'Project Shield', role:'Financial Risk Analyst — Market & Enterprise Risk', reviewer:'Alicia Grant · Risk Manager', client:'Trading Business', deadline:'Risk escalation · 30 minutes',
+    objective:'Measure limit usage, quantify stress loss and prepare an escalation with a concrete action.',
+    files:[
+      {id:'limits',name:'01_Risk_Limits.csv',type:'Risk',label:'Limits',rows:[['VaR usage','$8m'],['VaR limit','$10m'],['Counterparty exposure','$120m'],['Counterparty limit','$100m']]},
+      {id:'stress',name:'02_Stress_Scenarios.xlsx',type:'Scenario',label:'Stress',rows:[['Rates +150 bps','-$14m'],['Equities -15%','-$11m'],['Combined stress','-$22m']]}
+    ],
+    tasks:[
+      simNum('rm-var-util','VaR limit utilization',80,.02,'%','limits','VaR usage divided by VaR limit.','D8'),
+      simNum('rm-cp-util','Counterparty limit utilization',120,.02,'%','limits','Counterparty exposure divided by counterparty limit.','D9'),
+      simNum('rm-breach','Counterparty limit breach amount',20,.01,'$m','limits','Exposure less limit.','D10'),
+      simNum('rm-combined','Combined stress loss magnitude',22,.01,'$m','stress','Report the absolute magnitude of combined stress loss.','F14'),
+      simText('rm-escalate','Risk escalation action',['breach','reduce','hedge','limit','counterparty','escalate'],2,18,'escalation','State the breach, why it matters, and the immediate action you would recommend to the risk manager.')
+    ],
+    writingPrompt:'Write the risk escalation: current limit usage, breach amount, stress result, immediate action, and what additional information/approval is required. Avoid implying VaR is a maximum possible loss.'
+  },
+  'real-estate-finance': {
+    project:'Project Skyline', role:'Real Estate Financial Analyst — Acquisitions', reviewer:'Michael Chen · Acquisitions VP', client:'Skyline Multifamily', deadline:'Investment Committee · tomorrow',
+    objective:'Underwrite NOI, value, debt service and downside before recommending a bid.',
+    files:[
+      {id:'rentroll',name:'01_Rent_Roll.xlsx',type:'Rent Roll',label:'Property operations',rows:[['Gross potential rent','$12.0m'],['Occupancy','95%'],['Other income','$0.8m'],['Operating expenses','$4.0m']]},
+      {id:'market',name:'02_Market_Valuation.xlsx',type:'Comps',label:'Market',rows:[['Selected cap rate','5.0%'],['Debt amount','$100m'],['Interest rate','6.0%'],['Annual principal amortization','$1.5m']]}
+    ],
+    tasks:[
+      simNum('re-effective-rent','Effective rental revenue',11.4,.01,'$m','property','Gross potential rent × occupancy.','D10'),
+      simNum('re-noi','Net operating income',8.2,.01,'$m','property','Effective rent + other income − operating expenses.','D12'),
+      simNum('re-value','Value at selected cap rate',164,.25,'$m','valuation','NOI divided by cap rate.','G16'),
+      simNum('re-dscr','DSCR',1.093,.01,'x','debt','NOI divided by annual interest plus principal amortization.','H18'),
+      simText('re-risk','Property risk note',['occupancy','rent','lease','interest','dscr','cap rate'],2,18,'diligence','Identify the operating or financing assumption most likely to change bid value and why.')
+    ],
+    writingPrompt:'Draft the IC recommendation: bid / continue diligence / pass. Cite NOI, cap-rate value and DSCR, identify the key downside assumption, and state the financing or diligence action required.'
+  }
+};
+
+
+const V2_CAREER_COMPETENCY_IDS = {"private-equity":["cmp_private_equity_underwriting","cmp_private_equity_debt","cmp_private_equity_returns","cmp_private_equity_diligence","cmp_private_equity_judgment","cmp_private_equity_quality"],"venture-capital":["cmp_venture_capital_market","cmp_venture_capital_unit","cmp_venture_capital_cap","cmp_venture_capital_diligence","cmp_venture_capital_judgment","cmp_venture_capital_memo"],"equity-research":["cmp_equity_research_model","cmp_equity_research_earnings","cmp_equity_research_valuation","cmp_equity_research_thesis","cmp_equity_research_sources","cmp_equity_research_note"],"asset-management":["cmp_asset_management_research","cmp_asset_management_portfolio","cmp_asset_management_risk","cmp_asset_management_attribution","cmp_asset_management_rebalance","cmp_asset_management_pm"],"hedge-funds":["cmp_hedge_funds_variant","cmp_hedge_funds_model","cmp_hedge_funds_catalyst","cmp_hedge_funds_risk","cmp_hedge_funds_sizing","cmp_hedge_funds_pm"],"sales-trading":["cmp_sales_trading_market","cmp_sales_trading_execution","cmp_sales_trading_risk","cmp_sales_trading_analysis","cmp_sales_trading_client","cmp_sales_trading_review"],"quantitative-finance":["cmp_quantitative_finance_data","cmp_quantitative_finance_research","cmp_quantitative_finance_backtest","cmp_quantitative_finance_implementation","cmp_quantitative_finance_risk","cmp_quantitative_finance_writeup"],"private-credit":["cmp_private_credit_spread","cmp_private_credit_leverage","cmp_private_credit_structure","cmp_private_credit_downside","cmp_private_credit_judgment","cmp_private_credit_memo"],"corporate-banking":["cmp_corporate_banking_spread","cmp_corporate_banking_credit","cmp_corporate_banking_facility","cmp_corporate_banking_covenant","cmp_corporate_banking_economics","cmp_corporate_banking_approval"],"corporate-development":["cmp_corporate_development_strategy","cmp_corporate_development_valuation","cmp_corporate_development_synergy","cmp_corporate_development_diligence","cmp_corporate_development_integration","cmp_corporate_development_exec"],"fp-and-a":["cmp_fp_and_a_actuals","cmp_fp_and_a_forecast","cmp_fp_and_a_variance","cmp_fp_and_a_scenario","cmp_fp_and_a_kpi","cmp_fp_and_a_commentary"],"treasury":["cmp_treasury_cash","cmp_treasury_liquidity","cmp_treasury_funding","cmp_treasury_market","cmp_treasury_policy","cmp_treasury_update"],"wealth-management":["cmp_wealth_management_discovery","cmp_wealth_management_suitability","cmp_wealth_management_allocation","cmp_wealth_management_portfolio","cmp_wealth_management_implementation","cmp_wealth_management_client"],"risk-management":["cmp_risk_management_exposure","cmp_risk_management_var","cmp_risk_management_stress","cmp_risk_management_concentration","cmp_risk_management_limits","cmp_risk_management_challenge"],"real-estate-finance":["cmp_real_estate_finance_rent","cmp_real_estate_finance_noi","cmp_real_estate_finance_valuation","cmp_real_estate_finance_debt","cmp_real_estate_finance_risk","cmp_real_estate_finance_memo"]};
+
+function v2PublicPathwayId(pathwayId) { return pathwayId === 'quantitative-finance' ? 'quant-finance' : pathwayId; }
+function v2CareerAssessmentKey(pathwayId, stage) {
+  if (pathwayId === 'investment-banking') return stage === 'essentials' ? 'ib-essentials-case' : 'ib-professional-final';
+  return `${pathwayId}-${stage === 'essentials' ? 'essentials-case' : 'professional-final'}`;
+}
+function v2CareerRoleLabKey(pathwayId) { return pathwayId === 'investment-banking' ? 'ib-project-northstar' : `cm2-${pathwayId}-role-lab`; }
+function v2CareerCompetencies(pathwayId) { return V2_CAREER_COMPETENCY_IDS[pathwayId] || []; }
+
+function v2DynamicDiagnosticQuestions(pathway) {
+  if (pathway.id === 'investment-banking') return [];
+  const comps=v2CareerCompetencies(pathway.id); if(!comps.length) return [];
+  const bank=stageQuestions(pathway,2).filter(q=>q.type==='mc').slice(0,8);
+  return bank.map((q,i)=>({
+    id:`dyn-${pathway.code.toLowerCase()}-diag-${i+1}`, pathway_id:pathway.id, version:'2.0', competency_id:comps[i%comps.length], position:i+1,
+    prompt:q.prompt, options_json:JSON.stringify(q.options||[]), correct_answer:q.answer,
+    rationale:`This baseline item checks ${pathway.title} readiness before professional evidence is collected.`, status:'active'
+  }));
+}
+
+function v2DynamicAssessment(pathway, stage) {
+  if(pathway.id==='investment-banking') return null;
+  const wb=CAREER_WORKBENCHES[pathway.id]; const comps=v2CareerCompetencies(pathway.id); if(!wb||!comps.length) return null;
+  const key=v2CareerAssessmentKey(pathway.id,stage); const isFinal=stage==='final';
+  const numeric=wb.tasks.filter(t=>t.type==='numeric').slice(0,isFinal?4:2).map((t,i)=>({
+    id:`dyn-${pathway.code.toLowerCase()}-${stage}-n${i+1}`,assessment_key:key,assessment_version:'2.0',position:i+1,competency_id:comps[i%comps.length],prompt:t.prompt,
+    options_json:'[]',correct_answer:String(t.answer),rationale:t.workProduct?.instruction||'Calculate the requested professional output.',weight:isFinal?2:1,status:'active',question_type:'numeric',tolerance:Number(t.tolerance||0),unit:t.unit||''
+  }));
+  const bank=stageQuestions(pathway,isFinal?4:2).filter(q=>q.type==='mc').slice(0,isFinal?6:5);
+  const mc=bank.map((q,i)=>({
+    id:`dyn-${pathway.code.toLowerCase()}-${stage}-m${i+1}`,assessment_key:key,assessment_version:'2.0',position:numeric.length+i+1,competency_id:comps[(numeric.length+i)%comps.length],prompt:q.prompt,
+    options_json:JSON.stringify(q.options||[]),correct_answer:q.answer,rationale:`Correct application of ${pathway.title} workflow and professional judgment.`,weight:1,status:'active',question_type:'mc',tolerance:0,unit:''
+  }));
+  const files=wb.files||[];
+  return {definition:{assessment_key:key,version:'2.0',pathway_id:pathway.id,stage,title:`${pathway.title} ${isFinal?'Professional Readiness Final':'Essentials Mini Case'}`,description:isFinal?`Comprehensive ${pathway.role} readiness check combining calculations, workflow judgment and quality control.`:`Guided beginner case that checks the core calculations and workflow needed before advanced ${pathway.title} work.`,scenario_json:JSON.stringify({project:wb.project,objective:wb.objective,files,note:'All companies, people and data are synthetic training materials.'}),pass_score:isFinal?80:75,status:'active'},questions:[...numeric,...mc]};
+}
+function v2DynamicAssessmentFromKey(key) {
+  for(const pathway of ALL_PATHWAYS) {
+    if(pathway.id==='investment-banking') continue;
+    if(key===v2CareerAssessmentKey(pathway.id,'essentials')) return v2DynamicAssessment(pathway,'essentials');
+    if(key===v2CareerAssessmentKey(pathway.id,'final')) return v2DynamicAssessment(pathway,'final');
+  }
+  return null;
+}
+
+function v2DynamicLab(pathway) {
+  if(pathway.id==='investment-banking') return null;
+  const wb=CAREER_WORKBENCHES[pathway.id]; const comps=v2CareerCompetencies(pathway.id); if(!wb||!comps.length) return null;
+  const labKey=v2CareerRoleLabKey(pathway.id);
+  const tasks=[]; let stageNo=1;
+  for(const t of wb.tasks) {
+    const cid=comps[(stageNo-1)%comps.length];
+    if(t.type==='numeric') {
+      tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.0',stage_no:stageNo,title:t.prompt,task_type:'numeric_fields',brief_json:JSON.stringify({timestamp:`Stage ${stageNo}`,from:wb.reviewer,message:t.workProduct?.instruction||'Complete the requested work product.',fileName:wb.files?.[Math.min(stageNo-1,(wb.files?.length||1)-1)]?.name||`${wb.project}_Workpaper.xlsx`,deliverable:t.workProduct?.section||'Analysis',fields:[{id:t.id,label:t.prompt,type:'number',suffix:t.unit||''}]}),grading_json:JSON.stringify({rules:[{field:t.id,type:'numeric',expected:Number(t.answer),tolerance:Number(t.tolerance||0),points:100,feedback:t.workProduct?.instruction||'Recheck the workpaper calculation.'}]}),competency_map_json:JSON.stringify({[cid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
+    } else {
+      tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.0',stage_no:stageNo,title:t.prompt,task_type:'written_decision',brief_json:JSON.stringify({timestamp:`Stage ${stageNo}`,from:wb.reviewer,message:t.workProduct?.instruction||'Write the requested analysis note.',fileName:wb.files?.[Math.min(stageNo-1,(wb.files?.length||1)-1)]?.name||`${wb.project}_Notes.docx`,deliverable:t.workProduct?.section||'Analysis note',fields:[{id:t.id,label:t.prompt,type:'textarea',maxLength:1800}]}),grading_json:JSON.stringify({rules:[{field:t.id,type:'text_evidence',points:100,min_chars:Math.max(120,Number(t.minWords||18)*5),evidence_groups:(t.keywords||[]).slice(0,6).map(k=>[k]),feedback:'Connect the work product to specific case evidence, risk and decision relevance.'}]}),competency_map_json:JSON.stringify({[cid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
+    }
+    stageNo++;
+  }
+  const finalCid=comps[(stageNo-1)%comps.length];
+  tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.0',stage_no:stageNo,title:'Send the manager your final recommendation',task_type:'written_decision',brief_json:JSON.stringify({timestamp:'Final review',from:wb.reviewer,message:'Send the decision-ready conclusion using the work you completed in the case.',fileName:`${wb.project.replace(/\s+/g,'_')}_Manager_Update.docx`,deliverable:'Manager recommendation',fields:[{id:'recommendation',label:'Manager recommendation',type:'textarea',maxLength:2400}]}),grading_json:JSON.stringify({rules:[{field:'recommendation',type:'text_evidence',points:100,min_chars:220,evidence_groups:[['recommend','proceed','approve','invest','hold','trim','pass','decline','rebalance'],['risk','downside','constraint','uncertain','assumption'],['because','evidence','analysis','model','forecast','valuation','liquidity','return'],['next','diligence','monitor','review','action','test']],feedback:'State a decision, cite case evidence, identify material risk and name the next action.'}]}),competency_map_json:JSON.stringify({[finalCid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
+  return {definition:{lab_key:labKey,version:'2.0',pathway_id:pathway.id,title:`${wb.project} — ${pathway.title} Professional Role Lab`,role_title:pathway.role,client_name:wb.client,scenario_json:JSON.stringify({project:wb.project,desk:pathway.title,reviewer:wb.reviewer,client:wb.client,deadline:wb.deadline,context:wb.objective,files:wb.files,workflow:tasks.map(x=>x.title),note:'Synthetic training case. No proprietary employer information is used.'}),pass_score:80,status:'active'},tasks};
+}
+function v2DynamicLabByKey(key) { for(const p of ALL_PATHWAYS){if(p.id!=='investment-banking'&&v2CareerRoleLabKey(p.id)===key)return v2DynamicLab(p);} return null; }
+
+function buildCareerWorkbenchSimulation(pathway) {
+  const b=CAREER_WORKBENCHES[pathway.id]; if(!b) return null;
+  return {
+    version:'2.0-workbench', itemType:'simulation', questions:b.tasks, writingPrompt:b.writingPrompt,
+    simulationProfile:{kind:'career-workbench-v2',project:b.project,role:b.role,reviewer:b.reviewer,client:b.client,deadline:b.deadline,objective:b.objective,files:b.files,workflow:[...new Set(b.tasks.map(x=>x.workProduct.section))]}
+  };
+}
+
+function buildInvestmentBankingSimulation(pathway) {
+  const questions = [
+    {
+      id: "ib-sim-ev",
+      type: "numeric",
+      prompt: "Implied enterprise value",
+      answer: 850,
+      tolerance: 0.25,
+      unit: "$m",
+      workProduct: { section:"model", label:"Enterprise Value", cell:"G12", instruction:"Bridge equity value to enterprise value using debt and cash from the capitalization file." }
+    },
+    {
+      id: "ib-sim-multiple",
+      type: "numeric",
+      prompt: "Implied EV / LTM EBITDA",
+      answer: 10.625,
+      tolerance: 0.03,
+      unit: "x",
+      workProduct: { section:"model", label:"EV / LTM EBITDA", cell:"G13", instruction:"Calculate the headline transaction multiple using LTM EBITDA." }
+    },
+    {
+      id: "ib-sim-comps-median",
+      type: "numeric",
+      prompt: "Median NTM EV / EBITDA for the selected peer set",
+      answer: 10.25,
+      tolerance: 0.03,
+      unit: "x",
+      workProduct: { section:"valuation", label:"Selected peer median", cell:"D18", instruction:"Calculate each peer's NTM EV / EBITDA and use the median of the defensible four-company peer set." }
+    },
+    {
+      id: "ib-sim-implied-equity",
+      type: "numeric",
+      prompt: "Equity value implied by the selected trading multiple",
+      answer: 840,
+      tolerance: 0.5,
+      unit: "$m",
+      workProduct: { section:"valuation", label:"Implied Equity Value", cell:"D21", instruction:"Apply the selected 10.25x multiple to Orion NTM EBITDA, then bridge enterprise value to equity value." }
+    },
+    {
+      id: "ib-sim-revised-revenue",
+      type: "numeric",
+      prompt: "Revised Year 1 revenue after management's update",
+      answer: 456,
+      tolerance: 0.25,
+      unit: "$m",
+      workProduct: { section:"update", label:"Year 1 Revenue", cell:"F27", instruction:"Update the forecast using the new management guidance before refreshing the valuation outputs." }
+    },
+    {
+      id: "ib-sim-qa",
+      type: "choice",
+      prompt: "Model QA finding that must be corrected before senior review",
+      answer: "Cash is being subtracted in the EV-to-equity bridge instead of added",
+      options: [
+        "Cash is being subtracted in the EV-to-equity bridge instead of added",
+        "The model uses a blue font for one assumption cell",
+        "The EBITDA margin is displayed to one decimal place",
+        "The file name includes today's date"
+      ],
+      workProduct: { section:"qa", label:"Material QA finding", instruction:"Review the planted model-check findings and escalate the one that changes valuation." }
+    },
+    {
+      id: "ib-sim-revised-equity",
+      type: "numeric",
+      prompt: "Revised equity value after the management update",
+      answer: 793.875,
+      tolerance: 0.75,
+      unit: "$m",
+      workProduct: { section:"update", label:"Revised Equity Value", cell:"D31", instruction:"Refresh valuation using revised NTM EBITDA of $83.5m at the same 10.25x selected multiple, then bridge to equity value." }
+    }
+  ];
+  return {
+    version: "2.0-workbench",
+    itemType: "simulation",
+    questions,
+    writingPrompt: "Draft the email you would send to your Associate. State whether Northstar should continue diligence on Orion, cite the most decision-relevant valuation evidence, explain the impact of the new management guidance, identify at least two material risks or diligence items, and state the next step you recommend.",
+    simulationProfile: {
+      kind: "ib-deal-workbench-v2",
+      project: "Project Northstar",
+      role: "Investment Banking Analyst — M&A Advisory",
+      desk: "M&A Advisory",
+      associate: "Maya Chen, Associate",
+      vp: "Daniel Brooks, Vice President",
+      client: "Northstar Technologies",
+      target: "Orion Systems",
+      deadline: "5:30 PM — same day",
+      objective: "Update the buy-side valuation materials and send the Associate a defensible recommendation before the VP review.",
+      inbox: [
+        { time:"9:08 AM", from:"Maya Chen · Associate", subject:"Northstar / Orion — valuation refresh before VP review", body:"Please update the transaction snapshot, trading comps output and recommendation using the attached capitalization, forecast and peer files. Check the model carefully before you send anything up. I need your revised output before 5:30 PM." },
+        { time:"2:17 PM", from:"Maya Chen · Associate", subject:"NEW INFO — management guidance changed", body:"Orion just lowered Year 1 revenue guidance by 5% from the $480m case. Update the forecast and every dependent valuation output. Flag what changed and whether it affects our recommendation." }
+      ],
+      files: [
+        { id:"cap", name:"01_Orion_Capitalization.xlsx", type:"Excel", label:"Capitalization", rows:[["Diluted shares","40.0m"],["Offer price / share","$19.75"],["Equity value","$790m"],["Debt","$95m"],["Cash","$35m"]] },
+        { id:"forecast", name:"02_Orion_Management_Forecast.xlsx", type:"Excel", label:"Forecast", rows:[["LTM Revenue","$445m"],["LTM EBITDA","$80m"],["NTM Revenue — initial","$480m"],["NTM EBITDA — initial","$88m"],["NTM EBITDA — revised","$83.5m"]] },
+        { id:"comps", name:"03_Trading_Comps.xlsx", type:"Excel", label:"Trading comps", rows:[["Peer","Enterprise Value","NTM EBITDA","Business fit"],["Aster Cloud","$1,020m","$100m","High"],["Beacon Software","$1,240m","$120m","High"],["Cobalt Systems","$820m","$80m","High"],["Delta Apps","$1,075m","$100m","High"],["Mega Hardware","$4,800m","$240m","Low — hardware-heavy"]] },
+        { id:"qa", name:"04_Model_Check_Notes.txt", type:"QA", label:"Model check", rows:[["Check","Observation"],["EV bridge","Formula currently subtracts cash"],["Share count","Matches capitalization file"],["Units","All model outputs in $m"],["Sensitivity","Updates when selected multiple changes"]] },
+        { id:"process", name:"05_Diligence_Request_List.pdf", type:"PDF", label:"Diligence", rows:[["Priority","Request"],["High","Top-10 customer revenue and renewal dates"],["High","Revenue bridge: recurring vs services"],["High","Synergy build and one-time implementation costs"],["Medium","Employee retention / key technical staff"]] }
+      ],
+      workflow: [
+        { id:"model", title:"1 · Transaction Model", subtitle:"Build the EV bridge and headline transaction multiple." },
+        { id:"valuation", title:"2 · Trading Comps", subtitle:"Calculate the defensible peer median and implied equity value." },
+        { id:"update", title:"3 · Management Update", subtitle:"Revise the forecast and dependent valuation output after new information arrives." },
+        { id:"qa", title:"4 · Model QA", subtitle:"Find the material model issue before senior review." },
+        { id:"email", title:"5 · Associate Email", subtitle:"Send a decision-useful recommendation with evidence, risks and next step." }
+      ]
+    }
+  };
+}
+
 function buildAssessment(pathway, itemId) {
   if (
     itemId.startsWith("part-")
@@ -2301,10 +3036,12 @@ function buildAssessment(pathway, itemId) {
   }
 
   if (itemId === "simulation") {
-    const bank =
-      stageQuestions(pathway, 5);
-
+    if (pathway.id === "investment-banking") return buildInvestmentBankingSimulation(pathway);
+    const workbench = buildCareerWorkbenchSimulation(pathway);
+    if (workbench) return workbench;
+    const bank = stageQuestions(pathway, 5);
     return {
+      version: "1.0",
       itemType: "simulation",
       questions: bank.slice(0, 7),
       writingPrompt:
@@ -3012,7 +3749,8 @@ function publicQuestion(q) {
     options: q.options || null,
     context: q.context || null,
     table: Array.isArray(q.table) ? q.table : null,
-    unit: q.unit || null
+    unit: q.unit || null,
+    workProduct: q.workProduct || null
   };
 }
 
@@ -3101,6 +3839,11 @@ function gradeAssessment(
       if (Number.isFinite(value) && Math.abs(value - Number(q.answer)) <= Number(q.tolerance || 0)) {
         correct++;
       }
+    } else if (q.type === "text") {
+      const text=cleanString(submitted||"",3000).toLowerCase();
+      const words=text.split(/\s+/).filter(Boolean);
+      const hits=(q.keywords||[]).filter(k=>text.includes(String(k).toLowerCase())).length;
+      if(words.length>=Number(q.minWords||12) && hits>=Number(q.minHits||1)) correct++;
     } else if (
       typeof submitted === "string" &&
       submitted === q.answer
@@ -3174,6 +3917,22 @@ function gradeWriting(
 
   const lower =
     text.toLowerCase();
+
+  if (assessment.version === "2.0-workbench" && assessment.simulationProfile?.kind === "ib-deal-workbench-v2") {
+    let points = 0;
+    const wc = words.length;
+    if (wc >= 55) points += 3;
+    if (wc >= 85) points += 2;
+    if (/\b(recommend|proceed|continue diligence|do not proceed|pause|decline)\b/i.test(text)) points += 4;
+    const valuationSignals = ["10.25", "793", "794", "840", "equity value", "multiple", "valuation"];
+    points += Math.min(6, valuationSignals.filter(x => lower.includes(x)).length * 2);
+    if (/\b(guidance|revised|update|revenue)\b/i.test(text) && /\b(5%|456|83.5|lower|declin)\b/i.test(text)) points += 5;
+    const riskSignals = ["customer", "contract", "synergy", "retention", "churn", "diligence", "execution", "downside", "revenue mix", "implementation cost"];
+    points += Math.min(5, riskSignals.filter(x => lower.includes(x)).length * 2);
+    if (/\b(next step|request|confirm|validate|diligence|review|rerun|send)\b/i.test(text)) points += 3;
+    if (wc >= 70 && wc <= 260) points += 2;
+    return Math.min(30, points);
+  }
 
   let lengthPoints =
     Math.round(
@@ -4090,6 +4849,39 @@ const ENTERPRISE_REQUIRED_STANDARD_CONTENT = new Set([
   "final-assessment"
 ]);
 
+
+function managerReviewPublic(x){return {id:x.id,orgId:x.org_id,assignmentId:x.assignment_id,learnerUid:x.learner_uid,pathwayId:x.pathway_id,artifactType:x.artifact_type,artifactRef:x.artifact_ref,reviewStatus:x.review_status,rating:x.rating==null?null:Number(x.rating),comment:x.comment,createdByUid:x.created_by_uid,createdAt:x.created_at,updatedAt:x.updated_at};}
+async function upsertEnterpriseNotification(env,{recipientUid,orgId,assignmentId=null,category,severity='info',title,body,actionHash=null,dedupeKey}){
+  const id=`note_${(await sha256Hex(`${recipientUid}|${dedupeKey}`)).slice(0,24)}`;
+  await env.DB.prepare(`INSERT INTO enterprise_notifications (id,recipient_uid,org_id,assignment_id,category,severity,title,body,action_hash,dedupe_key,status) VALUES (?,?,?,?,?,?,?,?,?,?,'unread') ON CONFLICT(recipient_uid,dedupe_key) DO UPDATE SET severity=excluded.severity,title=excluded.title,body=excluded.body,action_hash=excluded.action_hash,updated_at=CURRENT_TIMESTAMP`).bind(id,recipientUid,orgId,assignmentId,category,severity,title,body,actionHash,dedupeKey).run(); return id;
+}
+async function refreshEnterpriseNotifications(env,user){
+  const activeKeys=[];
+  const memberships=(await env.DB.prepare(`SELECT org_id,role FROM organization_members WHERE uid=? AND status='active'`).bind(user.sub).all()).results||[];
+  for(const m of memberships){
+    if(ENTERPRISE_EMPLOYER_ROLES.includes(m.role)){
+      const assignments=(await env.DB.prepare(`SELECT a.id,a.cohort_id,a.pathway_id,a.due_at,c.name AS cohort_name FROM program_assignments a JOIN cohorts c ON c.id=a.cohort_id WHERE a.org_id=? AND a.status='published'`).bind(m.org_id).all()).results||[];
+      for(const a of assignments){
+        const learners=(await env.DB.prepare(`SELECT cm.uid,MAX(i.email_normalized) AS email,MAX(cr.holder_name) AS holder_name FROM cohort_members cm LEFT JOIN organization_invites i ON i.org_id=cm.org_id AND i.cohort_id=cm.cohort_id AND i.accepted_by_uid=cm.uid LEFT JOIN credentials cr ON cr.uid=cm.uid WHERE cm.cohort_id=? AND cm.org_id=? AND cm.status='active' GROUP BY cm.uid`).bind(a.cohort_id,m.org_id).all()).results||[];
+        for(const l of learners){
+          const name=l.holder_name||l.email||'Learner'; const cred=await env.DB.prepare(`SELECT credential_id FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' AND status='active' LIMIT 1`).bind(l.uid,a.id).first(); const lab=await env.DB.prepare(`SELECT score,revision_count,status FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(l.uid,a.id).first(); const readiness=await env.DB.prepare(`SELECT overall_score,evidence_coverage FROM readiness_snapshots WHERE uid=? AND assignment_id=? ORDER BY created_at DESC LIMIT 1`).bind(l.uid,a.id).first();
+          const due=a.due_at?Date.parse(a.due_at):null, days=due?Math.ceil((due-Date.now())/86400000):null;
+          let note=null,key=null;
+          if(due&&due<Date.now()&&!cred){key=`employer:overdue:${a.id}:${l.uid}`;note={category:'overdue',severity:'urgent',title:`Overdue · ${name}`,body:`${a.cohort_name} is past due and Professional Readiness is not complete.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          else if(Number(lab?.revision_count||0)>0&&lab?.status!=='passed'){key=`employer:revision:${a.id}:${l.uid}`;note={category:'revision',severity:'attention',title:`Revision cycle · ${name}`,body:`${Number(lab.revision_count)} Role Lab revision cycle${Number(lab.revision_count)===1?'':'s'} recorded. Review the recurring work-product weakness.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          else if(readiness&&Number(readiness.evidence_coverage||0)>=.7&&Number(readiness.overall_score)<75){key=`employer:readiness:${a.id}:${l.uid}`;note={category:'readiness',severity:'attention',title:`Readiness gap · ${name}`,body:`Readiness is ${Number(readiness.overall_score)} with ${Math.round(Number(readiness.evidence_coverage)*100)}% evidence coverage.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          else if(days!=null&&days>=0&&days<=3&&!cred){key=`employer:deadline:${a.id}:${l.uid}`;note={category:'deadline',severity:'info',title:`Due soon · ${name}`,body:`${a.cohort_name} is due in ${days} day${days===1?'':'s'}.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          if(note){activeKeys.push(key);await upsertEnterpriseNotification(env,{recipientUid:user.sub,orgId:m.org_id,assignmentId:a.id,dedupeKey:key,...note});}
+        }
+      }
+    }
+  }
+  // Learner-side assigned deadlines/revisions.
+  const learnerAssignments=(await env.DB.prepare(`SELECT a.id,a.org_id,a.pathway_id,a.due_at,c.name AS cohort_name FROM cohort_members cm JOIN program_assignments a ON a.cohort_id=cm.cohort_id AND a.org_id=cm.org_id JOIN cohorts c ON c.id=a.cohort_id WHERE cm.uid=? AND cm.status='active' AND a.status='published'`).bind(user.sub).all()).results||[];
+  for(const a of learnerAssignments){const cred=await env.DB.prepare(`SELECT credential_id FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' AND status='active' LIMIT 1`).bind(user.sub,a.id).first();const lab=await env.DB.prepare(`SELECT revision_count,status FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(user.sub,a.id).first();const due=a.due_at?Date.parse(a.due_at):null,days=due?Math.ceil((due-Date.now())/86400000):null;let note=null,key=null;if(due&&due<Date.now()&&!cred){key=`learner:overdue:${a.id}`;note={category:'overdue',severity:'urgent',title:`Assigned training is overdue`,body:`${a.cohort_name} is past due. Open the assigned program to continue.`,actionHash:`#/assigned/${a.id}`};}else if(lab&&Number(lab.revision_count||0)>0&&lab.status!=='passed'){key=`learner:revision:${a.id}`;note={category:'revision',severity:'attention',title:'Role Lab revision required',body:'Manager-style feedback is waiting in your Role Lab. Revise the current work product before continuing.',actionHash:`#/role-lab/${a.pathway_id}?assignment=${a.id}`};}else if(days!=null&&days>=0&&days<=3&&!cred){key=`learner:deadline:${a.id}`;note={category:'deadline',severity:'info',title:'Assigned training due soon',body:`${a.cohort_name} is due in ${days} day${days===1?'':'s'}.`,actionHash:`#/assigned/${a.id}`};}if(note){activeKeys.push(key);await upsertEnterpriseNotification(env,{recipientUid:user.sub,orgId:a.org_id,assignmentId:a.id,dedupeKey:key,...note});}}
+  return {activeGenerated:activeKeys.length};
+}
+
 const ENTERPRISE_EMPLOYER_ROLES = ["owner", "training_admin", "content_manager", "manager", "viewer"];
 
 async function requireOrgMember(env, uid, orgId) {
@@ -4342,7 +5134,7 @@ async function v2LatestTaskSubmissions(env, runId) {
 
 async function v2RunState(env, run) {
   const tasksRes = await env.DB.prepare(`SELECT * FROM role_lab_tasks WHERE lab_key=? AND lab_version=? AND status='active' ORDER BY stage_no`).bind(run.lab_key, run.lab_version).all();
-  const tasks = tasksRes.results || [];
+  let tasks = tasksRes.results || []; if(!tasks.length){const dyn=v2DynamicLabByKey(run.lab_key);tasks=dyn?.tasks||[];}
   const latest = await v2LatestTaskSubmissions(env, run.id);
   const byTask = new Map(latest.map(s => [s.task_id, s]));
   let current = null;
@@ -4368,6 +5160,68 @@ const V2_LEVEL_CODES = {
   role_lab: 'RLB',
   professional_readiness: 'PRD'
 };
+
+
+const ACADEMY_PRIMARY_DOMAIN = {
+  'investment-banking':'deals','corporate-development':'deals',
+  'private-equity':'investing','venture-capital':'investing','equity-research':'investing','asset-management':'investing','hedge-funds':'investing',
+  'sales-trading':'markets_quant','quantitative-finance':'markets_quant',
+  'private-credit':'credit_risk','corporate-banking':'credit_risk','risk-management':'credit_risk',
+  'fp-and-a':'corporate_finance','treasury':'corporate_finance',
+  'wealth-management':'wealth_real_assets','real-estate-finance':'wealth_real_assets'
+};
+const ACADEMY_AWARDS = [
+  {id:'academy-finance-core',pathwayId:'finance-core',level:'finance_core',code:'CORE',title:'Capital Mastery Finance Core Certificate',kind:'finance_core'},
+  {id:'academy-deals',pathwayId:'academy-deals',level:'academy',code:'DEALS',title:'Capital Mastery Deals Academy Certificate',required:['investment-banking','corporate-development']},
+  {id:'academy-investing',pathwayId:'academy-investing',level:'academy',code:'INV',title:'Capital Mastery Investing Academy Certificate',pool:['private-equity','venture-capital','equity-research','asset-management','hedge-funds'],minimum:2},
+  {id:'academy-markets-quant',pathwayId:'academy-markets-quant',level:'academy',code:'MQ',title:'Capital Mastery Markets & Quant Academy Certificate',pool:['sales-trading','quantitative-finance','risk-management'],minimum:2},
+  {id:'academy-credit-risk',pathwayId:'academy-credit-risk',level:'academy',code:'CR',title:'Capital Mastery Credit & Risk Academy Certificate',pool:['private-credit','corporate-banking','risk-management'],minimum:2},
+  {id:'academy-corporate-finance',pathwayId:'academy-corporate-finance',level:'academy',code:'CF',title:'Capital Mastery Corporate Finance Academy Certificate',pool:['fp-and-a','treasury','corporate-development'],minimum:2},
+  {id:'academy-wealth-real-assets',pathwayId:'academy-wealth-real-assets',level:'academy',code:'WRA',title:'Capital Mastery Wealth & Real Assets Academy Certificate',required:['wealth-management','real-estate-finance']},
+  {id:'academy-finance-professional',pathwayId:'finance-professional',level:'finance_professional',code:'PRO',title:'Capital Mastery Finance Professional Achievement',kind:'finance_professional'}
+];
+function academySafeCredential(c){return {credentialId:c.credential_id,title:c.credential_title,pathwayId:c.pathway_id,level:c.credential_level,issuedAt:c.issued_at};}
+async function academyCredentialState(env,uid){
+  const rows=(await env.DB.prepare(`SELECT credential_id,public_token,pathway_id,credential_level,credential_title,issued_at,status FROM credentials WHERE uid=? AND status='active' ORDER BY issued_at`).bind(uid).all()).results||[];
+  const foundations=rows.filter(x=>x.credential_level==='foundations'&&ACADEMY_PRIMARY_DOMAIN[x.pathway_id]);
+  const professional=rows.filter(x=>x.credential_level==='professional_readiness'&&ACADEMY_PRIMARY_DOMAIN[x.pathway_id]);
+  const byPrd=new Map(professional.map(x=>[x.pathway_id,x]));
+  const financeCore=rows.find(x=>x.pathway_id==='finance-core'&&x.credential_level==='finance_core');
+  return {rows,foundations,professional,byPrd,financeCore};
+}
+function academyEligibility(def,state){
+  if(def.kind==='finance_core'){
+    const domains=new Set(state.foundations.map(x=>ACADEMY_PRIMARY_DOMAIN[x.pathway_id]));
+    const supporting=[...new Map(state.foundations.map(x=>[x.pathway_id,x])).values()];
+    return {eligible:supporting.length>=4&&domains.size>=3,supporting,summary:`${supporting.length}/4 Foundations · ${domains.size}/3 finance domains`,missing:supporting.length<4?'Earn Foundations in at least four careers':domains.size<3?'Spread Foundations across at least three finance domains':null};
+  }
+  if(def.kind==='finance_professional'){
+    const domains=new Set(state.professional.map(x=>ACADEMY_PRIMARY_DOMAIN[x.pathway_id]));
+    return {eligible:!!state.financeCore&&state.professional.length>=4&&domains.size>=3,supporting:[...(state.financeCore?[state.financeCore]:[]),...state.professional],summary:`${state.financeCore?'Finance Core ✓':'Finance Core required'} · ${state.professional.length}/4 Professional Readiness · ${domains.size}/3 domains`,missing:!state.financeCore?'Earn Finance Core first':state.professional.length<4?'Earn Professional Readiness in at least four careers':domains.size<3?'Professional Readiness must span at least three finance domains':null};
+  }
+  const eligiblePaths=def.required||def.pool||[]; const support=eligiblePaths.map(p=>state.byPrd.get(p)).filter(Boolean);
+  const needed=def.required?def.required.length:Number(def.minimum||2); const missingPaths=def.required?def.required.filter(p=>!state.byPrd.has(p)):[];
+  return {eligible:support.length>=needed,supporting:support,summary:`${support.length}/${needed} required Professional Readiness credentials`,missing:missingPaths.length?`Still required: ${missingPaths.map(x=>getPathway(x).title).join(', ')}`:support.length<needed?`Earn ${needed-support.length} more eligible Professional Readiness credential${needed-support.length===1?'':'s'}`:null};
+}
+async function issueAcademyCredential(env,user,def,eligibility){
+  const existing=await env.DB.prepare(`SELECT * FROM credentials WHERE uid=? AND pathway_id=? AND credential_level=? AND status='active' ORDER BY issued_at DESC LIMIT 1`).bind(user.sub,def.pathwayId,def.level).first();
+  if(existing)return {issued:false,credential:existing,existing:true};
+  if(!eligibility.eligible)return {issued:false,eligible:false,missing:eligibility.missing};
+  const year=new Date().getUTCFullYear(), random=crypto.randomUUID().replace(/-/g,'').slice(0,10).toUpperCase(), credentialId=`CM-${def.code}-${year}-${random}`, publicToken=randomToken(24), holderName=holderNameFromUser(user);
+  const summary={standardVersion:'2.0-academy',supportingCredentials:eligibility.supporting.map(academySafeCredential),ruleSummary:eligibility.summary,generatedAt:new Date().toISOString()};
+  const statements=[
+    env.DB.prepare(`INSERT INTO credentials (credential_id,public_token,uid,holder_name,pathway_id,credential_level,credential_title,status,standard_version,credential_definition_id,evidence_summary_json) VALUES (?,?,?,?,?,?,?,'active','2.0-academy',?,?)`).bind(credentialId,publicToken,user.sub,holderName,def.pathwayId,def.level,def.title,def.id,JSON.stringify(summary)),
+    env.DB.prepare(`INSERT INTO credential_events (id,credential_id,event_type,actor_uid,details) VALUES (?,?, 'issued', ?, ?)`).bind(crypto.randomUUID(),credentialId,user.sub,JSON.stringify({automatic:true,academy:true,definitionId:def.id})),
+    env.DB.prepare(`INSERT INTO credential_evidence_items (id,credential_id,evidence_type,evidence_ref,title,evidence_json) VALUES (?,?,?,?,?,?)`).bind(crypto.randomUUID(),credentialId,'curriculum',def.id,'Capital Mastery Academy Standard 2.0',JSON.stringify({definitionId:def.id,ruleSummary:eligibility.summary}))
+  ];
+  for(const c of eligibility.supporting){statements.push(env.DB.prepare(`INSERT INTO credential_evidence_items (id,credential_id,evidence_type,evidence_ref,title,evidence_json) VALUES (?,?,?,?,?,?)`).bind(crypto.randomUUID(),credentialId,'credential',c.credential_id,c.credential_title,JSON.stringify(academySafeCredential(c))));}
+  await env.DB.batch(statements); return {issued:true,eligible:true,credential:{credentialId,publicToken,title:def.title,level:def.level,pathwayId:def.pathwayId,status:'active',standardVersion:'2.0-academy'}};
+}
+async function academyRefresh(env,user){
+  let state=await academyCredentialState(env,user.sub); const results=[];
+  for(const def of ACADEMY_AWARDS){const eligibility=academyEligibility(def,state);const result=await issueAcademyCredential(env,user,def,eligibility);results.push({definition:def,eligibility,...result});if(result.issued)state=await academyCredentialState(env,user.sub);}
+  return results;
+}
 
 async function v2ActiveCredential(env, uid, pathwayId, level) {
   return env.DB.prepare(`
@@ -4573,7 +5427,7 @@ async function v2AssessmentAccess(env, user, assessment, assignmentId) {
     if (assignment.accessRole==='learner' && !['published','completed'].includes(assignment.status)) throw new HttpError(403,'Assignment is not active');
     orgId=assignment.org_id; cohortId=assignment.cohort_id; curriculumVersion=assignment.curriculum_version||V2_STANDARD_VERSION;
   }
-  if (assessment.assessment_key==='ib-essentials-case') {
+  if (assessment.stage==='essentials') {
     const foundations=await v2ActiveCredential(env,user.sub,assessment.pathway_id,'foundations');
     if (!foundations) throw new HttpError(409,'Earn the Foundations Certificate before the Essentials mini case');
     if (assignment && assignment.track==='professional') {
@@ -4581,7 +5435,7 @@ async function v2AssessmentAccess(env, user, assessment, assignmentId) {
       if(!baseline) throw new HttpError(409,'Complete the assigned baseline diagnostic before the Essentials mini case');
     }
   }
-  if (assessment.assessment_key==='ib-professional-final') {
+  if (assessment.stage==='final') {
     const scope=assignmentId||'public';
     const baseline=await env.DB.prepare(`SELECT id FROM diagnostic_attempts WHERE uid=? AND pathway_id=? AND COALESCE(assignment_id,'public')=? ORDER BY submitted_at ASC LIMIT 1`).bind(user.sub,assessment.pathway_id,scope).first();
     if(!baseline) throw new HttpError(409,'Complete the baseline diagnostic before the Professional Readiness Final');
@@ -4593,11 +5447,12 @@ async function v2AssessmentAccess(env, user, assessment, assignmentId) {
 }
 
 function v2PublicAssessmentQuestion(row) {
-  return {id:row.id,position:Number(row.position),competencyId:row.competency_id,prompt:row.prompt,options:v2ParseJson(row.options_json,[]),weight:Number(row.weight||1)};
+  const options=v2ParseJson(row.options_json,[]); const type=row.question_type||(options.length?'mc':'numeric');
+  return {id:row.id,position:Number(row.position),competencyId:row.competency_id,type,prompt:row.prompt,options,weight:Number(row.weight||1),tolerance:Number(row.tolerance||0),unit:row.unit||''};
 }
 
-async function v2GradeAssessment(env, { user, assessment, answers, assignmentId = null, orgId = null, cohortId = null, curriculumVersion = V2_STANDARD_VERSION }) {
-  const qres=await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? AND status='active' ORDER BY position`).bind(assessment.assessment_key,assessment.version).all();
+async function v2GradeAssessment(env, { user, assessment, answers, assignmentId = null, orgId = null, cohortId = null, curriculumVersion = V2_STANDARD_VERSION, dynamicQuestions = null }) {
+  const qres=dynamicQuestions?{results:dynamicQuestions}:await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? AND status='active' ORDER BY position`).bind(assessment.assessment_key,assessment.version).all();
   const qs=qres.results||[];
   if (!qs.length) throw new HttpError(404,'Assessment questions unavailable');
   let earned=0,totalWeight=0,correct=0;
@@ -4605,7 +5460,8 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
   const details=[];
   for(const q of qs){
     const weight=Math.max(1,Number(q.weight||1)); totalWeight+=weight;
-    const submitted=String(answers?.[q.id]??''); const ok=submitted===String(q.correct_answer);
+    const submitted=answers?.[q.id]; const options=v2ParseJson(q.options_json,[]); const qType=q.question_type||(options.length?'mc':'numeric');
+    const ok=qType==='numeric' ? (Number.isFinite(Number(submitted)) && Math.abs(Number(submitted)-Number(q.correct_answer))<=Number(q.tolerance||0)) : String(submitted??'')===String(q.correct_answer);
     if(ok){earned+=weight;correct++;}
     (byComp[q.competency_id] ||= []).push({score:ok?100:0,weight});
     details.push({id:q.id,correct:ok,rationale:q.rationale});

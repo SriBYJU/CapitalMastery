@@ -48,6 +48,8 @@ Firebase/Firestore may synchronize non-authoritative learner state, but official
 
 See [`docs/architecture.md`](docs/architecture.md), [`docs/enterprise-security.md`](docs/enterprise-security.md), [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md), and [`docs/phase2-roadmap.md`](docs/phase2-roadmap.md).
 
+Phase 2 pilot materials: [`docs/employer-one-pager.md`](docs/employer-one-pager.md), [`docs/phase2-pilot-guide.md`](docs/phase2-pilot-guide.md), [`docs/phase2-security-overview.md`](docs/phase2-security-overview.md), [`docs/sample-readiness-report.md`](docs/sample-readiness-report.md), [`docs/workforce-evidence.md`](docs/workforce-evidence.md), and [`docs/pilot-demo-playbook.md`](docs/pilot-demo-playbook.md).
+
 ## Run locally
 
 This is a static frontend. Serve the repository root with any local static server, for example:
