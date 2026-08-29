@@ -4,6 +4,16 @@
   "main": "v2/worker-v2-phase1-release.js",
   "compatibility_date": "2026-08-28",
   "keep_vars": true,
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "invocation_logs": true,
+      "head_sampling_rate": 1
+    }
+  },
   "vars": {
     "ALLOWED_ORIGIN": "https://sribyju.github.io",
     "FIREBASE_PROJECT_ID": "capital-mastery26"
