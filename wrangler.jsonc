@@ -15,7 +15,7 @@
     }
   },
   "vars": {
-    "ALLOWED_ORIGIN": "https://sribyju.github.io",
+    "ALLOWED_ORIGIN": "https://sribyju.github.io,https://capitalmastery.pages.dev",
     "FIREBASE_PROJECT_ID": "capital-mastery26"
   },
   "d1_databases": [

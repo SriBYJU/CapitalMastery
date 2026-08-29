@@ -1,0 +1,11 @@
+import fs from 'node:fs';
+const read = (p) => fs.readFileSync(p,'utf8');
+const html=read('index.html'), robots=read('robots.txt'), sitemap=read('sitemap.xml'), worker=read('v2/worker-v2-phase1-release.js'), wrangler=read('wrangler.jsonc');
+const must=(ok,msg)=>{ if(!ok) throw new Error(msg); };
+must(html.includes('https://capitalmastery.pages.dev/'), 'Cloudflare Pages canonical missing');
+must(!html.includes('rel="canonical" href="https://sribyju.github.io/CapitalMastery/'), 'Old GitHub canonical still active');
+must(robots.includes('Sitemap: https://capitalmastery.pages.dev/sitemap.xml'), 'robots sitemap host mismatch');
+must(sitemap.includes('<loc>https://capitalmastery.pages.dev/</loc>'), 'sitemap primary URL mismatch');
+must(wrangler.includes('https://sribyju.github.io,https://capitalmastery.pages.dev'), 'dual production origin config missing');
+must(worker.includes('allowedOriginList(env).includes(origin)'), 'Worker does not enforce explicit origin allowlist');
+console.log('CLOUDFLARE PAGES MIGRATION AUDIT PASS: canonical, sitemap, fallback origin and Worker allowlist aligned.');

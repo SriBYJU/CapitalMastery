@@ -575,7 +575,7 @@ export default {
 
       const origin = request.headers.get("Origin");
 
-      if (origin && origin !== env.ALLOWED_ORIGIN) {
+      if (origin && !allowedOriginList(env).includes(origin)) {
         throw new HttpError(403, "Origin not allowed");
       }
 
@@ -4921,10 +4921,20 @@ class HttpError extends Error {
   }
 }
 
+function allowedOriginList(env) {
+  return String(env.ALLOWED_ORIGIN || "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function corsHeaders(env) {
   return {
+    // Browser access is still restricted by the explicit Origin allowlist above.
+    // Wildcard response CORS lets the same bearer-token API serve both approved
+    // static production hosts during the GitHub Pages -> Cloudflare Pages move.
     "Access-Control-Allow-Origin":
-      env.ALLOWED_ORIGIN,
+      "*",
 
     "Access-Control-Allow-Headers":
       "Authorization, Content-Type, X-Request-ID",
