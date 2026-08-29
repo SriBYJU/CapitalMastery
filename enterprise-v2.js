@@ -370,13 +370,55 @@
     } catch(e) { errorPage('Could not load assigned training.',e.message,'#/'); }
   }
 
+
+  function assignedStageState(stage, report={}) {
+    const creds=Array.isArray(report.credentials)?report.credentials:[];
+    const activeLevel=level=>creds.find(c=>c.level===level && c.status==='active');
+    const foundations=activeLevel('foundations');
+    const essentials=activeLevel('essentials');
+    const applied=activeLevel('applied');
+    const roleCredential=activeLevel('role_lab');
+    const readinessCredential=activeLevel('professional_readiness');
+    const diagnostic=report.diagnostic||null;
+    const lab=report.roleLab||null;
+    const final=report.finalAssessment||null;
+    if(stage.id==='foundations-core') return foundations?{label:'Complete · Foundations earned',tone:'complete'}:{label:'Start here',tone:'ready'};
+    if(stage.id==='foundations-assessment') return foundations?{label:'Complete',tone:'complete'}:{label:'Required',tone:'required'};
+    if(stage.id==='diagnostic') return diagnostic?{label:`Complete · ${Number(diagnostic.score)}% baseline`,tone:'complete'}:{label:foundations?'Ready to take':'Required after Foundations',tone:foundations?'ready':'required'};
+    if(stage.id==='essentials-mini-case'||stage.id==='essentials-assessment') return essentials?{label:'Complete · Essentials earned',tone:'complete'}:{label:diagnostic?'Ready to take':'Locked · baseline first',tone:diagnostic?'ready':'locked'};
+    if(stage.id==='applied-skills') return applied?{label:'Complete · Applied Skills earned',tone:'complete'}:{label:essentials?'Ready to complete':'Locked · Essentials first',tone:essentials?'ready':'locked'};
+    if(stage.id==='role-lab') {
+      if(roleCredential||lab?.status==='completed') return {label:`Complete${lab?.score!=null?` · ${Number(lab.score)}%`:''}`,tone:'complete'};
+      if(lab) return {label:`${String(lab.status||'in progress').replace(/_/g,' ')}${lab.score!=null?` · ${Number(lab.score)}%`:''}`,tone:'active'};
+      return applied&&essentials?{label:'Ready · Open workbench',tone:'ready'}:{label:'Locked · prerequisites',tone:'locked'};
+    }
+    if(stage.id==='final-assessment') {
+      if(final) return {label:`${final.passed?'Passed':'Needs revision'} · ${Number(final.score)}%`,tone:final.passed?'complete':'active'};
+      const labDone=roleCredential||lab?.status==='completed'||Number(lab?.score||0)>=80;
+      return labDone?{label:'Ready to take',tone:'ready'}:{label:'Locked · Role Lab first',tone:'locked'};
+    }
+    if(stage.id==='optional-interview-prep') return {label:'Optional',tone:'optional'};
+    if(readinessCredential) return {label:'Complete',tone:'complete'};
+    return {label:stage.required?'Required':'Optional',tone:stage.required?'required':'optional'};
+  }
+
+  function assignedProgressSummary(report={}) {
+    const creds=Array.isArray(report.credentials)?report.credentials:[];
+    const levels=new Set(creds.filter(c=>c.status==='active').map(c=>c.level));
+    const complete=[levels.has('foundations'),!!report.diagnostic,levels.has('essentials'),levels.has('applied'),levels.has('role_lab')||report.roleLab?.status==='completed',!!report.finalAssessment?.passed].filter(Boolean).length;
+    const total=6;
+    return {complete,total,pct:Math.round((complete/total)*100),ready:levels.has('professional_readiness')||report.readiness?.status==='ready'};
+  }
+
   async function assignedDetail(id) {
     if (!authReady()) return loading('Checking your account…');
     if (!signedIn()) return authGate('learner');
     loading('Opening assigned program…');
     try {
       await loadCatalog(); const d=await api(`/enterprise/learner/assignments/${encodeURIComponent(id)}`); const a=d.assignment; const firm=d.firmContent||[]; const stages=STANDARD_STAGES[a.track]||STANDARD_STAGES.professional; const hidden=new Set((d.standardPreferences||[]).filter(x=>x.visibility==='hidden').map(x=>x.standard_content_id));
-      setMain(`<section class="cmv2-page"><div class="container"><a class="cmv2-back" href="#/assigned">← Assigned training</a><div class="cmv2-assignment-hero"><div><span class="cmv2-company">${esc(a.organizationName)}</span><div class="eyebrow">${esc(a.cohortName)}</div><h1>${esc(pathTitle(a.pathwayId))}</h1><p>${esc(targetTitle(a.credentialTarget))} · Curriculum ${esc(a.curriculumVersion)}</p></div><div class="cmv2-due"><span>Due</span><b>${fmtDate(a.dueAt)}</b></div></div>${firm.length?`<section class="card cmv2-firm-banner"><div class="eyebrow">YOUR FIRM LAYER</div><h2>Company-specific preparation</h2>${firm.map(x=>`<article><b>${esc(x.title)}</b><p>${esc(x.body?.text||'')}</p></article>`).join('')}</section>`:''}<section class="card"><div class="cmv2-card-head"><div><div class="eyebrow">YOUR READINESS PATH</div><h2>Complete the work. Prove the skills.</h2></div><span class="cmv2-lock-pill">CAPITAL MASTERY STANDARD</span></div><div class="cmv2-learner-stages">${stages.filter(s=>!hidden.has(s.id)).map((s,i)=>`<div class="cmv2-learner-stage"><span>${String(i+1).padStart(2,'0')}</span><div><b>${esc(s.title)}</b><p>${esc(s.copy)}</p></div><div class="cmv2-stage-state">${s.id==='role-lab'?'Role Lab':'Required'}</div></div>`).join('')}</div><div class="cmv2-program-actions">${a.track==='professional'?`<a class="btn btn-primary" href="#/career/${encodeURIComponent(publicPathId(a.pathwayId))}">1 · Learn Foundations + Technical Core</a><a class="btn btn-outline" href="#/diagnostic/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">2 · Baseline Diagnostic</a><a class="btn btn-outline" href="#/v2-assessment/${encodeURIComponent(assessmentKey(a.pathwayId,'essentials'))}?assignment=${encodeURIComponent(a.id)}">3 · Essentials Mini Case</a><a class="btn btn-primary" href="#/learn/${encodeURIComponent(publicPathId(a.pathwayId))}/3">4 · Professional Toolkit</a><a class="btn btn-primary" href="#/learn/${encodeURIComponent(publicPathId(a.pathwayId))}/4">5 · Applied Work</a><a class="btn btn-gold" href="#/role-lab/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">6 · Open Role Lab · Professional Workbench</a><a class="btn btn-primary" href="#/v2-assessment/${encodeURIComponent(assessmentKey(a.pathwayId,'final'))}?assignment=${encodeURIComponent(a.id)}">7 · Professional Final</a><a class="btn btn-outline" href="#/readiness/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">Readiness Report</a><a class="btn btn-outline" href="#/skills/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">Skill Profile</a>`:`<a class="btn btn-primary" href="#/career/${encodeURIComponent(publicPathId(a.pathwayId))}">1 · Open Foundations Learning</a><a class="btn btn-gold" href="#/v2-assessment/${encodeURIComponent(assessmentKey(a.pathwayId,'essentials'))}?assignment=${encodeURIComponent(a.id)}">2 · Essentials Mini Case</a><a class="btn btn-outline" href="#/skills/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">Skill Profile</a>`}</div></section></div></section>`);
+      let report={}; try { report=await api(`/enterprise/learner/readiness-report/${encodeURIComponent(a.pathwayId)}?assignmentId=${encodeURIComponent(a.id)}`); } catch {}
+      const progress=assignedProgressSummary(report);
+      setMain(`<section class="cmv2-page"><div class="container"><a class="cmv2-back" href="#/assigned">← Assigned training</a><div class="cmv2-assignment-hero"><div><span class="cmv2-company">${esc(a.organizationName)}</span><div class="eyebrow">${esc(a.cohortName)}</div><h1>${esc(pathTitle(a.pathwayId))}</h1><p>${esc(targetTitle(a.credentialTarget))} · Curriculum ${esc(a.curriculumVersion)}</p><div class="cmv2-assignment-progress"><div><b>${progress.complete}/${progress.total}</b><span>professional gates complete</span></div><div class="cmv2-assignment-progress-bar"><i style="width:${progress.pct}%"></i></div><strong>${progress.ready?'Professional Readiness verified':`${progress.pct}% through the evidence path`}</strong></div></div><div class="cmv2-due"><span>Due</span><b>${fmtDate(a.dueAt)}</b></div></div>${firm.length?`<section class="card cmv2-firm-banner"><div class="eyebrow">YOUR FIRM LAYER</div><h2>Company-specific preparation</h2>${firm.map(x=>`<article><b>${esc(x.title)}</b><p>${esc(x.body?.text||'')}</p></article>`).join('')}</section>`:''}<section class="card"><div class="cmv2-card-head"><div><div class="eyebrow">YOUR READINESS PATH</div><h2>Complete the work. Prove the skills.</h2><p>Stage status below is read from your authoritative assessment, credential and Role Lab evidence—not browser completion state.</p></div><span class="cmv2-lock-pill">CAPITAL MASTERY STANDARD</span></div><div class="cmv2-learner-stages">${stages.filter(s=>!hidden.has(s.id)).map((s,i)=>{const st=assignedStageState(s,report);return `<div class="cmv2-learner-stage ${esc(st.tone)}"><span>${st.tone==='complete'?'✓':String(i+1).padStart(2,'0')}</span><div><b>${esc(s.title)}</b><p>${esc(s.copy)}</p></div><div class="cmv2-stage-state ${esc(st.tone)}">${esc(st.label)}</div></div>`}).join('')}</div><div class="cmv2-program-actions">${a.track==='professional'?`<a class="btn btn-primary" href="#/career/${encodeURIComponent(publicPathId(a.pathwayId))}">1 · Learn Foundations + Technical Core</a><a class="btn btn-outline" href="#/diagnostic/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">2 · Baseline Diagnostic</a><a class="btn btn-outline" href="#/v2-assessment/${encodeURIComponent(assessmentKey(a.pathwayId,'essentials'))}?assignment=${encodeURIComponent(a.id)}">3 · Essentials Mini Case</a><a class="btn btn-primary" href="#/learn/${encodeURIComponent(publicPathId(a.pathwayId))}/3">4 · Professional Toolkit</a><a class="btn btn-primary" href="#/learn/${encodeURIComponent(publicPathId(a.pathwayId))}/4">5 · Applied Work</a><a class="btn btn-gold" href="#/role-lab/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">6 · Open Role Lab · Professional Workbench</a><a class="btn btn-primary" href="#/v2-assessment/${encodeURIComponent(assessmentKey(a.pathwayId,'final'))}?assignment=${encodeURIComponent(a.id)}">7 · Professional Final</a><a class="btn btn-outline" href="#/readiness/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">Readiness Report</a><a class="btn btn-outline" href="#/skills/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">Skill Profile</a>`:`<a class="btn btn-primary" href="#/career/${encodeURIComponent(publicPathId(a.pathwayId))}">1 · Open Foundations Learning</a><a class="btn btn-gold" href="#/v2-assessment/${encodeURIComponent(assessmentKey(a.pathwayId,'essentials'))}?assignment=${encodeURIComponent(a.id)}">2 · Essentials Mini Case</a><a class="btn btn-outline" href="#/skills/${encodeURIComponent(a.pathwayId)}?assignment=${encodeURIComponent(a.id)}">Skill Profile</a>`}</div></section></div></section>`);
     } catch(e) { errorPage('Assigned program unavailable.',e.message,'#/assigned'); }
   }
 
