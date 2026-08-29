@@ -418,10 +418,13 @@
   function careerPage(c){
     const cs=getCareerState(c.id); issueAllEligible(c);
     const pct=pctFor(c), ready=readiness(c);
+    const finalReady=cs.completedParts.includes(5) && Number(cs.simulationScore||0)>=PASS;
+    const finalPassed=Number(cs.finalScore||0)>=PASS;
+    const finalExamStep=`<div class="path-step ${!finalReady?'locked':''}"><div class="step-num">${finalPassed?'✓':finalReady?'F':'🔒'}</div><div><h3>Final Examination</h3><p>20-question comprehensive credential gate · 80% required.</p>${cs.finalScore!=null?`<div class="small kicker">Final exam: ${Number(cs.finalScore)}%</div>`:''}</div>${finalReady?`<a class="btn btn-${finalPassed?'soft':'gold'} btn-sm" href="#/final/${c.id}">${finalPassed?'Review Final':'Take Final Examination'} →</a>`:'<span class="small muted">Pass the Job Simulation first</span>'}</div>`;
     render(`<section class="page-hero"><div class="container"><div class="eyebrow">${esc(c.group)} · CAREER PATHWAY</div><h1>${esc(c.title)}</h1><p><strong>Target role:</strong> ${esc(c.role)}${c.track?` · <strong>Flagship track:</strong> ${esc(c.track)}`:''}</p></div></section>
     <section class="section-tight"><div class="container career-summary"><div>
       <div class="card"><div class="section-head"><div><div class="eyebrow">YOUR PATH</div><h2>${pct}% complete</h2></div><div><strong>${ready||'—'}</strong><div class="small muted">Readiness score</div></div></div><div class="progress progress-light"><span style="width:${pct}%"></span></div>
-      <div class="path-list">${PARTS.map(p=>pathStep(c,p)).join('')}</div></div>
+      <div class="path-list">${PARTS.map(p=>pathStep(c,p)).join('')}${finalExamStep}</div></div>
     </div><aside class="card"><div class="eyebrow">THE JOB</div><h3>${esc(c.role)}</h3><p>${esc(c.description)}</p><div class="divider"></div><p><strong>Purpose</strong><br>${esc(c.purpose)}</p><p><strong>Who you work with</strong><br>${esc(c.clients)}</p><p><strong>How the business earns revenue</strong><br>${esc(c.revenue)}</p><div class="divider"></div><a class="btn btn-outline btn-block" href="#/compare?a=${c.id}">Compare this career</a></aside></div></section>
     <section class="section section-white"><div class="container"><div class="section-head"><div><div class="eyebrow">DESK STANDARD</div><h2>What Capital Mastery trains you to do.</h2></div><p>Every lesson maps to a real competency: know, calculate, build, research, judge, communicate or deliver.</p></div>
     <div class="grid grid-3"><div class="card"><h3>Deliver</h3><p>${c.deliverables.map(esc).join(' · ')}</p></div><div class="card"><h3>Tools & inputs</h3><p>${c.tools.map(esc).join(' · ')}</p></div><div class="card"><h3>Career ladder</h3><p>${c.ladder.map(esc).join(' → ')}</p></div></div></div></section>
@@ -644,6 +647,7 @@
 
   function qaScores(score){ const c=careerById('investment-banking'),cs=getCareerState(c.id); cs.learningComplete=[1,2,3,4,5]; cs.completedParts=[1,2,3,4,5];[1,2,3,4].forEach(p=>cs.quizScores[p]=score);cs.simulationKnowledge=score;cs.simulationScore=score;cs.finalScore=score;state.credentials=state.credentials.filter(x=>x.careerId!==c.id); if(score>=80) issueAllEligible(c);saveState();toast(`IB QA scores set to ${score}%.`,score>=80?'good':'warn');renderRoute(); }
   function qaProgress(pct){ const c=careerById('investment-banking'),cs=getCareerState(c.id),n=Math.floor(pct/20);cs.learningComplete=[];cs.completedParts=[];cs.quizScores={};for(let p=1;p<=Math.min(n,4);p++){cs.learningComplete.push(p);cs.completedParts.push(p);cs.quizScores[p]=90;}if(n>=5){cs.learningComplete.push(5);cs.completedParts.push(5);cs.simulationKnowledge=90;cs.simulationScore=90;cs.finalScore=90;}else{cs.simulationKnowledge=null;cs.simulationScore=null;cs.finalScore=null;}state.credentials=state.credentials.filter(x=>x.careerId!==c.id);issueAllEligible(c);saveState();toast(`IB QA progress set to ${pct}%.`,'good');renderRoute(); }
+  function refreshLocalState(){ state=loadState(); }
   function resetState(){ if(confirm('Reset all local Capital Mastery QA progress?')){localStorage.removeItem(STATE_KEY);state=loadState();saveState();renderRoute();} }
 
   function mobileMenu(){ modal(`<h2>Menu</h2><div class="grid"><a class="btn btn-outline" href="#/" onclick="CM.closeModal()">Home</a><a class="btn btn-outline" href="#/careers" onclick="CM.closeModal()">Careers</a><a class="btn btn-outline" href="#/credentials" onclick="CM.closeModal()">Credentials</a><a class="btn btn-outline" href="#/passport" onclick="CM.closeModal()">My Learning</a><a class="btn btn-outline" href="#/about" onclick="CM.closeModal()">About</a></div>`); }
@@ -686,7 +690,7 @@
     }catch(err){console.error(err);render(`<section class="section"><div class="container"><div class="card"><h1>Something went wrong.</h1><p>${esc(err.message)}</p><a class="btn btn-primary" href="#/">Return home</a></div></div></section>`);}
   }
 
-  window.CM={mobileMenu,markPart,toggleQa,qaScores,qaProgress,resetState,copy,closeModal,linkedinFields,postModal,postStyle,downloadSocial,downloadCertificateImage,compareGo};
+  window.CM={mobileMenu,markPart,toggleQa,qaScores,qaProgress,refreshLocalState,resetState,copy,closeModal,linkedinFields,postModal,postStyle,downloadSocial,downloadCertificateImage,compareGo};
   window.addEventListener('hashchange',renderRoute);
   renderRoute();
 })();
