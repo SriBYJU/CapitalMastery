@@ -46,7 +46,7 @@ GitHub Pages frontend
 
 Firebase/Firestore may synchronize non-authoritative learner state, but official assessment results, readiness evidence, and credential issuance are determined server-side by the Worker and D1.
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/enterprise-security.md`](docs/enterprise-security.md), and [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md).
+See [`docs/architecture.md`](docs/architecture.md), [`docs/enterprise-security.md`](docs/enterprise-security.md), [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md), and [`docs/phase2-roadmap.md`](docs/phase2-roadmap.md).
 
 ## Run locally
 

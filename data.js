@@ -306,51 +306,51 @@ window.CM_DATA = {
   "concepts": {
     "financial-statements": {
       "name": "Financial Statement Linkage",
-      "explain": "Understand how the income statement, balance sheet and cash-flow statement interact.",
-      "work": "Trace a revenue, expense, CapEx or financing assumption through all three statements.",
-      "example": "A $10 depreciation increase lowers pretax income, affects taxes, is added back in CFO and reduces PP&E."
+      "explain": "Investment bankers use the income statement, balance sheet and cash flow statement together to understand historical performance, forecast operating results, normalize EBITDA, identify cash/debt and build valuation or transaction models. The statements must reconcile because a small accounting error can flow directly into enterprise value, purchase price or per-share outputs.",
+      "work": "Start with reported revenue, operating expenses, EBITDA, D&A, taxes, working capital, cash, debt and diluted shares. Trace how earnings convert to cash flow, separate operating items from financing items, and reconcile the balance sheet before using the numbers in a valuation or transaction model.",
+      "example": "A target reports $620m revenue and $93m EBITDA, but also has $8m of one-time restructuring expense. An analyst should understand the reported result, determine whether an adjustment is defensible, and show both reported and adjusted EBITDA rather than automatically adding the expense back."
     },
     "accounting-quality": {
       "name": "Accounting Quality",
-      "explain": "Separate recurring operating economics from accounting presentation and one-time items.",
-      "work": "Normalize earnings and identify aggressive assumptions before using reported figures.",
-      "example": "A restructuring charge may be non-recurring, but repeated “one-time” charges deserve skepticism."
+      "explain": "Banking analysis is not just copying reported numbers. Analysts test whether earnings are recurring, whether adjustments are defensible, whether working-capital movements distort cash generation and whether debt, leases, minority interests or other items belong in the enterprise-value bridge.",
+      "work": "Review footnotes and management adjustments, identify non-recurring or non-cash items, compare EBITDA with cash generation, reconcile net debt, and document every normalization so an Associate or VP can trace the source and judgment behind the number.",
+      "example": "If management presents $110m adjusted EBITDA versus $93m reported EBITDA, the analyst should break the $17m difference into individual adjustments, reject items that are really recurring operating costs, and show the valuation effect of both the reported and defensible adjusted cases."
     },
     "comps": {
       "name": "Comparable Company Analysis",
-      "explain": "Select defensible peers and apply consistent trading multiples.",
-      "work": "Create an operating and valuation comparison table and derive a valuation range.",
-      "example": "Compare EV/EBITDA using consistent LTM or forward periods across peers."
+      "explain": "Trading comparables value a company relative to publicly traded peers. The hard part is not calculating a multiple; it is selecting genuinely comparable businesses, using consistent LTM/NTM operating metrics, understanding outliers and translating enterprise-value multiples back to equity value and per-share value correctly.",
+      "work": "Build a peer set using business model, end market, growth, margins, size and risk. Calculate EV/Revenue, EV/EBITDA and relevant equity multiples, review median and quartile ranges, investigate outliers, apply a defensible range to the target and reconcile enterprise value to equity value.",
+      "example": "If four relevant peers trade at 8.0x, 9.0x, 10.0x and 11.0x NTM EBITDA, the median is 9.5x. Applying 9.5x to $120m target EBITDA implies $1.14bn enterprise value; the analyst must then adjust for debt, cash and diluted shares before presenting an implied share price."
     },
     "precedents": {
       "name": "Precedent Transaction Analysis",
-      "explain": "Use relevant historical M&A transactions to frame control valuations.",
-      "work": "Normalize transaction values, select multiples and explain differences in timing and strategic context.",
-      "example": "A strategic acquisition with large synergies may trade above ordinary public-market multiples."
+      "explain": "Precedent transactions compare the target with prices paid in relevant completed or announced acquisitions. Transaction multiples can exceed trading multiples because buyers may pay for control, expected synergies, scarcity or strategic value, so deal context matters as much as the headline multiple.",
+      "work": "Screen transactions for sector, geography, size, timing and strategic relevance; calculate purchase equity value and enterprise value consistently; compare EV/Revenue and EV/EBITDA; examine premiums paid; and explain why older, distressed or highly strategic deals may deserve less weight.",
+      "example": "A precedent at 12.0x EBITDA may not justify a 12.0x valuation if that buyer expected unusually large synergies. A banker should separate the observable transaction multiple from the transaction-specific reasons that produced it."
     },
     "dcf": {
       "name": "Discounted Cash Flow Valuation",
-      "explain": "Forecast unlevered free cash flow and discount it using a consistent required return.",
-      "work": "Build a forecast, terminal value and sensitivity analysis rather than relying on a single point estimate.",
-      "example": "Test value across WACC and terminal-growth ranges."
+      "explain": "A DCF values the enterprise from the present value of forecast unlevered free cash flow plus terminal value. In banking, the model must connect operating assumptions to cash flow, use a defensible WACC and terminal assumption, and show sensitivities because small changes can materially move the valuation range.",
+      "work": "Forecast revenue, margins, taxes, D&A, capex and working capital; calculate unlevered FCF; discount each period by WACC; estimate terminal value using a perpetual-growth or exit-multiple method; bridge enterprise value to equity value; and build WACC/terminal-value sensitivities.",
+      "example": "If a DCF implies $30.80 per share while trading comps imply $22.30, do not simply average them. Trace the difference to growth, margin, WACC and terminal assumptions, test downside cases, and explain the resulting valuation range to the deal team."
     },
     "ma": {
       "name": "M&A Mechanics",
-      "explain": "Understand deal rationale, consideration, financing, synergies, process and closing risk.",
-      "work": "Analyze buyer/target economics and connect strategic logic to valuation.",
-      "example": "A higher premium can still be rational if synergies are credible and alternatives are weaker."
+      "explain": "M&A analysis connects valuation with what a buyer would actually pay and how a transaction would be funded. Analysts evaluate purchase price, premium, equity value, enterprise value, financing, fees, debt refinancing, synergies and transaction consequences rather than treating the deal as a single valuation number.",
+      "work": "Translate offer price into purchase equity value and enterprise value, build a sources-and-uses schedule, identify financing sources, model fees and debt refinancing, test synergy assumptions and compare the proposed price with standalone valuation and downside cases.",
+      "example": "A $26 offer for 40m diluted shares implies $1.04bn purchase equity value. If the target has $85m net debt, purchase enterprise value is about $1.125bn before other transaction adjustments. The analyst then tests whether that price is supported by comps, DCF, precedents and the revised operating outlook."
     },
     "accretion": {
       "name": "Accretion / Dilution Modeling",
-      "explain": "Estimate how acquisition financing and target earnings affect buyer EPS.",
-      "work": "Build a simple pro forma earnings bridge and test purchase-price sensitivities.",
-      "example": "Debt financing can be accretive if after-tax interest cost is below acquired earnings yield, but risk matters."
+      "explain": "Accretion/dilution analysis estimates how an acquisition could affect the buyer’s earnings per share. The output depends on purchase price, financing mix, interest cost, foregone cash interest, purchase-accounting effects, synergies, taxes and the target’s contribution—not just whether the target is profitable.",
+      "work": "Establish the buyer standalone EPS, model the target contribution and transaction adjustments, incorporate financing and synergy assumptions, calculate pro forma net income and diluted shares, then compare pro forma EPS with standalone EPS under multiple scenarios.",
+      "example": "A transaction can be EPS-accretive even at a premium if low-cost financing and credible synergies outweigh incremental interest and purchase-accounting costs. The banker should show which assumptions drive the result and how quickly it changes when those assumptions weaken."
     },
     "pitch": {
       "name": "Transaction & Pitch Materials",
-      "explain": "Turn analysis into concise, decision-oriented client materials.",
-      "work": "Build slides with clear headlines, consistent formatting, sourced data and a logical recommendation.",
-      "example": "A slide title should state the takeaway, not merely name the chart."
+      "explain": "A banking pitchbook is a decision document, not a collection of attractive slides. Every page should answer a client question, use numbers linked to the underlying analysis, cite sources, maintain consistent units/dates and lead the reader logically from situation to valuation, alternatives and recommendation.",
+      "work": "Start with the decision the client must make. Build only pages that support that decision, link valuation outputs to the model, reconcile numbers across pages, source market data, write concise headlines that state the takeaway and run a final numerical and formatting QA before senior review.",
+      "example": "Instead of titling a page “Valuation,” use a decision-oriented headline such as “Standalone methods imply $22–31/share; the $26 offer sits above trading comps but below the DCF cross-check.” The page should let the VP understand the conclusion before reading the footnotes."
     },
     "lbo": {
       "name": "LBO Modeling",
@@ -601,7 +601,7 @@ window.CM_DATA = {
       "track": "M&A Advisory",
       "group": "Deals",
       "tagline": "Advise companies on acquisitions, sales and financing decisions.",
-      "description": "Learn how junior bankers analyze companies, value businesses, build transaction materials and support live M&A execution.",
+      "description": "Learn how junior bankers analyze companies, build and audit valuation work, evaluate transaction terms, react to changing information and turn analysis into senior- and client-ready M&A materials.",
       "purpose": "Advise corporate and sponsor clients on major strategic and financing transactions.",
       "clients": "Corporations, financial sponsors, boards and other institutional clients.",
       "revenue": "Advisory and underwriting fees tied to transactions and capital raising.",
@@ -666,19 +666,20 @@ window.CM_DATA = {
         "Assess an acquisition premium and synergy case.",
         "Write an associate-ready recommendation slide."
       ],
-      "sim_title": "Project Northstar",
-      "sim_context": "You are a first-year Investment Banking Analyst on an M&A team advising Northstar Technologies on a potential acquisition of Orion Systems.",
+      "sim_title": "Project Northstar — M&A Analyst Readiness",
+      "sim_context": "You are a first-year Investment Banking Analyst on an Industrials M&A team advising Apex Systems on a potential acquisition of Northstar Components. You own the first-pass transaction analysis, valuation cross-checks, model QA and Associate update.",
       "sim_steps": [
-        "Review the client brief and identify the decision that must be made.",
-        "Research Northstar and Orion using provided public-company style materials.",
-        "Select and defend a comparable-company peer set.",
-        "Complete valuation outputs and reconcile DCF, comps and precedents.",
-        "Analyze purchase price, financing and synergy assumptions.",
-        "Prepare an executive recommendation and respond to associate comments."
+        "Build a clean transaction snapshot from historical financials and capitalization.",
+        "Run trading-comparables valuation and reconcile enterprise value to equity value.",
+        "Complete an independent DCF cross-check and sensitivity-aware valuation view.",
+        "Analyze the proposed acquisition price, premium and purchase enterprise value.",
+        "Perform a model QA pass and identify valuation-changing errors before senior review.",
+        "React to revised management guidance and update the valuation implication.",
+        "Send the Associate a concise recommendation supported by valuation, downside and diligence evidence."
       ],
       "twists": [
-        "Management lowers Orion revenue guidance midway through the process.",
-        "One comparable company announces a major acquisition and becomes less comparable."
+        "Management cuts the 2028 revenue outlook and EBITDA margin after the initial valuation work is complete.",
+        "The draft model contains planted share-count, enterprise-value bridge, comps-period and terminal-growth errors that must be caught before the work can move forward."
       ],
       "day": [
         "Start by reviewing new information relevant to investment banking analyst work and prioritizing the highest-impact assignment.",

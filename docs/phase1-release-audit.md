@@ -120,3 +120,33 @@ Post-cleanup verification:
 - 0 active organizations without an active owner
 - 0 orphan cohort-member records
 - 0 orphan assignment/cohort records
+
+## Final live UI closure — August 28, 2026
+
+The production GitHub Pages build was validated in a rendered browser after deployment of the Phase 1 commit. The signed-out audit passed for the homepage, Careers, For Employers, Trust Center and learner authentication gate. A disposable signed-in employer then created a real temporary workspace through the production UI and verified:
+
+- employer workspace creation
+- Investment Banking Quick Assign
+- Command Center cohort/assignment rendering
+- Firm Layer create → hide → archive → restore lifecycle
+- Team & Roles with the owner active and only `active` / `archived` member states
+- enterprise Audit Log entries for material changes
+- Employer Readiness Reports with a valid zero-learner state, assignment picker, Export CSV control and no error screen
+
+The temporary UI-audit organization was then removed from D1 in foreign-key-safe order. Post-cleanup verification returned:
+
+- `PRAGMA quick_check` → `ok`
+- 0 remaining rows for the temporary organization, membership or credential scope
+- 5 active Investment Banking V2 credential definitions
+- 12 active Investment Banking V2 diagnostic questions
+- 7 active Project Northstar tasks
+- 2 active Investment Banking V2 assessments
+- 0 active organizations without an active owner
+- 0 orphan cohort-member records
+- 0 orphan assignment/cohort records
+
+### Investment Banking reference-pathway closure
+
+The final Phase 1 consistency pass also upgraded the eight Investment Banking learning concepts (financial statements, accounting quality, trading comps, precedent transactions, DCF, M&A mechanics, accretion/dilution and client-ready pitching) from short legacy summaries to work-oriented analyst explanations, process guidance and realistic examples. Public Investment Banking simulation metadata was aligned with the production Project Northstar / Apex Systems case so the learning curriculum and secure Role Lab no longer describe different transactions.
+
+**Phase 1 release status: COMPLETE after the final GitHub commit and Pages build containing this closure section and the aligned Investment Banking curriculum pass.**
