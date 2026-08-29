@@ -347,7 +347,7 @@
         ${link('passport','My Learning',active==='learning'?'active':'')}
       </nav>
       <button class="mobile-menu" aria-label="Open menu" onclick="CM.mobileMenu()">☰</button>
-      <div class="nav-actions"><a class="btn btn-outline btn-sm" href="#/login">Sign in</a><a class="btn btn-primary btn-sm" href="#/careers">Start Free</a></div>
+      <div class="nav-actions">${window.CM_AUTH?.user?'<a class="btn btn-outline btn-sm" href="#/notifications">Notifications</a><a class="btn btn-outline btn-sm" href="#/login">Account</a>':'<a class="btn btn-outline btn-sm" href="#/login">Sign in</a>'}<a class="btn btn-primary btn-sm" href="#/careers">Start Free</a></div>
     </div></header>`;
   }
   function footer(){
