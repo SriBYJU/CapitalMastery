@@ -1,0 +1,63 @@
+name: Patch course assessment state
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-course-assessment-state.mjs'
+      - 'tests/course-assessment-state-audit.mjs'
+      - 'tests/course-assessment-state-browser-audit.cjs'
+      - '.github/workflows/patch-course-assessment-state.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Apply guarded course assessment state repair
+        run: node tools/patch-course-assessment-state.mjs
+
+      - name: Validate syntax and static state contract
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node --check capital-mastery-live.js
+          node tests/course-assessment-state-audit.mjs
+          node tests/official-simulation-job-realism-audit.mjs
+          node tests/state-resilience-audit.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Run browser retry/review regression
+        run: |
+          set -euo pipefail
+          node tools/build-pages.mjs
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory dist-pages >/tmp/cm-course-state-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-assessment-state-browser-audit.cjs
+
+      - name: Commit product repair only
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- app.js capital-mastery-live.js; then
+            echo 'No product changes were required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js capital-mastery-live.js
+          git commit -m 'Fix course assessment retry and review state'
+          git push
