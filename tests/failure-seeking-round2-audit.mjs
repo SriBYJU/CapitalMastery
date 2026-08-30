@@ -53,6 +53,16 @@ ok(ux.includes('window.CM_SYNC?.flush?.().catch(() => {})'),'Stateful bfcache re
 const bfcacheBody=ux.slice(ux.indexOf('function refreshFromBfcache(event)'),ux.indexOf('function repairCredentialRendererRace()'));
 ok(!bfcacheBody.includes('location.reload()'),'bfcache restoration must not hard reload and become network-dependent');
 
+// Authoritative progress reconciliation must merge evidence without turning a
+// hash-route update into a document reload or erasing fields that were not
+// represented in the server response.
+ok(runtime.includes("if (!Array.isArray(rows) || !rows.length) return false;"),'Empty authoritative progress results must be a no-op');
+ok(runtime.includes('Merge only fields represented by authoritative rows'),'Runtime must preserve local fields absent from partial server responses');
+ok(runtime.includes('window.CM?.refreshLocalState?.()'),'Authoritative progress changes must refresh app.js in-memory state');
+ok(runtime.includes('skipNextHashReconcile = true')&&runtime.includes("window.dispatchEvent(new HashChangeEvent('hashchange'))"),'Progress repaint must stay inside the SPA without a reconciliation loop');
+const reconcileBody=runtime.slice(runtime.indexOf('async function reconcileCurrent'),runtime.indexOf('function repairAsyncRouteRace'));
+ok(!reconcileBody.includes('location.reload()'),'Progress reconciliation must never hard reload the document');
+
 // The interactive guide may contain wide spreadsheet work, but the page itself
 // must stay viewport-contained while the workbook becomes the horizontal scroller.
 ok(trainingCss.includes('Failure-seeking mobile containment'),'Learner Guide mobile overflow hardening marker missing from loaded CSS');
@@ -71,7 +81,7 @@ for(const asset of [
   'capital-mastery-e2e.js?v=20260830-stability3',
   'ux-stability.js?v=20260830-stability4',
   'course-continuity.js?v=20260830-stability3',
-  'runtime-audit-fixes.js?v=20260830-stability3',
+  'runtime-audit-fixes.js?v=20260830-stability4',
   'madeline.js?v=20260830-stability3',
   'admin-qa-simulation-fix.js?v=20260830-stability3'
 ]) ok(index.includes(asset), `Missing current cache-bust for ${asset}`);
