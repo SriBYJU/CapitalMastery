@@ -43,7 +43,8 @@ jobs:
               'runtime-audit-fixes.js?v=20260830-stability4' \
               'ux-stability.js?v=20260830-stability4' \
               'learner-guide.css?v=20260830-stability4' \
-              'training-tracks.css?v=20260830-stability4'; do
+              'training-tracks.css?v=20260830-stability4' \
+              'admin-route-guard.js?v=20260830-security1'; do
               if ! grep -Fq "$marker" /tmp/live-index.html; then
                 echo "LIVE_GENERATION_MISMATCH: missing $marker"
                 stale=1
@@ -140,6 +141,7 @@ jobs:
             tests/state-resilience-browser-audit.cjs \
             tests/failure-seeking-browser-audit.mjs \
             tests/adversarial-chaos-browser-audit.cjs \
+            tests/admin-route-zero-exposure-browser-audit.cjs \
             tests/learner-guide-mobile-browser-audit.cjs \
             tests/all-career-browser-sweep.cjs \
             tests/employer-public-browser-audit.cjs \
