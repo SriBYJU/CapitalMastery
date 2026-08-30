@@ -56,6 +56,8 @@ async function pageSnapshot(page){
   const context=await browser.newContext({viewport:{width:430,height:932}});
   const severe=[];
   const navEvents=[];
+  const offlineAssetFailures=[];
+  let offlineMode=false;
   try{
     await context.addInitScript(({stateKey,userKey,uid,state})=>{
       localStorage.setItem(stateKey,JSON.stringify(state));
@@ -73,11 +75,23 @@ async function pageSnapshot(page){
     page.on('close',()=>severe.push('page closed unexpectedly'));
     page.on('framenavigated',frame=>{if(frame===page.mainFrame())navEvents.push(`nav:${frame.url()}`);});
     page.on('requestfailed',request=>{
-      if(request.isNavigationRequest()) navEvents.push(`failed-nav:${request.url()}::${request.failure()?.errorText||''}`);
-      if(request.url().startsWith(BASE)) severe.push(`same-origin request failed: ${request.url()}`);
+      const url=request.url();
+      if(request.isNavigationRequest()) {
+        navEvents.push(`failed-nav:${url}::${request.failure()?.errorText||''}`);
+        severe.push(`navigation request failed: ${url}`);
+        return;
+      }
+      if(url.startsWith(BASE)) {
+        if(offlineMode) offlineAssetFailures.push(url);
+        else severe.push(`same-origin request failed: ${url}`);
+      }
     });
     page.on('console',msg=>{
-      if(msg.type()==='error'&&!/Firebase|auth-check|Failed to fetch|favicon/i.test(msg.text())) severe.push(`console: ${msg.text()}`);
+      if(msg.type()!=='error') return;
+      const text=msg.text();
+      if(/Firebase|auth-check|Failed to fetch|favicon/i.test(text)) return;
+      if(offlineMode&&/ERR_INTERNET_DISCONNECTED/i.test(text)) return;
+      severe.push(`console: ${text}`);
     });
 
     await page.goto(`${BASE}/#/career/investment-banking`,{waitUntil:'domcontentloaded',timeout:30000});
@@ -103,8 +117,6 @@ async function pageSnapshot(page){
       for(const [key,value] of Object.entries(shape)) assert(value,`${which} state repair missing ${key}: ${JSON.stringify(shape)}`);
     }
 
-    // Hash history should survive normal Back / Forward instead of leaving a stale
-    // async renderer on the wrong route.
     await page.evaluate(()=>{location.hash='#/learner-guide';});
     await page.waitForTimeout(250);
     assert(locationHash(await page.evaluate(()=>location.hash))==='#/learner-guide','Could not navigate to learner guide before history test');
@@ -117,10 +129,8 @@ async function pageSnapshot(page){
     assert(locationHash(await page.evaluate(()=>location.hash))==='#/learner-guide',`Forward navigation returned wrong hash: ${await page.evaluate(()=>location.hash)}`);
     assert((await page.textContent('#app')).includes('See exactly how you go from beginner to desk-ready.'),'Forward navigation left stale career DOM');
 
-    // Once the shell/assets are loaded, losing network access must not blank local
-    // navigation. Capture the document state immediately if it does so the audit
-    // identifies full-navigation failures instead of timing out on a missing root.
     const beforeOffline=await pageSnapshot(page);
+    offlineMode=true;
     await context.setOffline(true);
     await page.evaluate(()=>{location.hash='#/career/private-equity';});
     await page.waitForTimeout(500);
@@ -130,13 +140,22 @@ async function pageSnapshot(page){
     assert(offlineSnapshot.body.includes('Private Equity'),
       `Offline route change did not render Private Equity. snapshot=${JSON.stringify(offlineSnapshot)} navEvents=${JSON.stringify(navEvents.slice(-12))}`);
 
+    const unexpectedOfflineAssets=offlineAssetFailures.filter(url=>!/\/assets\/logo-mark\.svg(?:[?#]|$)/i.test(url));
+    assert(unexpectedOfflineAssets.length===0,`Unexpected same-origin assets failed during offline SPA navigation: ${unexpectedOfflineAssets.join(', ')}`);
+    const logoFailures=offlineAssetFailures.filter(url=>/\/assets\/logo-mark\.svg(?:[?#]|$)/i.test(url));
+    if(logoFailures.length) {
+      const fallbackCount=await page.locator('img[data-cm-asset-fallback="true"]').count();
+      assert(fallbackCount>0,`Logo request failed offline but inline brand fallback was not installed: ${logoFailures.join(', ')}`);
+    }
+
     await context.setOffline(false);
+    offlineMode=false;
     await page.evaluate(()=>window.dispatchEvent(new Event('online')));
     await page.waitForTimeout(250);
     assert((await page.textContent('#app')).includes('Private Equity'),'Online recovery replaced the current career with stale content');
 
     assert([...new Set(severe)].length===0,`State-resilience browser audit captured failures: ${[...new Set(severe)].join(' | ')} navEvents=${JSON.stringify(navEvents.slice(-12))}`);
-    console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed v1 snapshots, repaired timestamps, Back/Forward, offline navigation and online recovery');
+    console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed state, repaired timestamps, Back/Forward, offline SPA navigation, inline logo fallback and online recovery');
   } finally {
     await context.close();
     await browser.close();
