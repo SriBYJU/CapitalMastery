@@ -23,6 +23,7 @@ ok(admin.includes('const originalToggle = window.CM.toggleQa'), 'QA mode toggle 
 ok(live.includes("localStorage.getItem(QA_KEY) === 'true'"), 'Live credential UI must understand isolated Admin QA mode');
 ok(live.includes("['credential','certificate','achievement'].includes(root)"), 'Authoritative credential renderer must yield to verified Admin QA previews');
 ok(live.includes("window.CM_AUTH?.isAdmin === true"), 'QA preview yield must require verified admin state');
+ok(app.includes("if(c.id==='investment-banking' && !qaMode())"), 'Investment Banking must stay on the local simulation surface for verified Admin QA preview mode');
 
 // A raw localStorage flag must never be enough to activate QA bypasses.
 for(const [name,source] of Object.entries({app,e2e,ux,continuity,runtime})) {
