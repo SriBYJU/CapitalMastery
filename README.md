@@ -88,17 +88,24 @@ Workspace permissions are separated across Owner, Training Admin, Content Manage
 
 ## Documentation
 
-Architecture and security:
+Start here for technical or firm review:
+
+- [`docs/phase2-release-audit.md`](docs/phase2-release-audit.md) — authoritative current release evidence, audited artifact IDs and unresolved live blockers
+- [`docs/training-track-standard.md`](docs/training-track-standard.md) — Career Skills / Professional Readiness product contract and no-repeat stacking rules
+- [`docs/credential-system.md`](docs/credential-system.md) — five-level Standard 2.0 credential architecture and program-completion distinction
+- [`SECURITY.md`](SECURITY.md) — implemented security boundaries, release checks and claim limits
+- [`docs/deployment-runbook.md`](docs/deployment-runbook.md) — guarded Cloudflare promotion, live validation and rollback procedure
+
+Architecture and security detail:
 
 - [`docs/architecture.md`](docs/architecture.md)
 - [`docs/enterprise-security.md`](docs/enterprise-security.md)
 - [`docs/phase2-security-overview.md`](docs/phase2-security-overview.md)
-- [`docs/deployment-runbook.md`](docs/deployment-runbook.md)
 
-Release evidence:
+Release history:
 
 - [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md)
-- [`docs/phase2-release-audit.md`](docs/phase2-release-audit.md)
+- [`docs/archive/README.md`](docs/archive/README.md) — clearly labeled superseded Phase 1 QA/checklist/live-release snapshots
 
 Employer / pilot materials:
 
@@ -148,13 +155,13 @@ node tests/pages-production-bundle-audit.mjs
 
 Deploy `dist-pages/`, never the repository root. The production bundle excludes Worker code, tests, migrations, diagnostics and internal documentation.
 
-The Worker and Pages surfaces are deployed separately. When both change, promote the reviewed Worker while preserving existing Cloudflare bindings/secrets, validate D1/auth/origin boundaries, then deploy the exact audited Pages artifact and rerun the live browser matrix. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md).
+The Worker and Pages surfaces are deployed separately. When both change, promote the reviewed Worker while preserving existing Cloudflare bindings/secrets, validate D1/auth/origin boundaries, then deploy the exact audited Pages artifact and rerun the live browser matrix. The repository includes a guarded manual-only **Cloudflare production release** workflow for this sequence; it refuses to run without the required Cloudflare Actions credentials and explicit `RELEASE` confirmation. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md).
 
 ## Independence and claims
 
 Capital Mastery is an independent educational and workforce-readiness platform. References to financial institutions, professional organizations, employers and public agencies identify research sources or simulated professional contexts only and do not imply affiliation, endorsement or sponsorship.
 
-Capital Mastery does not claim professional licensure, accreditation, regulatory-training status, or third-party security certification unless explicitly documented.
+Capital Mastery does not claim professional licensure, accreditation, regulatory-training status, SOC 2, ISO 27001 certification, or another third-party security/compliance certification unless explicitly documented.
 
 ## Founder
 
