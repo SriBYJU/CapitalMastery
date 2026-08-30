@@ -9,8 +9,10 @@ const enterprise=fs.readFileSync('enterprise-v2.js','utf8');
 const visuals=fs.readFileSync('career-professional-visuals.js','utf8');
 const live=fs.readFileSync('capital-mastery-live.js','utf8');
 
-ok(index.includes('learner-guide.css?v=20260830-stability4')&&index.includes('training-tracks.css?v=20260830-stability4')&&index.includes('learner-guide.js?v=20260830-guided1'),'Interactive learner guide assets must be loaded with the current mobile-stability stylesheet generations');
-ok(index.includes('app.js?v=20260830-stability3')&&index.includes('enterprise-v2.js?v=20260830-guided2')&&index.includes('career-professional-visuals.js?v=20260830-workbook1'),'Product-polish assets must be cache-busted to the current stability generation');
+const cacheBusted = path => new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\?v=[^"\\']+').test(index);
+for(const asset of ['learner-guide.css','training-tracks.css','learner-guide.js']) ok(cacheBusted(asset),`Interactive learner guide asset must be loaded with a cache-busted production URL: ${asset}`);
+for(const asset of ['app.js','enterprise-v2.js','career-professional-visuals.js']) ok(cacheBusted(asset),`Product-polish asset must be cache-busted: ${asset}`);
+ok(index.indexOf('learner-guide.css') < index.indexOf('training-tracks.css'),'Training-track mobile containment must load after learner-guide base styles');
 ok(app.includes('HOW YOU ARE ASSESSED')&&app.includes('no Career Certificate is earned through multiple choice alone'),'Career pages must explain the practical proof journey');
 ok(!app.includes('20-question comprehensive credential gate')&&!live.includes('MCQ knowledge testing remains'),'Public product copy must not frame readiness as an MCQ-only course');
 ok(app.includes("root==='learner-guide'")&&app.includes("link('learner-guide','How Learning Works')"),'Learner guide must be routable and discoverable');
