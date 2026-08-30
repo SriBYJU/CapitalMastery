@@ -1,0 +1,25 @@
+# GitHub Pages fallback publish boundary.
+# Canonical Cloudflare Pages is built from dist-pages/. The branch-based GitHub
+# Pages fallback must never publish backend, database, QA, deployment, or repo
+# documentation artifacts alongside the browser application.
+exclude:
+  - .github
+  - .gitignore
+  - README.md
+  - SECURITY.md
+  - auth-test.html
+  - docs
+  - functions
+  - migrations
+  - tests
+  - tools
+  - v2
+  - wrangler.jsonc
+  - firestore.rules
+  - firestore.rules.example
+  - firebase-config.example.js
+  - learner-guide-mobile-fix.css
+
+# Keep Jekyll processing minimal. The application is a client-side SPA and all
+# runtime frontend files are already referenced by index.html or assets/.
+plugins: []
