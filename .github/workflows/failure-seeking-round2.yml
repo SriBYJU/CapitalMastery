@@ -9,6 +9,7 @@ on:
       - 'tools/instrument-browser-overflow-diagnostics.mjs'
       - 'tests/failure-seeking-round2-audit.mjs'
       - 'tests/failure-seeking-browser-audit.mjs'
+      - 'tests/interactive-guidance-workbook-audit.mjs'
       - '.github/workflows/failure-seeking-round2.yml'
   workflow_dispatch:
 
