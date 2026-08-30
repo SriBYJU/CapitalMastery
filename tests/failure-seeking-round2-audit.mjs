@@ -46,6 +46,13 @@ ok(certName.includes("if (location.hash !== '#/') location.replace(publicHome)")
 ok(!certName.includes("history.replaceState(null, '', `${location.pathname}${location.search}#/`)"), 'Silent history replacement must not leave stale gated DOM under the account modal');
 ok(certName.includes('setTimeout(() => openLearningGate(hash), 0)'), 'Account reason modal should open after the public Home rerender, not race it');
 
+// bfcache recovery must never throw away the loaded app just to refresh state.
+ok(ux.includes('function refreshFromBfcache(event)'),'UX stability layer must handle bfcache restoration explicitly');
+ok(ux.includes("window.dispatchEvent(new HashChangeEvent('hashchange'))"),'Stateful bfcache restoration must rerun route/reconciliation listeners');
+ok(ux.includes('window.CM_SYNC?.flush?.().catch(() => {})'),'Stateful bfcache restoration should opportunistically flush sync');
+const bfcacheBody=ux.slice(ux.indexOf('function refreshFromBfcache(event)'),ux.indexOf('function repairCredentialRendererRace()'));
+ok(!bfcacheBody.includes('location.reload()'),'bfcache restoration must not hard reload and become network-dependent');
+
 // The interactive guide may contain wide spreadsheet work, but the page itself
 // must stay viewport-contained while the workbook becomes the horizontal scroller.
 ok(trainingCss.includes('Failure-seeking mobile containment'),'Learner Guide mobile overflow hardening marker missing from loaded CSS');
@@ -62,7 +69,7 @@ for(const asset of [
   'training-tracks.js?v=20260830-stability3',
   'capital-mastery-live-ui.js?v=20260830-stability3',
   'capital-mastery-e2e.js?v=20260830-stability3',
-  'ux-stability.js?v=20260830-stability3',
+  'ux-stability.js?v=20260830-stability4',
   'course-continuity.js?v=20260830-stability3',
   'runtime-audit-fixes.js?v=20260830-stability3',
   'madeline.js?v=20260830-stability3',
