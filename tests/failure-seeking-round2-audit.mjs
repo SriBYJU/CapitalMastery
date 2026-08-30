@@ -4,6 +4,7 @@ const admin=fs.readFileSync('admin-qa-simulation-fix.js','utf8');
 const live=fs.readFileSync('capital-mastery-live-ui.js','utf8');
 const tracks=fs.readFileSync('training-tracks.js','utf8');
 const madeline=fs.readFileSync('madeline.js','utf8');
+const certName=fs.readFileSync('certificate-name.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const workbookAudit=fs.readFileSync('tests/interactive-guidance-workbook-audit.mjs','utf8');
 const notificationAudit=fs.readFileSync('tests/notification-discovery-audit.mjs','utf8');
@@ -23,8 +24,14 @@ ok(tracks.includes('`#/official-simulation/${id}`'), 'Career Skills sequence mus
 ok(tracks.includes("(route==='simulation'||route==='official-simulation')"), 'Professional Readiness must guard both legacy and authoritative Career Skills simulation deep links');
 ok(madeline.includes("#/official-simulation/${c.id}"), 'Madeline must direct Career Skills to the authoritative capstone');
 
+// Signed-out gating must keep route state and rendered state synchronized.
+ok(certName.includes("if (location.hash !== '#/') location.replace(publicHome)"), 'Gated signed-out routes must perform a real hash navigation back to public Home');
+ok(!certName.includes("history.replaceState(null, '', `${location.pathname}${location.search}#/`)"), 'Silent history replacement must not leave stale gated DOM under the account modal');
+ok(certName.includes('setTimeout(() => openLearningGate(hash), 0)'), 'Account reason modal should open after the public Home rerender, not race it');
+
 // New releases must not allow old cached versions of recently changed scripts to mix.
 for(const asset of [
+  'certificate-name.js?v=20260830-stability3',
   'app.js?v=20260830-stability3',
   'training-tracks.js?v=20260830-stability3',
   'capital-mastery-live-ui.js?v=20260830-stability3',
