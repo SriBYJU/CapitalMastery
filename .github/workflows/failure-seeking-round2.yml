@@ -30,6 +30,7 @@ jobs:
 
       - name: Syntax validation
         run: |
+          node --check brand-asset-resilience.js
           node --check state-resilience.js
           node --check certificate-name.js
           node --check admin-qa-simulation-fix.js
