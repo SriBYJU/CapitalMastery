@@ -7,8 +7,12 @@ on:
       - '.github/workflows/firebase-live-auth-audit.yml'
       - 'tests/live-firebase-auth-browser-audit.cjs'
       - 'tests/firebase-authorized-domain-browser-audit.cjs'
+      - 'tests/credential-name-root-persistence-audit.mjs'
       - 'firebase-auth.js'
       - 'firebase-config.js'
+      - 'certificate-name.js'
+      - 'firebase-sync.js'
+      - 'firestore.rules'
   workflow_dispatch:
 
 permissions:
@@ -17,17 +21,34 @@ permissions:
 jobs:
   firebase-live:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate audit syntax
+      - name: Validate audit syntax and identity contract
         run: |
           set -euo pipefail
           node --check firebase-auth.js
+          node --check certificate-name.js
+          node --check firebase-sync.js
           node --check tests/live-firebase-auth-browser-audit.cjs
           node --check tests/firebase-authorized-domain-browser-audit.cjs
+          node tests/credential-name-root-persistence-audit.mjs
           node tests/deployable-encoding-audit.mjs
+
+      - name: Wait for repaired GitHub Pages generation
+        run: |
+          set -euo pipefail
+          ready=false
+          for i in {1..30}; do
+            if curl -fsS https://sribyju.github.io/CapitalMastery/certificate-name.js | grep -q 'Credential identity is authoritative on the protected user-root document'; then
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          [ "$ready" = true ] || { echo 'GitHub Pages fallback did not publish the credential-identity repair in time'; exit 1; }
+          echo 'GitHub Pages repaired credential-identity generation: PASS'
 
       - name: Install Chromium
         run: |
