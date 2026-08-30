@@ -35,6 +35,7 @@ jobs:
           node --check certificate-name.js
           node --check admin-route-guard.js
           node --check admin-qa-simulation-fix.js
+          node --check capital-mastery-live.js
           node --check capital-mastery-live-ui.js
           node --check training-tracks.js
           node --check madeline.js
