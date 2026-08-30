@@ -7,6 +7,9 @@ const migration = fs.readFileSync('migrations/016_phase2_career_skills_track_con
 
 if (!migration.includes("'career_skills'")) throw new Error('Migration does not add career_skills constraints');
 if (!migration.includes("'career'")) throw new Error('Migration does not add Career Skills completion target');
+if (!/PRAGMA\s+defer_foreign_keys\s*=\s*ON/i.test(migration)) throw new Error('Migration must defer foreign-key checks for the D1 parent-table rebuild');
+if (!/PRAGMA\s+defer_foreign_keys\s*=\s*OFF/i.test(migration)) throw new Error('Migration must restore deferred foreign-key checking');
+if (/PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(migration)) throw new Error('Migration must not use foreign_keys=OFF; D1 implicit transactions require defer_foreign_keys');
 
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'cm-track-schema-'));
 const migrationPath = path.join(temp, 'migration.sql');
@@ -84,10 +87,24 @@ try:
 except sqlite3.IntegrityError:
     conn.rollback()
 
+# Cloudflare D1 executes a query/migration inside an implicit transaction. Model
+# that explicitly here rather than sqlite3.executescript(), which autocommits and
+# would incorrectly reset defer_foreign_keys between statements.
 with open(migration_path, 'r', encoding='utf-8') as fh:
-    conn.executescript(fh.read())
+    migration_sql = fh.read()
+conn.execute('BEGIN')
+try:
+    for statement in migration_sql.split(';'):
+        statement = statement.strip()
+        if statement:
+            conn.execute(statement)
+    conn.commit()
+except Exception:
+    conn.rollback()
+    raise
 
 # Existing data and dependent foreign keys must survive the parent-table rebuild.
+assert conn.execute('PRAGMA foreign_keys').fetchone() == (1,)
 assert conn.execute("SELECT program_level FROM cohorts WHERE id='coh_old'").fetchone() == ('professional',)
 assert conn.execute("SELECT credential_target FROM program_assignments WHERE id='asn_old'").fetchone() == ('professional_readiness',)
 assert conn.execute("SELECT assignment_id FROM firm_content WHERE id='fc_old'").fetchone() == ('asn_old',)
@@ -111,4 +128,4 @@ if (result.status !== 0) {
   throw new Error(`Career Skills schema migration execution failed:\n${result.stdout}\n${result.stderr}`);
 }
 process.stdout.write(result.stdout);
-console.log('CAREER SKILLS ENTERPRISE SCHEMA MIGRATION AUDIT PASS: old constraints reject Track 1, migration preserves existing foreign keys/data, and Phase 2 Career Skills cohort + assignment inserts succeed');
+console.log('CAREER SKILLS ENTERPRISE SCHEMA MIGRATION AUDIT PASS: D1-style transaction defers FK checks, preserves existing foreign keys/data, keeps FK enforcement on, and accepts Phase 2 Career Skills rows');
