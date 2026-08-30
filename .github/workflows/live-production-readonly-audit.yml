@@ -30,23 +30,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Cloudflare serves the audited generation
+      - name: Inspect Cloudflare production generation
         run: |
           set -euo pipefail
           curl -fsSL --retry 3 --retry-all-errors "$LIVE_URL/" -o /tmp/live-index.html
+          stale=0
           for marker in \
             'brand-asset-resilience.js?v=20260830-stability1' \
             'runtime-audit-fixes.js?v=20260830-stability4' \
             'ux-stability.js?v=20260830-stability4' \
             'learner-guide.css?v=20260830-stability4' \
             'training-tracks.css?v=20260830-stability4'; do
-            grep -Fq "$marker" /tmp/live-index.html || {
+            if ! grep -Fq "$marker" /tmp/live-index.html; then
               echo "LIVE_GENERATION_MISMATCH: missing $marker"
-              exit 1
-            }
+              stale=1
+            fi
           done
-          grep -Fq '<link rel="canonical" href="https://capitalmastery.pages.dev/"' /tmp/live-index.html
-          echo 'LIVE_GENERATION_MATCH=1'
+          if ! grep -Fq '<link rel="canonical" href="https://capitalmastery.pages.dev/"' /tmp/live-index.html; then
+            echo 'LIVE_CANONICAL_MISMATCH'
+            stale=1
+          fi
+          echo "LIVE_STALE=$stale" >> "$GITHUB_ENV"
+          if [ "$stale" -eq 0 ]; then echo 'LIVE_GENERATION_MATCH=1'; else echo 'LIVE_GENERATION_MATCH=0'; fi
 
       - name: Verify live security headers
         run: |
@@ -89,3 +94,12 @@ jobs:
           CM_AUDIT_URL="$LIVE_URL" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="$LIVE_URL" node tests/employer-public-browser-audit.cjs
           echo 'LIVE_BROWSER_AUDIT=PASS'
+
+      - name: Assert production freshness
+        if: always()
+        run: |
+          if [ "${LIVE_STALE:-1}" != "0" ]; then
+            echo 'Cloudflare production is not serving the audited frontend generation.'
+            exit 1
+          fi
+          echo 'LIVE_RELEASE_FRESHNESS=PASS'
