@@ -77,17 +77,22 @@ async function assertContained(page, label) {
       assert(await page.locator('[data-cm-track-sequence]').count()===1,`${career.id}: Professional selection duplicated sequence`);
     }
 
-    // Narrow-screen sweep across all 16 career landing pages. This catches a
-    // role-specific long title, badge or sequence label widening the whole app.
-    await page.setViewportSize({width:375,height:812});
-    for(const career of careers) {
-      await gotoHash(page,`#/career/${career.id}`);
-      await page.waitForSelector('[data-cm-track-chooser]',{timeout:3000});
-      await assertContained(page,`${career.id} @ 375px`);
+    // Release-width sweep across all 16 career landing pages. This catches
+    // role-specific long titles, badges, workbook labels or track sequences that
+    // only overflow at phone, large-phone, tablet or desktop breakpoints.
+    const releaseWidths=[[375,812],[430,932],[768,1024],[1440,900]];
+    for(const [width,height] of releaseWidths) {
+      await page.setViewportSize({width,height});
+      for(const career of careers) {
+        await gotoHash(page,`#/career/${career.id}`);
+        await page.waitForSelector('[data-cm-track-chooser]',{timeout:3000});
+        await assertContained(page,`${career.id} @ ${width}px`);
+        assert(await page.locator('[data-cm-track-chooser]').count()===1,`${career.id} @ ${width}px: chooser disappeared or duplicated`);
+      }
     }
 
     assert(runtimeErrors.length===0,`All-career browser sweep runtime errors: ${[...new Set(runtimeErrors)].join(' | ')}`);
-    console.log(`ALL-CAREER TWO-TRACK BROWSER SWEEP PASS: ${careers.length} careers × both tracks + 375px overflow`);
+    console.log(`ALL-CAREER TWO-TRACK BROWSER SWEEP PASS: ${careers.length} careers × both tracks + 4 release widths`);
   } finally {
     await context.close();
     await browser.close();
