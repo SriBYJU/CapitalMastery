@@ -30,6 +30,11 @@
     return (location.hash || '#/').replace(/^#\/?/,'').split('?')[0].split('/').filter(Boolean);
   }
 
+  function hashQuery() {
+    const query=(location.hash||'').split('?')[1]||'';
+    return new URLSearchParams(query);
+  }
+
   function main() {
     return document.querySelector('#app main#main');
   }
@@ -164,6 +169,7 @@
 
   function bindOfficialAssessmentSubmit(data, pathwayId, itemId) {
     document.getElementById('cm-official-form')?.addEventListener('submit', async event => {
+      const assignmentId=hashQuery().get('assignment')||'';
       event.preventDefault();
       const form = event.currentTarget;
       const button = form.querySelector('button[type="submit"]');
@@ -186,9 +192,9 @@
       try {
         button.disabled = true;
         button.textContent = itemId === 'simulation' ? 'Sending to Associate review…' : 'Grading securely…';
-        const result = await apiFetch('/assessment/submit', { method:'POST', body:JSON.stringify({ pathwayId:apiPathway(pathwayId), itemId, answers, writing }) });
+        const result = await apiFetch('/assessment/submit', { method:'POST', body:JSON.stringify({ pathwayId:apiPathway(pathwayId), itemId, answers, writing, assignmentId:assignmentId||null }) });
         mirrorOfficialResult(pathwayId, itemId, result.score, result.passed);
-        renderResult(pathwayId, itemId, result);
+        renderResult(pathwayId, itemId, result, assignmentId);
       } catch (error) {
         button.disabled = false;
         button.textContent = itemId === 'simulation' ? 'Send Work for Associate Review →' : 'Submit Again';
@@ -211,7 +217,9 @@
     renderLoading();
     const el = main();
     try {
-      const data = await apiFetch(`/assessment/${encodeURIComponent(apiPathway(pathwayId))}/${encodeURIComponent(itemId)}`);
+      const assignmentId=hashQuery().get('assignment')||'';
+      const query=assignmentId?`?assignmentId=${encodeURIComponent(assignmentId)}`:'';
+      const data = await apiFetch(`/assessment/${encodeURIComponent(apiPathway(pathwayId))}/${encodeURIComponent(itemId)}${query}`);
       if (!el) return;
       const isSimulation = itemId === 'simulation';
       const isFinal = itemId === 'final';
@@ -276,9 +284,9 @@
     }
   }
 
-  function nextHref(pathwayId, itemId, passed) {
+  function nextHref(pathwayId, itemId, passed, assignmentId='') {
     if (!passed) {
-      if (itemId === 'simulation') return `#/official-simulation/${pathwayId}`;
+      if (itemId === 'simulation') return `#/official-simulation/${pathwayId}${assignmentId?`?assignment=${encodeURIComponent(assignmentId)}`:''}`;
       if (itemId === 'final') return `#/final/${pathwayId}`;
       const n = Number(itemId.split('-')[1]);
       return `#/quiz/${pathwayId}/${n}`;
@@ -288,15 +296,15 @@
       return `#/learn/${pathwayId}/${n+1}`;
     }
     if (itemId === 'part-5') return `#/official-simulation/${pathwayId}`;
-    if (itemId === 'simulation') return `#/final/${pathwayId}`;
+    if (itemId === 'simulation') return assignmentId?`#/assigned/${encodeURIComponent(assignmentId)}`:`#/final/${pathwayId}`;
     return '#/credentials';
   }
 
-  function renderResult(pathwayId, itemId, result) {
+  function renderResult(pathwayId, itemId, result, assignmentId='') {
     const el = main();
     if (!el) return;
     const issued = result.issuedCredentials || [];
-    el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-result ${result.passed ? 'passed' : 'failed'}"><div class="eyebrow">SERVER-GRADED RESULT</div><div class="cm-result-score">${Number(result.score)}%</div><h1 class="serif">${result.passed ? 'Official pass recorded.' : 'Not yet.'}</h1><p>${result.passed ? 'Your result has been stored in the authoritative D1 progress record.' : `You need ${PASS}% to pass. Review the material and try again.`}</p>${result.objectiveTotal ? `<p class="muted">${itemId === 'simulation' ? 'Work products accepted' : 'Objective questions'}: ${result.objectiveCorrect}/${result.objectiveTotal}${result.writingScore !== null && result.writingScore !== undefined ? ` Â· Writing: ${result.writingScore}/30` : ''}</p>` : ''}${issued.length ? `<div class="cm-issued"><strong>Credential${issued.length > 1 ? 's' : ''} automatically issued:</strong>${issued.map(c => `<a href="#/verify/${encodeURIComponent(c.publicToken)}">${esc(c.title)} â</a>`).join('')}</div>` : ''}<div class="cm-result-actions"><a class="btn ${result.passed ? 'btn-gold' : 'btn-primary'}" href="${nextHref(pathwayId, itemId, result.passed)}">${result.passed ? (itemId === 'final' ? 'View Verified Credentials' : 'Continue') : 'Try Again'} â</a><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
+    el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-result ${result.passed ? 'passed' : 'failed'}"><div class="eyebrow">SERVER-GRADED RESULT</div><div class="cm-result-score">${Number(result.score)}%</div><h1 class="serif">${result.passed ? 'Official pass recorded.' : 'Not yet.'}</h1><p>${result.passed ? 'Your result has been stored in the authoritative D1 progress record.' : `You need ${PASS}% to pass. Review the material and try again.`}</p>${result.objectiveTotal ? `<p class="muted">${itemId === 'simulation' ? 'Work products accepted' : 'Objective questions'}: ${result.objectiveCorrect}/${result.objectiveTotal}${result.writingScore !== null && result.writingScore !== undefined ? ` Â· Writing: ${result.writingScore}/30` : ''}</p>` : ''}${issued.length ? `<div class="cm-issued"><strong>Credential${issued.length > 1 ? 's' : ''} automatically issued:</strong>${issued.map(c => `<a href="#/verify/${encodeURIComponent(c.publicToken)}">${esc(c.title)} â</a>`).join('')}</div>` : ''}<div class="cm-result-actions"><a class="btn ${result.passed ? 'btn-gold' : 'btn-primary'}" href="${nextHref(pathwayId, itemId, result.passed, assignmentId)}">${result.passed ? (itemId === 'final' ? 'View Verified Credentials' : 'Continue') : 'Try Again'} â</a><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
   }
 
   async function renderCredentials() {
