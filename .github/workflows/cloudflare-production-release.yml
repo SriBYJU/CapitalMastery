@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type RELEASE to promote the audited Worker and Pages bundle to canonical production'
+        description: 'Type RELEASE to promote the audited D1 schema, Worker and Pages bundle to canonical production'
         required: true
         type: string
 
@@ -19,7 +19,7 @@ jobs:
   release:
     if: ${{ inputs.confirmation == 'RELEASE' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 50
     environment: production
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -43,14 +43,20 @@ jobs:
           node --check app.js
           node --check training-tracks.js
           node --check capital-mastery-live.js
+          node --check capital-mastery-live-ui.js
+          node --check public-certificate-verify.js
           node --check enterprise-v2.js
           node --check v2/worker-v2-phase1-release.js
+          node --check tools/prepare-production-d1.mjs
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
+          node --check tests/admin-simulation-route-stability-browser-audit.cjs
+          node --check tests/program-completion-public-browser-audit.cjs
           node tests/admin-route-boundary-audit.mjs
           node tests/d1-integrity-endpoint-audit.mjs
           node tests/release-security-abuse-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
+          node tests/program-completion-public-verification-audit.mjs
           for test_file in tests/*.mjs; do
             if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then
               continue
@@ -88,12 +94,21 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-simulation-route-stability-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/program-completion-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
 
-      - name: Deploy Worker first
+      - name: Prepare and verify production D1 schema before Worker
+        run: |
+          set -euo pipefail
+          node tools/prepare-production-d1.mjs
+          test -s d1-production-preflight.json
+          cat d1-production-preflight.json
+
+      - name: Deploy Worker only after D1 compatibility gate
         run: |
           set -euo pipefail
           npx --yes wrangler@4 deploy --config wrangler.jsonc
@@ -162,6 +177,8 @@ jobs:
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/admin-simulation-route-stability-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/program-completion-public-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
@@ -175,13 +192,15 @@ jobs:
           This proves:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
-          - exact dist-pages artifact survived eight hostile Chromium suites before any production mutation
-          - Worker deployed with configured bindings
+          - exact dist-pages artifact survived ten hostile Chromium suites before any production mutation
+          - production D1 schema was inspected and only missing Career Skills migrations 016/017 were conditionally applied
+          - D1 row-count preservation, quick_check and foreign_key_check passed before Worker deployment
+          - Worker deployed only after D1 compatibility was proven
           - Worker public/auth/origin boundaries passed
           - protected /admin/integrity route exists
           - exact production Pages allowlist deployed
           - canonical generation/security headers passed
-          - eight canonical Chromium suites passed again after deployment, including adversarial chaos/race and zero-transient-exposure admin testing
+          - ten canonical Chromium suites passed again after deployment, including the Admin auth-timing race and Program Completion verification
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts
