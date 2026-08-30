@@ -9,7 +9,7 @@ const visuals=fs.readFileSync('career-professional-visuals.js','utf8');
 const live=fs.readFileSync('capital-mastery-live.js','utf8');
 
 ok(index.includes('learner-guide.css?v=20260830-guided2')&&index.includes('learner-guide.js?v=20260830-guided1'),'Interactive learner guide assets must be loaded and cache-busted');
-ok(index.includes('app.js?v=20260830-guided2')&&index.includes('enterprise-v2.js?v=20260830-guided2')&&index.includes('career-professional-visuals.js?v=20260830-workbook1'),'Product-polish assets must be cache-busted');
+ok(index.includes('app.js?v=20260830-stability3')&&index.includes('enterprise-v2.js?v=20260830-guided2')&&index.includes('career-professional-visuals.js?v=20260830-workbook1'),'Product-polish assets must be cache-busted to the current stability generation');
 ok(app.includes('HOW YOU ARE ASSESSED')&&app.includes('no Career Certificate is earned through multiple choice alone'),'Career pages must explain the practical proof journey');
 ok(!app.includes('20-question comprehensive credential gate')&&!live.includes('MCQ knowledge testing remains'),'Public product copy must not frame readiness as an MCQ-only course');
 ok(app.includes("root==='learner-guide'")&&app.includes("link('learner-guide','How Learning Works')"),'Learner guide must be routable and discoverable');
