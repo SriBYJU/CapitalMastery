@@ -9,7 +9,21 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == uid;
     }
 
+    function validCredentialIdentity() {
+      return !('credentialNameConfirmed' in request.resource.data)
+        || (
+          request.resource.data.credentialNameConfirmed == true
+          && request.resource.data.credentialName is string
+          && request.resource.data.credentialName.size() >= 3
+          && request.resource.data.credentialName.size() <= 80
+          && request.resource.data.displayName == request.resource.data.credentialName
+          && request.resource.data.credentialNameUpdatedAt is timestamp
+        );
+    }
+
     // Account metadata used only for the signed-in learner's own account.
+    // Credential-name confirmation lives here rather than inside progress/state so
+    // normal progress synchronization cannot erase a learner's confirmed identity.
     match /users/{uid} {
       allow read: if owns(uid);
       allow create, update: if owns(uid)
@@ -17,8 +31,12 @@ service cloud.firestore {
           'displayName',
           'email',
           'createdAt',
-          'lastSeenAt'
-        ]);
+          'lastSeenAt',
+          'credentialName',
+          'credentialNameConfirmed',
+          'credentialNameUpdatedAt'
+        ])
+        && validCredentialIdentity();
       allow delete: if owns(uid);
 
       // Cross-device learning state. This is convenience/progress data only.
