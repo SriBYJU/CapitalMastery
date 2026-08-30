@@ -51,7 +51,7 @@
   function routeContext() {
     const p = routeParts();
     const route = p[0] || '';
-    const pathwayRoutes = new Set(['career','learn','quiz','simulation','final','role-lab']);
+    const pathwayRoutes = new Set(['career','learn','quiz','simulation','official-simulation','final','role-lab']);
     const pathwayId = pathwayRoutes.has(route) && p[1] ? decodeURIComponent(p[1]) : '';
     return { route, pathwayId, parts:p };
   }
@@ -214,7 +214,7 @@
       ['01','Foundations','Learn the role + technical core and earn Foundations',`#/learn/${id}/1`],
       ['02','Essentials','Apply the core concepts in the secure mini case',`#/v2-assessment/${essentials}`],
       ['03','Applied Skills','Complete Toolkit + Applied Work',`#/learn/${id}/3`],
-      ['04','Career Skills Capstone','Complete the realistic job simulation and earn Career Skills',`#/simulation/${id}`]
+      ['04','Career Skills Capstone','Complete the realistic server-graded job simulation and earn Career Skills',`#/official-simulation/${id}`]
     ];
     return `<section class="cm-track-sequence" data-cm-track-sequence data-cm-track-id="${trackId}"><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Four verified credentials. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
   }
@@ -396,7 +396,7 @@
       sessionStorage.setItem(NOTICE_KEY,'The legacy final is no longer a program gate. Career Skills ends at its capstone; Professional Readiness uses the Standard 2.0 Role Lab and Professional Final shown on the pathway.');
       location.replace(`#/career/${encodeURIComponent(pathwayId)}`); return true;
     }
-    if(route==='simulation'&&pathwayId&&getTrack(pathwayId)===PROFESSIONAL&&!adminQaPreviewActive()){
+    if((route==='simulation'||route==='official-simulation')&&pathwayId&&getTrack(pathwayId)===PROFESSIONAL&&!adminQaPreviewActive()){
       sessionStorage.setItem(NOTICE_KEY,'Professional Readiness uses the deeper Role Lab instead of the shorter Career Skills capstone.');
       location.replace(`#/career/${encodeURIComponent(pathwayId)}`); return true;
     }

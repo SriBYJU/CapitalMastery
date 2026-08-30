@@ -260,7 +260,7 @@
     if(!cs.simResponses) cs.simResponses={};
     return cs;
   }
-  function qaMode(){ return localStorage.getItem(QA_KEY) === 'true'; }
+  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }
   function setQa(v){ localStorage.setItem(QA_KEY, v ? 'true':'false'); }
 
   function esc(v=''){ return String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':'&quot;'}[c])); }
@@ -573,7 +573,7 @@
   }
 
   function simulationPage(c){
-    if(c.id==='investment-banking'){ location.hash=`#/official-simulation/${c.id}`; return; }
+    if(c.id==='investment-banking' && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }
     const cs=getCareerState(c.id); if(!qaMode() && Number(cs.simulationKnowledge||0)<PASS){ toast('Pass the Part 5 knowledge check first.','warn'); return nav(`learn/${c.id}/5`); }
     const sim=simFor(c);
     render(`<div class="sim-shell"><div class="sim-topbar"><div class="container"><div><h2>${esc(sim.name)}</h2><div class="sim-role">${esc(c.role)}${c.track?` · ${esc(c.track)}`:''}</div></div><div class="small">Assessment Mode · Practical Simulation</div></div></div><div class="container sim-layout"><nav class="sim-nav">${['Inbox','Brief','Data','Workspace','Review','Results'].map((x,i)=>`<button class="${i===0?'active':''}" data-sim-tab="${x.toLowerCase()}">${simIcon(x)} ${x}</button>`).join('')}</nav><section class="sim-panel" id="sim-panel">${simInbox(c,sim)}</section></div></div>`,'learning');

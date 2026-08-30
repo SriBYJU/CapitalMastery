@@ -327,9 +327,12 @@
     if (!currentUser()) {
       routeGuardBusy = true;
       savePendingRoute(hash);
-      history.replaceState(null, '', `${location.pathname}${location.search}#/`);
+      const publicHome = `${location.pathname}${location.search}#/`;
+      if (location.hash !== '#/') location.replace(publicHome);
       routeGuardBusy = false;
-      openLearningGate(hash);
+      // Keep the modal outside #app so the home rerender cannot destroy it, but
+      // defer one task so the hashchange renderer and the gate never race.
+      setTimeout(() => openLearningGate(hash), 0);
       return;
     }
     routeGuardBusy = true;

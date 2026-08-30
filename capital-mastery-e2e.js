@@ -28,7 +28,9 @@
   }
 
   function qaMode() {
-    return localStorage.getItem(QA_KEY) === 'true';
+    return window.CM_AUTH?.ready === true &&
+      window.CM_AUTH?.isAdmin === true &&
+      localStorage.getItem(QA_KEY) === 'true';
   }
 
   function readState() {

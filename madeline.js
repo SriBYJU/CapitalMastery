@@ -119,7 +119,7 @@
     }
     if (!learned.includes(5)) return `Next is the <b>Career Skills capstone</b> section. Read the briefing and click <b>Mark Learning Complete</b>.${action('Open capstone learning',`#/learn/${c.id}/5`)}`;
     if (Number(cs.simulationKnowledge || 0) < PASS) return `Next, pass the Career Skills capstone knowledge check with <b>${PASS}%+</b>.${action('Take capstone knowledge check',`#/quiz/${c.id}/5`)}`;
-    if (Number(cs.simulationScore || 0) < PASS) return `You’re ready for the <b>Career Skills practical simulation</b>.${action('Open Career Skills capstone',`#/simulation/${c.id}`)}`;
+    if (Number(cs.simulationScore || 0) < PASS) return `You’re ready for the <b>Career Skills practical simulation</b>.${action('Open Career Skills capstone',`#/official-simulation/${c.id}`)}`;
     return `You’ve completed the recorded Career Skills capstone requirements. Check your verified credentials, or upgrade to Professional Readiness without repeating earned stages.${action('Open Credentials','#/credentials')}${action('View Professional Readiness option',`#/career/${c.id}`)}`;
   }
 

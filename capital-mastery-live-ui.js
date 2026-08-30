@@ -4,6 +4,7 @@
   const API = window.CAPITAL_MASTERY_API_URL;
   const V2_API = window.CAPITAL_MASTERY_V2_API_URL || API;
   const STATE_KEY = 'capitalMasteryLocalStateV1';
+  const QA_KEY = 'capitalMasteryQaPreviewV1';
   const PASS = 80;
   let rerenderGuard = '';
   let enhanceBusy = false;
@@ -20,6 +21,12 @@
 
   function main() {
     return document.querySelector('#app main#main');
+  }
+
+  function adminQaPreviewActive() {
+    return window.CM_AUTH?.ready === true &&
+      window.CM_AUTH?.isAdmin === true &&
+      localStorage.getItem(QA_KEY) === 'true';
   }
 
   function careerById(id) {
@@ -410,6 +417,11 @@
         return;
       }
     }
+
+    // Admin QA certificate/credential previews are intentionally local and must
+    // not be replaced by the authoritative renderer. Normal learner routes stay
+    // authoritative. This only applies to a backend-verified admin with QA mode on.
+    if (adminQaPreviewActive() && ['credential','certificate','achievement'].includes(root)) return;
 
     if (root === 'credentials') return renderCredentials();
     if (root === 'credential' && a && b) return renderCredentialDetail(a, b);

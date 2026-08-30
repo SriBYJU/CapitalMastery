@@ -18,7 +18,7 @@
     return String(hash || '#/').replace(/^#\/?/,'').split('?')[0].split('/').filter(Boolean);
   }
 
-  function qaMode() { return localStorage.getItem(QA_KEY) === 'true'; }
+  function qaMode() { return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }
   function apiPathway(id) { return ALIASES[id] || id; }
 
   function readState() {

@@ -27,12 +27,27 @@
     if (wrapped || !window.CM) return;
     wrapped = true;
 
-    for (const name of ['qaProgress', 'qaScores']) {
+    for (const name of ['qaProgress', 'qaScores', 'resetState']) {
       const original = window.CM[name];
       if (typeof original !== 'function') continue;
       window.CM[name] = function(...args) {
-        if (isAdmin()) enableQa();
+        if (!isAdmin()) {
+          console.warn('Capital Mastery QA control blocked: administrator verification required.');
+          return false;
+        }
+        enableQa();
         return original.apply(this, args);
+      };
+    }
+
+    const originalToggle = window.CM.toggleQa;
+    if (typeof originalToggle === 'function') {
+      window.CM.toggleQa = function(...args) {
+        if (!isAdmin()) {
+          console.warn('Capital Mastery QA mode blocked: administrator verification required.');
+          return false;
+        }
+        return originalToggle.apply(this, args);
       };
     }
   }

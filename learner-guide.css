@@ -9,3 +9,26 @@
 
 /* Career assessment journey */
 .cm-assessment-journey{background:linear-gradient(180deg,#eef3f7 0%,#f8fafb 100%)}.cm-assessment-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}.cm-assessment-grid article{position:relative;display:grid;align-content:start;min-height:242px;padding:20px 17px;border:1px solid #d6e0e7;border-radius:14px;background:#fff;box-shadow:0 12px 30px #071a3309;overflow:hidden}.cm-assessment-grid article:after{content:"";position:absolute;right:-17px;top:26px;width:34px;height:1px;background:#b98a43;z-index:2}.cm-assessment-grid article:last-child{background:#102b47;border-color:#102b47}.cm-assessment-grid article:last-child:after{display:none}.cm-assessment-grid article>span{display:grid;place-items:center;width:36px;height:36px;border-radius:9px;background:#edf2f5;color:#264a68;font-size:.72rem;font-weight:900}.cm-assessment-grid article:last-child>span{background:#d9b468;color:#102b47}.cm-assessment-grid small{margin-top:20px;color:#98702f;font-size:.6rem;font-weight:900;letter-spacing:.1em}.cm-assessment-grid h3{margin:6px 0 8px;color:#102b47;font-size:1rem}.cm-assessment-grid p{margin:0;color:#647485;font-size:.76rem;line-height:1.6}.cm-assessment-grid article:last-child small{color:#e1bf72}.cm-assessment-grid article:last-child h3{color:#fff}.cm-assessment-grid article:last-child p{color:#cbd8e2}@media(max-width:1050px){.cm-assessment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-assessment-grid article{min-height:210px}.cm-assessment-grid article:after{display:none}.cm-assessment-grid article:last-child{grid-column:1/-1}}@media(max-width:640px){.cm-assessment-grid{grid-template-columns:1fr}.cm-assessment-grid article{min-height:0}.cm-assessment-grid article:last-child{grid-column:auto}}
+
+
+/* Failure-seeking mobile containment */
+.cm-learner-guide-shell,.cm-learner-guide-nav,.cm-learner-guide-panels,.cm-learner-guide-panel,.cm-guide-workbook,.cm-guide-case-update,.cm-guide-role-card{min-width:0;max-width:100%}
+.cm-learner-guide-panel{overflow:hidden}
+.cm-learner-guide-nav button{min-width:0;grid-template-columns:38px minmax(0,1fr)}
+.cm-learner-guide-nav button div,.cm-learner-guide-nav button b,.cm-learner-guide-nav button small{min-width:0;overflow-wrap:anywhere}
+.cm-guide-career-picker,.cm-guide-career-picker select{min-width:0;max-width:100%;width:100%}
+.cm-guide-workbook{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+.cm-guide-workbook-title,.cm-guide-workbook-ribbon,.cm-guide-workbook-formula,.cm-guide-workbook-tabs{max-width:100%}
+.cm-guide-workbook-title>*{min-width:0;overflow-wrap:anywhere}
+@media(max-width:980px){
+  .cm-learner-guide-hero>.container,.cm-learner-guide-shell{grid-template-columns:minmax(0,1fr)}
+  .cm-learner-guide-nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .cm-learner-guide-nav{grid-template-columns:minmax(0,1fr)}
+  .cm-learner-guide-panel{padding:16px}
+  .cm-guide-workbook{width:100%}
+  .cm-guide-workbook table{min-width:520px}
+  .cm-guide-learning-loop>div,.cm-guide-case-update,.cm-guide-role-card{min-width:0}
+  .cm-guide-learning-loop b,.cm-guide-learning-loop small,.cm-guide-case-update *,.cm-guide-role-card *{overflow-wrap:anywhere}
+}
