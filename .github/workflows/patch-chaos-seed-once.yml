@@ -1,0 +1,38 @@
+name: Patch chaos seed once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-chaos-seed-once.mjs'
+      - '.github/workflows/patch-chaos-seed-once.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Correct hostile-test corruption lifecycle
+        run: |
+          set -euo pipefail
+          node tools/patch-chaos-seed-once.mjs
+          node --check tests/adversarial-chaos-browser-audit.cjs
+          git diff --check
+      - name: Commit corrected audit
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- tests/adversarial-chaos-browser-audit.cjs; then
+            echo 'Audit patch produced no changes.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/adversarial-chaos-browser-audit.cjs
+          git commit -m 'Seed chaos corruption only once'
+          git push origin HEAD:main
