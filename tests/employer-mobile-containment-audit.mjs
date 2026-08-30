@@ -5,7 +5,7 @@ const index=fs.readFileSync('index.html','utf8');
 const css=fs.readFileSync('employer-mobile-stability.css','utf8');
 const build=fs.readFileSync('tools/build-pages.mjs','utf8');
 
-ok(index.includes('employer-mobile-stability.css?v=20260830-stability1'),'Employer mobile stability stylesheet must be cache-busted and loaded after enterprise-v2.css');
+ok(/<link\s+rel=["']stylesheet["']\s+href=["']employer-mobile-stability\.css\?v=[^"']+["']\s*\/?>/.test(index),'Employer mobile stability stylesheet must be loaded with a cache-busted production URL');
 ok(index.indexOf('enterprise-v2.css') < index.indexOf('employer-mobile-stability.css'),'Employer stability overrides must load after the enterprise base stylesheet');
 ok(css.includes('.cmv2-public-tour-shell > *') && css.includes('min-width: 0') && css.includes('max-width: 100%'),'Employer walkthrough grid items must be allowed to shrink below intrinsic content width');
 ok(css.includes('grid-template-columns: minmax(0, 1fr)'),'Single-column employer responsive grids must use minmax(0,1fr), not shrink-resistant 1fr');
