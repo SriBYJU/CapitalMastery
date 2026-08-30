@@ -5,6 +5,8 @@ const email = `cm.phase2.${Date.now()}-${Math.floor(Math.random()*1e9)}@example.
 const password = `CmPhase2!${Date.now()}Aa9`;
 const fullName = 'Phase Two Audit';
 let apiKey = '';
+let projectId = '';
+let uid = '';
 let lastToken = '';
 let created = false;
 
@@ -22,45 +24,41 @@ function assert(condition, message) {
   page.on('pageerror', error => pageErrors.push(String(error?.message || error)));
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
 
-  async function identityToken() {
-    if (lastToken) return lastToken;
+  async function freshToken() {
     if (!created || !apiKey) return '';
     const response = await api.post(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
       data:{ email, password, returnSecureToken:true }
     });
-    if (!response.ok()) return '';
-    return (await response.json()).idToken || '';
+    if (!response.ok()) return lastToken || '';
+    const data = await response.json();
+    uid ||= data.localId || '';
+    lastToken = data.idToken || lastToken || '';
+    return lastToken;
   }
 
   async function deleteFirestoreDocs() {
-    if (!created || !windowUserPossible()) return;
-    await page.evaluate(async () => {
-      const user = window.CM_AUTH?.user;
-      if (!user) return;
-      const SDK = '12.18.0';
-      const appApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-app.js`);
-      const fs = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-firestore.js`);
-      const app = appApi.getApps().length ? appApi.getApp() : appApi.initializeApp(window.CAPITAL_MASTERY_FIREBASE_CONFIG);
-      const db = fs.getFirestore(app);
-      await fs.deleteDoc(fs.doc(db, 'users', user.uid, 'progress', 'state'));
-      await fs.deleteDoc(fs.doc(db, 'users', user.uid));
-    });
-  }
-
-  function windowUserPossible() {
-    return !page.isClosed();
+    if (!created || !projectId || !uid) return;
+    const token = await freshToken();
+    if (!token) return;
+    const root = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}`;
+    for (const url of [`${root}/progress/state`, root]) {
+      const response = await api.delete(url, { headers:{Authorization:`Bearer ${token}`} });
+      if (![200,404].includes(response.status())) {
+        throw new Error(`Firestore cleanup failed (${response.status()}) for ${url}: ${(await response.text()).slice(0,500)}`);
+      }
+    }
   }
 
   async function deleteIdentity() {
-    if (!apiKey) return;
-    const token = await identityToken();
+    if (!created || !apiKey) return;
+    const token = await freshToken();
     if (!token) return;
     const response = await api.post(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${encodeURIComponent(apiKey)}`, {
-      data:{ idToken:token }
+      data:{idToken:token}
     });
     if (!response.ok()) throw new Error(`Firebase identity cleanup failed (${response.status()}): ${(await response.text()).slice(0,500)}`);
-    lastToken = '';
     created = false;
+    lastToken = '';
   }
 
   async function authFormsReady() {
@@ -68,7 +66,7 @@ function assert(condition, message) {
     await page.locator('#cm-signin-form input[name="email"]').waitFor({state:'visible',timeout:10000});
   }
 
-  async function nameSaveOutcome() {
+  async function requireNameSaveSuccess() {
     await page.waitForFunction(() => {
       const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
       return window.CM_CERT_NAME?.confirmed?.() === true || (!!error && !error.hidden && !!error.textContent.trim());
@@ -87,14 +85,12 @@ function assert(condition, message) {
         localProfile:local?.profile || null
       };
     });
-    if (!state.confirmed) {
-      throw new Error(`Credential-name persistence failed. SNAPSHOT=${JSON.stringify(state)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
-    }
+    if (!state.confirmed) throw new Error(`Credential-name persistence failed. SNAPSHOT=${JSON.stringify(state)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
   }
 
   try {
-    // Exercise real Firebase Auth + Firestore, but keep D1 neutral. Worker auth
-    // verification has separate production boundary tests.
+    // Real Firebase Auth + Firestore; D1 is intentionally neutral here because
+    // Worker auth/data boundaries have separate release tests.
     await page.route('**/auth-check', route => route.fulfill({
       status:200,
       contentType:'application/json',
@@ -103,8 +99,10 @@ function assert(condition, message) {
 
     await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, {waitUntil:'domcontentloaded',timeout:30000});
     await page.waitForFunction(() => window.CM_AUTH?.ready === true, null, {timeout:30000});
-    apiKey = await page.evaluate(() => window.CAPITAL_MASTERY_FIREBASE_CONFIG?.apiKey || '');
-    assert(apiKey, 'Live page is missing Firebase web configuration');
+    const config = await page.evaluate(() => window.CAPITAL_MASTERY_FIREBASE_CONFIG || null);
+    apiKey = config?.apiKey || '';
+    projectId = config?.projectId || '';
+    assert(apiKey && projectId, 'Live page is missing Firebase web configuration');
     await authFormsReady();
     assert(await page.locator('#cm-create-form input[name="name"]').count() === 0, 'Signup reverted to obsolete inline Name field');
 
@@ -113,13 +111,13 @@ function assert(condition, message) {
     await page.locator('#cm-create-form button[type="submit"]').click();
     await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, {timeout:30000});
     created = true;
-    lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
+    ({uid,lastToken} = await page.evaluate(async () => ({uid:window.CM_AUTH.user.uid,lastToken:await window.CM_AUTH.getIdToken()})));
 
     await page.locator('#cm-full-name-onboarding').waitFor({state:'visible',timeout:20000});
     await page.locator('#cm-full-name-input').fill(fullName);
     await page.locator('#cm-full-name-form button[type="submit"]').click();
     await page.waitForFunction(expected => window.CM_AUTH?.user?.displayName === expected, fullName, {timeout:30000});
-    await nameSaveOutcome();
+    await requireNameSaveSuccess();
 
     // Successful onboarding deliberately reloads the app. Wait for the reloaded
     // auth/name modules before sampling the persisted result.
@@ -138,11 +136,11 @@ function assert(condition, message) {
     assert(afterSave.name === fullName && afterSave.confirmed, 'Credential name was not stable after the intentional post-save reload');
     assert(!/[âÃÂ�]/u.test(afterSave.body), 'Mojibake rendered in live account/name UI');
 
-    // Simulate a fresh device: sign out, erase every browser-only onboarding/profile
-    // marker, then sign in again. Remote Firestore state must prevent the one-time
-    // onboarding from repeating and must recover the exact credential name.
+    // Fresh-device simulation: sign out, erase all browser-only account/name state,
+    // reload signed out, then sign in. Firestore must restore the credential name
+    // without presenting the one-time onboarding again.
     await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, {waitUntil:'domcontentloaded',timeout:30000});
-    await page.waitForFunction(() => window.CM_AUTH?.user?.email === email, null, {timeout:30000});
+    await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, {timeout:30000});
     await page.locator('[data-cm-auth-action="signout"]').click();
     await page.waitForFunction(() => window.CM_AUTH?.user === null, null, {timeout:15000});
     await page.evaluate(() => {
@@ -157,6 +155,7 @@ function assert(condition, message) {
     await page.reload({waitUntil:'domcontentloaded',timeout:30000});
     await page.waitForFunction(() => window.CM_AUTH?.ready === true && window.CM_AUTH?.user === null, null, {timeout:30000});
     await authFormsReady();
+
     await page.locator('#cm-signin-form input[name="email"]').fill(email);
     await page.locator('#cm-signin-form input[name="password"]').fill(password);
     await page.locator('#cm-signin-form button[type="submit"]').click();
@@ -182,15 +181,15 @@ function assert(condition, message) {
 
     await deleteFirestoreDocs();
     await deleteIdentity();
-    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> one-time full-name save -> post-save reload -> fresh-state remote recovery -> Firestore/Auth cleanup');
+    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> one-time full-name save -> post-save reload -> fresh-state Firestore recovery -> REST cleanup');
   } finally {
     try {
       if (created) {
-        try { await deleteFirestoreDocs(); } catch (error) { console.error('Firestore cleanup error:', error); process.exitCode = 1; }
+        await deleteFirestoreDocs();
         await deleteIdentity();
       }
     } catch (error) {
-      console.error(error);
+      console.error('Disposable Firebase cleanup error:', error);
       process.exitCode = 1;
     }
     await api.dispose();
