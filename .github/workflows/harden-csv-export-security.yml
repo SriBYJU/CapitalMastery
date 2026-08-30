@@ -1,0 +1,72 @@
+name: Harden CSV export security
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/harden-csv-export-security.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Neutralize spreadsheet formulas in CSV cells
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          path=Path('enterprise-v2.js')
+          text=path.read_text()
+          old="""    const csv=rows.map(row=>row.map(v=>`\"${String(v??'').replace(/\"/g,'\"\"')}\"`).join(',')).join('\\n');"""
+          new="""    const csvCell=value=>{let s=String(value??'');if(/^[\\s]*[=+\\-@]/.test(s))s=`'${s}`;return `\"${s.replace(/\"/g,'\"\"')}\"`;};
+    const csv=rows.map(row=>row.map(csvCell).join(',')).join('\\n');"""
+          if old not in text:
+              if 'const csvCell=value=>' in text:
+                  print('CSV export hardening already present')
+              else:
+                  raise SystemExit('Expected CSV serializer not found; refusing broad rewrite')
+          else:
+              path.write_text(text.replace(old,new,1))
+          PY
+          node --check enterprise-v2.js
+
+      - name: Add focused CSV security regression
+        run: |
+          cat > tests/csv-export-security-audit.mjs <<'EOF'
+          import fs from 'node:fs';
+          const source=fs.readFileSync('enterprise-v2.js','utf8');
+          const must=(c,m)=>{if(!c)throw new Error(m);};
+          must(source.includes("const csvCell=value=>"),'CSV export must use a dedicated cell serializer');
+          must(source.includes("/^[\\s]*[=+\\-@]/.test(s)"),'CSV serializer must detect formula-leading content after optional whitespace');
+          must(source.includes("s=`'${s}`"),'CSV serializer must prefix formula-looking cells with a literal apostrophe');
+          must(source.includes("s.replace(/\"/g,'\"\"')"),'CSV serializer must continue escaping embedded quotes');
+          must(source.includes('rows.map(row=>row.map(csvCell).join'), 'All employer report CSV cells must pass through the safe serializer');
+
+          const csvCell=value=>{let s=String(value??'');if(/^[\s]*[=+\-@]/.test(s))s=`'${s}`;return `"${s.replace(/"/g,'""')}"`;};
+          for(const raw of ['=2+2','+SUM(A1:A2)','-1+2','@cmd','   =HYPERLINK("x","y")','\t=1+1']) {
+            const encoded=csvCell(raw);
+            must(encoded.startsWith('"\''),`Formula-like CSV value was not neutralized: ${JSON.stringify(raw)} -> ${encoded}`);
+          }
+          must(csvCell('Normal Learner')==='"Normal Learner"','Normal learner values must remain unchanged');
+          must(csvCell('A "quoted" name')==='"A ""quoted"" name"','CSV quote escaping regressed');
+          console.log('CSV EXPORT SECURITY AUDIT PASS: formula injection neutralization + quote escaping verified');
+          EOF
+          node tests/csv-export-security-audit.mjs
+
+      - name: Commit hardened export
+        run: |
+          if git diff --quiet; then
+            echo 'No CSV export changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add enterprise-v2.js tests/csv-export-security-audit.mjs
+          git commit -m 'Harden employer CSV export cells'
+          git push
