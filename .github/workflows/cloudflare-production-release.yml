@@ -1,0 +1,162 @@
+name: Cloudflare production release
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type RELEASE to promote the audited Worker and Pages bundle to canonical production'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capitalmastery-production-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: ${{ inputs.confirmation == 'RELEASE' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CANONICAL_URL: https://capitalmastery.pages.dev
+      WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require production deployment credentials
+        run: |
+          set -euo pipefail
+          [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || { echo 'Missing CLOUDFLARE_API_TOKEN'; exit 1; }
+          [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] || { echo 'Missing CLOUDFLARE_ACCOUNT_ID'; exit 1; }
+          echo 'Cloudflare credential presence check: PASS'
+
+      - name: Re-run release source gate
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node --check training-tracks.js
+          node --check capital-mastery-live.js
+          node --check enterprise-v2.js
+          node --check v2/worker-v2-phase1-release.js
+          node tests/d1-integrity-endpoint-audit.mjs
+          node tests/release-security-abuse-audit.mjs
+          node tests/career-skills-five-level-boundary-audit.mjs
+          for test_file in tests/*.mjs; do
+            if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then
+              continue
+            fi
+            echo "=== $test_file ==="
+            node "$test_file"
+          done
+
+      - name: Build exact production Pages bundle
+        run: |
+          set -euo pipefail
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+          find dist-pages -type f -print0 | sort -z | xargs -0 sha256sum > dist-pages-sha256.txt
+          echo "DEPLOYABLE_FILE_COUNT=$(find dist-pages -type f | wc -l | tr -d ' ')"
+          sha256sum dist-pages-sha256.txt
+
+      - name: Deploy Worker first
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 deploy --config wrangler.jsonc
+
+      - name: Verify Worker public and security boundaries
+        run: |
+          set -euo pipefail
+          for i in {1..24}; do
+            code=$(curl -sS -o /tmp/cm-health -w '%{http_code}' -H "Origin: ${CANONICAL_URL}" "${WORKER_URL}/health" || true)
+            if [ "$code" = "200" ]; then break; fi
+            sleep 5
+          done
+          [ "$code" = "200" ] || { echo "Worker health failed: HTTP $code"; cat /tmp/cm-health || true; exit 1; }
+
+          bad_origin=$(curl -sS -o /tmp/cm-bad-origin -w '%{http_code}' -H 'Origin: https://not-capital-mastery.invalid' "${WORKER_URL}/health" || true)
+          [ "$bad_origin" = "403" ] || { echo "Bad-origin boundary expected 403, got $bad_origin"; exit 1; }
+
+          auth_check=$(curl -sS -o /tmp/cm-auth-check -w '%{http_code}' -X POST -H "Origin: ${CANONICAL_URL}" -H 'Content-Type: application/json' -d '{}' "${WORKER_URL}/auth-check" || true)
+          [ "$auth_check" = "401" ] || { echo "Unauthenticated auth-check expected 401, got $auth_check"; exit 1; }
+
+          integrity=$(curl -sS -o /tmp/cm-integrity -w '%{http_code}' -H "Origin: ${CANONICAL_URL}" "${WORKER_URL}/admin/integrity" || true)
+          if [ "$integrity" = "404" ]; then
+            echo 'D1 integrity route is still absent after Worker deploy'
+            exit 1
+          fi
+          case "$integrity" in
+            401|403) echo "Protected D1 integrity route present: HTTP $integrity" ;;
+            *) echo "Unauthenticated D1 integrity route expected 401/403, got $integrity"; exit 1 ;;
+          esac
+
+      - name: Deploy exact Pages bundle
+        run: |
+          set -euo pipefail
+          npx --yes wrangler@4 pages deploy dist-pages --project-name=capitalmastery --branch=main
+
+      - name: Verify canonical generation and security headers
+        run: |
+          set -euo pipefail
+          ready=false
+          for i in {1..30}; do
+            curl -fsS -D /tmp/cm-headers "${CANONICAL_URL}/" -o /tmp/cm-index || true
+            if grep -q 'training-tracks.css' /tmp/cm-index 2>/dev/null && grep -qi '^x-frame-options: *DENY' /tmp/cm-headers 2>/dev/null && grep -qi '^permissions-policy:' /tmp/cm-headers 2>/dev/null; then
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          [ "$ready" = true ] || {
+            echo 'Canonical Pages generation/header verification failed'
+            echo '--- headers ---'
+            cat /tmp/cm-headers || true
+            echo '--- index markers ---'
+            grep -E 'training-tracks|learner-guide|runtime-audit' /tmp/cm-index || true
+            exit 1
+          }
+          grep -q 'training-tracks.js' /tmp/cm-index
+          grep -q 'learner-guide.js' /tmp/cm-index
+          grep -q 'enterprise-v2.js' /tmp/cm-index
+          echo 'Canonical generation and production headers: PASS'
+
+      - name: Install Chromium release-test dependency
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run canonical Chromium release matrix
+        run: |
+          set -euo pipefail
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/learner-guide-mobile-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-role-matrix-browser-audit.cjs
+
+      - name: Release boundary summary
+        run: |
+          cat <<'EOF'
+          CANONICAL CLOUDFLARE PROMOTION GATE: PASS
+
+          This proves:
+          - current source/static regression gate passed
+          - Worker deployed with configured bindings
+          - Worker public/auth/origin boundaries passed
+          - protected /admin/integrity route exists
+          - exact production Pages allowlist deployed
+          - canonical generation/security headers passed
+          - six canonical Chromium suites passed
+
+          This does NOT close Phase 2 by itself. Still required:
+          - authenticated administrator /admin/integrity execution and D1 counts
+          - Firebase Authorized Domains verification for capitalmastery.pages.dev
+          - authenticated learner/employer/admin/second-tenant production smokes
+          - disposable QA cleanup and post-cleanup integrity verification
+          EOF
