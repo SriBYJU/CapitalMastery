@@ -11,15 +11,15 @@
       name: 'Career Skills Program',
       kicker: 'SHORTER · PRACTICAL · CREDENTIALED',
       awardCount: 4,
-      verifiedCredentialCount: 3,
+      verifiedCredentialCount: 4,
       summary: 'Learn the role, practice the major technical and professional skills, complete applied work and finish a compact realistic job simulation.',
       milestones: [
         'Foundations credential',
         'Essentials credential',
         'Applied Skills credential',
-        'Career Skills Program completion certificate'
+        'Career Skills Certificate'
       ],
-      evidenceModel: '3 Standard 2.0 credentials + 1 evidence-backed program completion certificate'
+      evidenceModel: '4 verified credentials · Career Skills ends at the practical capstone'
     },
     [PROFESSIONAL]: {
       name: 'Professional Readiness Program',
@@ -51,7 +51,7 @@
   function routeContext() {
     const p = routeParts();
     const route = p[0] || '';
-    const pathwayRoutes = new Set(['career','learn','quiz','final']);
+    const pathwayRoutes = new Set(['career','learn','quiz','simulation','final','role-lab']);
     const pathwayId = pathwayRoutes.has(route) && p[1] ? decodeURIComponent(p[1]) : '';
     return { route, pathwayId, parts:p };
   }
@@ -87,7 +87,7 @@
         <h3>${esc(t.name)}</h3>
         <p>${esc(t.summary)}</p>
         <div class="cm-track-meta">
-          <span>${t.awardCount} awards</span>
+          <span>${t.verifiedCredentialCount} credentials</span>
           <span>${professional?'Full Role Lab + final':'Shorter capstone simulation'}</span>
           <span>${professional?'Highest career credential':'Upgrade anytime'}</span>
         </div>
@@ -111,10 +111,10 @@
     return `<div class="cm-track-status" data-cm-track-status>
       <div>
         <strong>${esc(t.name)}</strong>
-        <span class="cm-track-badge">${t.awardCount} awards</span>
+        <span class="cm-track-badge">${t.verifiedCredentialCount} credentials</span>
         <p>${professional
           ? 'Complete the full pathway, Role Lab and Professional Readiness Final.'
-          : 'Complete the core pathway and practical capstone. The fourth award is an evidence-backed program completion certificate; switch to Professional Readiness later without repeating completed stages.'}</p>
+          : 'Complete the core pathway and practical capstone to earn the Career Skills Certificate. Switch to Professional Readiness later without repeating completed stages.'}</p>
       </div>
       <button type="button" class="btn btn-soft btn-sm" data-cm-switch-track="${professional?CAREER_SKILLS:PROFESSIONAL}">${professional?'View shorter option':'Upgrade to Professional Readiness'}</button>
     </div>`;
@@ -176,6 +176,69 @@
     badge.textContent = track === PROFESSIONAL ? 'Builds toward Role Lab' : 'Career Skills capstone';
   }
 
+  function apiPathway(careerId) {
+    return careerId === 'quant-finance' ? 'quantitative-finance' : careerId;
+  }
+
+  function publicPathway(pathwayId) {
+    return pathwayId === 'quantitative-finance' ? 'quant-finance' : pathwayId;
+  }
+
+  function v2AssessmentKey(careerId, stage) {
+    const id = apiPathway(careerId);
+    if (id === 'investment-banking') return stage === 'essentials' ? 'ib-essentials-case' : 'ib-professional-final';
+    return `${id}-${stage === 'essentials' ? 'essentials-case' : 'professional-final'}`;
+  }
+
+  function trackSequenceHtml(careerId, trackId) {
+    const id=encodeURIComponent(careerId), api=encodeURIComponent(apiPathway(careerId));
+    const essentials=encodeURIComponent(v2AssessmentKey(careerId,'essentials'));
+    const finalKey=encodeURIComponent(v2AssessmentKey(careerId,'final'));
+    const professional=trackId===PROFESSIONAL;
+    const steps=professional ? [
+      ['01','Foundations','Learn the role + technical core and earn Foundations',`#/learn/${id}/1`],
+      ['02','Baseline','Measure starting readiness; this does not count against you',`#/diagnostic/${api}`],
+      ['03','Essentials','Complete the secure mini case and earn Essentials',`#/v2-assessment/${essentials}`],
+      ['04','Applied Skills','Complete Toolkit + Applied Work',`#/learn/${id}/3`],
+      ['05','Role Lab','Perform the full professional workflow with review and revisions',`#/role-lab/${api}`],
+      ['06','Professional Final','Clear the final calculation + judgment gate',`#/v2-assessment/${finalKey}`],
+      ['07','Readiness','Review evidence coverage and professional readiness',`#/readiness/${api}`]
+    ] : [
+      ['01','Foundations','Learn the role + technical core and earn Foundations',`#/learn/${id}/1`],
+      ['02','Essentials','Apply the core concepts in the secure mini case',`#/v2-assessment/${essentials}`],
+      ['03','Applied Skills','Complete Toolkit + Applied Work',`#/learn/${id}/3`],
+      ['04','Career Skills Capstone','Complete the realistic job simulation and earn Career Skills',`#/simulation/${id}`]
+    ];
+    return `<section class="cm-track-sequence" data-cm-track-sequence><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Four verified credentials. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
+  }
+
+  function shapeCareerPath(root, careerId, trackId) {
+    const pathList=root.querySelector('.career-summary .path-list');
+    if(!pathList) return;
+    const headings=[...pathList.querySelectorAll('.path-step h3')];
+    const legacyFinal=headings.find(x=>/Professional Readiness Final/i.test(x.textContent||''))?.closest('.path-step');
+    const legacySimulation=headings.find(x=>/^Job Simulation$/i.test((x.textContent||'').trim()))?.closest('.path-step');
+    if(legacyFinal){ legacyFinal.hidden=true; legacyFinal.setAttribute('aria-hidden','true'); }
+    if(legacySimulation){
+      const hide=trackId===PROFESSIONAL;
+      legacySimulation.hidden=hide;
+      legacySimulation.setAttribute('aria-hidden',String(hide));
+    }
+    root.querySelector('[data-cm-track-sequence]')?.remove();
+    pathList.insertAdjacentHTML('afterend',trackSequenceHtml(careerId,trackId));
+  }
+
+  function advancedRouteCareer() {
+    const p=routeParts();
+    if(p[0]==='role-lab'&&p[1]) return publicPathway(decodeURIComponent(p[1]));
+    if(p[0]==='v2-assessment'&&p[1]&&/professional-final$/i.test(p[1])) {
+      const key=decodeURIComponent(p[1]);
+      if(key==='ib-professional-final') return 'investment-banking';
+      return publicPathway(key.replace(/-professional-final$/i,''));
+    }
+    return '';
+  }
+
   function noticeHtml() {
     const message = sessionStorage.getItem(NOTICE_KEY);
     if (!message) return '';
@@ -226,11 +289,12 @@
 
     updateFinalGate(root, careerId, track);
     updateCapstoneBadge(root, track);
+    shapeCareerPath(root, careerId, track);
   }
 
   function decorateCareerDirectory() {
     document.querySelectorAll('.career-card .cred-count').forEach(el => {
-      el.textContent = 'Career Skills: 4 awards · Professional Readiness: 5 credentials';
+      el.textContent = 'Career Skills: 4 credentials · Professional Readiness: 5 credentials';
       el.classList.add('cm-track-count');
     });
   }
@@ -245,10 +309,10 @@
     hero.insertAdjacentHTML('afterend', `<section class="section-tight" data-cm-track-guide><div class="container"><div class="card">
       <div class="eyebrow">TWO PROGRAM LEVELS</div>
       <h2>Choose depth without losing progress.</h2>
-      <p><strong>Career Skills</strong> is the shorter practical route with three Standard 2.0 credentials plus an evidence-backed completion certificate. <strong>Professional Readiness</strong> is the advanced route with all five career credentials, the full Role Lab and the flagship readiness credential. Work earned in the shorter route carries forward.</p>
+      <p><strong>Career Skills</strong> is the shorter practical route with four verified credentials: Foundations, Essentials, Applied Skills and the Career Skills Certificate. <strong>Professional Readiness</strong> is the advanced five-credential Standard 2.0 route with the full Role Lab and flagship readiness credential. Work earned in the shorter route carries forward.</p>
       <div class="cm-track-mini">
         <div><strong>Career Skills</strong>Shorter practical route</div>
-        <div><strong>4 awards</strong>3 credentials + completion certificate</div>
+        <div><strong>4 credentials</strong>Ends with Career Skills Certificate</div>
         <div><strong>Professional Readiness</strong>Full job-readiness route</div>
         <div><strong>5 credentials</strong>Includes Role Lab + flagship credential</div>
       </div>
@@ -265,7 +329,7 @@
     firstSection.insertAdjacentHTML('afterend', `<section class="section-tight" data-cm-track-credential-model><div class="container"><div class="card cm-track-credential-model">
       <div class="eyebrow">CREDENTIAL MODEL</div>
       <h2>Stackable evidence, not certificate spam.</h2>
-      <p>Career Skills produces four learner-facing awards: Foundations, Essentials, Applied Skills and a Career Skills Program completion certificate backed by those credentials plus capstone evidence. Professional Readiness remains the five-level Standard 2.0 career credential stack: Foundations, Essentials, Applied Skills, Role Lab and Professional Readiness.</p>
+      <p>Career Skills produces four verified credentials: Foundations, Essentials, Applied Skills and the Career Skills Certificate, which requires the practical capstone simulation. Professional Readiness is the five-level Standard 2.0 career stack: Foundations, Essentials, Applied Skills, Role Lab and Professional Readiness. The two end credentials are intentionally different so a Career Skills completion is never mistaken for full Professional Readiness.</p>
     </div></div></section>`);
   }
 
@@ -281,11 +345,20 @@
 
   function guardAdvancedRoute() {
     const { route, pathwayId } = routeContext();
-    if (route !== 'final' || !pathwayId) return false;
-    if (getTrack(pathwayId) === PROFESSIONAL) return false;
-    sessionStorage.setItem(NOTICE_KEY, 'The Professional Readiness Final is part of the advanced program. Your Career Skills progress is preserved; upgrade when you want to continue.');
-    location.replace(`#/career/${encodeURIComponent(pathwayId)}`);
-    return true;
+    if(route==='final'&&pathwayId){
+      sessionStorage.setItem(NOTICE_KEY,'The legacy final is no longer a program gate. Career Skills ends at its capstone; Professional Readiness uses the Standard 2.0 Role Lab and Professional Final shown on the pathway.');
+      location.replace(`#/career/${encodeURIComponent(pathwayId)}`); return true;
+    }
+    if(route==='simulation'&&pathwayId&&getTrack(pathwayId)===PROFESSIONAL){
+      sessionStorage.setItem(NOTICE_KEY,'Professional Readiness uses the deeper Role Lab instead of the shorter Career Skills capstone.');
+      location.replace(`#/career/${encodeURIComponent(pathwayId)}`); return true;
+    }
+    const advancedCareer=advancedRouteCareer();
+    if(advancedCareer&&getTrack(advancedCareer)!==PROFESSIONAL){
+      sessionStorage.setItem(NOTICE_KEY,'Role Lab and the Professional Readiness Final are reserved for the advanced program. Your Career Skills work remains saved.');
+      location.replace(`#/career/${encodeURIComponent(advancedCareer)}`); return true;
+    }
+    return false;
   }
 
   function apply() {
