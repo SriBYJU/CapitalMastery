@@ -58,6 +58,15 @@ app=once(app,
 `  function qaMode(){ return localStorage.getItem(QA_KEY) === 'true'; }`,
 `  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }`,
 'core app admin-only QA mode');
+
+// The legacy IB route normally hands off to the authoritative server-graded
+// workbench. A verified Admin QA preview is the one intentional exception: it
+// must stay on the local synthetic Project Northstar surface so Admin Demo Lab
+// testing cannot create or depend on D1 progress.
+app=once(app,
+`  function simulationPage(c){\n    if(c.id==='investment-banking'){ location.hash=\`#/official-simulation/\${c.id}\`; return; }`,
+`  function simulationPage(c){\n    if(c.id==='investment-banking' && !qaMode()){ location.hash=\`#/official-simulation/\${c.id}\`; return; }`,
+'IB Admin QA simulation handoff exception');
 save(appPath,app);
 
 const e2ePath='capital-mastery-e2e.js';
