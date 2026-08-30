@@ -1,0 +1,45 @@
+name: Patch Admin browser assertion
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-admin-browser-assertion.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch stale shared-route browser assertion
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tests/failure-seeking-browser-audit.mjs')
+          s=p.read_text()
+          old="assert((await adminPage.evaluate(()=>location.hash)).startsWith('#/simulation/investment-banking'),`Admin simulation preview was redirected away: ${await adminPage.evaluate(()=>location.hash)}`);"
+          new="assert((await adminPage.evaluate(()=>location.hash))==='#/admin-preview/simulation/investment-banking',`Admin simulation preview escaped the protected Admin namespace: ${await adminPage.evaluate(()=>location.hash)}`);"
+          if old not in s:
+              raise SystemExit('Expected stale Admin browser assertion not found; refusing ambiguous patch')
+          if s.count(old)!=1:
+              raise SystemExit('Expected exactly one stale Admin browser assertion; refusing ambiguous patch')
+          p.write_text(s.replace(old,new))
+          PY
+          node --check tests/failure-seeking-browser-audit.mjs
+      - name: Commit corrected regression
+        run: |
+          if git diff --quiet; then
+            echo 'No changes to commit'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add tests/failure-seeking-browser-audit.mjs
+          git commit -m 'Require protected Admin route in browser torture audit'
+          git push
