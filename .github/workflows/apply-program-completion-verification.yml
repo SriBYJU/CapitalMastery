@@ -22,6 +22,8 @@ jobs:
         with:
           fetch-depth: 0
 
+      # This workflow always starts from the current main branch so a previously
+      # proven product patch cannot be lost behind a concurrent workflow commit.
       - name: Apply guarded patch in runner
         run: |
           set -euo pipefail
