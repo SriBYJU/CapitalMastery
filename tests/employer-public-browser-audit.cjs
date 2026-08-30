@@ -18,8 +18,25 @@ async function mockWorker(route){
 }
 
 async function assertContained(page,label){
-  const m=await page.evaluate(()=>({inner:innerWidth,doc:document.documentElement.scrollWidth,body:document.body.scrollWidth}));
-  assert(Math.max(m.doc,m.body)<=m.inner+2,`${label}: horizontal overflow ${Math.max(m.doc,m.body)}px > ${m.inner}px`);
+  const m=await page.evaluate(()=>{
+    const viewport=innerWidth;
+    const offenders=[...document.querySelectorAll('body *')].map(node=>{
+      const r=node.getBoundingClientRect();
+      return {
+        tag:node.tagName,
+        id:node.id||'',
+        cls:String(node.className||'').slice(0,160),
+        left:Math.round(r.left),
+        right:Math.round(r.right),
+        width:Math.round(r.width),
+        scrollWidth:node.scrollWidth||0,
+        overflowX:getComputedStyle(node).overflowX
+      };
+    }).filter(x=>x.width>0&&(x.right>viewport+2||x.left<-2||x.width>viewport+2)).sort((a,b)=>b.right-a.right).slice(0,12);
+    return {inner:viewport,doc:document.documentElement.scrollWidth,body:document.body.scrollWidth,offenders};
+  });
+  const actual=Math.max(m.doc,m.body);
+  assert(actual<=m.inner+2,`${label}: horizontal overflow ${actual}px > ${m.inner}px; offenders=${JSON.stringify(m.offenders)}`);
 }
 
 (async()=>{
