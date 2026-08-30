@@ -21,7 +21,7 @@ admin=once(admin,
         return original.apply(this, args);
       };
     }`,
-`    for (const name of ['qaProgress', 'qaScores']) {
+`    for (const name of ['qaProgress', 'qaScores', 'resetState']) {
       const original = window.CM[name];
       if (typeof original !== 'function') continue;
       window.CM[name] = function(...args) {
@@ -47,44 +47,69 @@ admin=once(admin,
 'admin QA console guard');
 save(adminPath,admin);
 
-// 2) Admin Credential Lab: authoritative live renderer must yield to isolated local QA previews.
+// 2) QA mode itself is an admin-only state. A localStorage flag by itself must
+// never disable prerequisite guards, authoritative progress reconciliation, or
+// legacy-to-official route normalization for a normal learner.
+const qaFunction=`  function qaMode() {\n    return window.CM_AUTH?.ready === true &&\n      window.CM_AUTH?.isAdmin === true &&\n      localStorage.getItem(QA_KEY) === 'true';\n  }`;
+
+const appPath='app.js';
+let app=load(appPath);
+app=once(app,
+`  function qaMode(){ return localStorage.getItem(QA_KEY) === 'true'; }`,
+`  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }`,
+'core app admin-only QA mode');
+save(appPath,app);
+
+const e2ePath='capital-mastery-e2e.js';
+let e2e=load(e2ePath);
+e2e=once(e2e,
+`  function qaMode() {\n    return localStorage.getItem(QA_KEY) === 'true';\n  }`,
+qaFunction,
+'E2E admin-only QA mode');
+save(e2ePath,e2e);
+
+const uxPath='ux-stability.js';
+let ux=load(uxPath);
+ux=once(ux,
+`  function qaMode() {\n    return localStorage.getItem(QA_KEY) === 'true';\n  }`,
+qaFunction,
+'UX admin-only QA mode');
+save(uxPath,ux);
+
+const continuityPath='course-continuity.js';
+let continuity=load(continuityPath);
+continuity=once(continuity,
+`  function qaMode() {\n    return localStorage.getItem(QA_KEY) === 'true';\n  }`,
+qaFunction,
+'course continuity admin-only QA mode');
+save(continuityPath,continuity);
+
+const runtimePath='runtime-audit-fixes.js';
+let runtime=load(runtimePath);
+runtime=once(runtime,
+`  function qaMode() { return localStorage.getItem(QA_KEY) === 'true'; }`,
+`  function qaMode() { return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }`,
+'runtime reconciliation admin-only QA mode');
+save(runtimePath,runtime);
+
+// 3) Admin Credential Lab: authoritative live renderer must yield to isolated local QA previews.
 const liveUiPath='capital-mastery-live-ui.js';
 let live=load(liveUiPath);
 live=once(live,
-`  const STATE_KEY = 'capitalMasteryLocalStateV1';
-  const PASS = 80;`,
-`  const STATE_KEY = 'capitalMasteryLocalStateV1';
-  const QA_KEY = 'capitalMasteryQaPreviewV1';
-  const PASS = 80;`,
+`  const STATE_KEY = 'capitalMasteryLocalStateV1';\n  const PASS = 80;`,
+`  const STATE_KEY = 'capitalMasteryLocalStateV1';\n  const QA_KEY = 'capitalMasteryQaPreviewV1';\n  const PASS = 80;`,
 'live UI QA key');
 live=once(live,
-`  function main() {
-    return document.querySelector('#app main#main');
-  }`,
-`  function main() {
-    return document.querySelector('#app main#main');
-  }
-
-  function adminQaPreviewActive() {
-    return window.CM_AUTH?.ready === true &&
-      window.CM_AUTH?.isAdmin === true &&
-      localStorage.getItem(QA_KEY) === 'true';
-  }`,
+`  function main() {\n    return document.querySelector('#app main#main');\n  }`,
+`  function main() {\n    return document.querySelector('#app main#main');\n  }\n\n  function adminQaPreviewActive() {\n    return window.CM_AUTH?.ready === true &&\n      window.CM_AUTH?.isAdmin === true &&\n      localStorage.getItem(QA_KEY) === 'true';\n  }`,
 'live UI admin QA helper');
 live=once(live,
-`    if (root === 'credentials') return renderCredentials();
-    if (root === 'credential' && a && b) return renderCredentialDetail(a, b);`,
-`    // Admin QA certificate/credential previews are intentionally local and must
-    // not be replaced by the authoritative renderer. Normal learner routes stay
-    // authoritative. This only applies to a backend-verified admin with QA mode on.
-    if (adminQaPreviewActive() && ['credential','certificate','achievement'].includes(root)) return;
-
-    if (root === 'credentials') return renderCredentials();
-    if (root === 'credential' && a && b) return renderCredentialDetail(a, b);`,
+`    if (root === 'credentials') return renderCredentials();\n    if (root === 'credential' && a && b) return renderCredentialDetail(a, b);`,
+`    // Admin QA certificate/credential previews are intentionally local and must\n    // not be replaced by the authoritative renderer. Normal learner routes stay\n    // authoritative. This only applies to a backend-verified admin with QA mode on.\n    if (adminQaPreviewActive() && ['credential','certificate','achievement'].includes(root)) return;\n\n    if (root === 'credentials') return renderCredentials();\n    if (root === 'credential' && a && b) return renderCredentialDetail(a, b);`,
 'live UI yield to admin QA preview');
 save(liveUiPath,live);
 
-// 3) Two-track routing: Career Skills goes directly to the authoritative compact
+// 4) Two-track routing: Career Skills goes directly to the authoritative compact
 // simulation; Professional Readiness cannot deep-link that Career Skills gate.
 const tracksPath='training-tracks.js';
 let tracks=load(tracksPath);
@@ -102,7 +127,7 @@ tracks=once(tracks,
 'Professional deep-link Career Skills capstone guard');
 save(tracksPath,tracks);
 
-// 4) Madeline must send Career Skills learners directly to the authoritative
+// 5) Madeline must send Career Skills learners directly to the authoritative
 // simulation instead of creating a visible legacy redirect hop.
 const madelinePath='madeline.js';
 let madeline=load(madelinePath);
@@ -112,35 +137,18 @@ madeline=once(madeline,
 'Madeline authoritative Career Skills capstone');
 save(madelinePath,madeline);
 
-// 5) Signed-out gating must not leave the URL on Home while stale gated content
+// 6) Signed-out gating must not leave the URL on Home while stale gated content
 // remains rendered underneath the modal. A real hash navigation keeps the URL,
 // rendered page, Back behavior, and pending-route state synchronized.
 const certificateNamePath='certificate-name.js';
 let certName=load(certificateNamePath);
 certName=once(certName,
-`    if (!currentUser()) {
-      routeGuardBusy = true;
-      savePendingRoute(hash);
-      history.replaceState(null, '', \`${'${location.pathname}${location.search}#/'}\`);
-      routeGuardBusy = false;
-      openLearningGate(hash);
-      return;
-    }`,
-`    if (!currentUser()) {
-      routeGuardBusy = true;
-      savePendingRoute(hash);
-      const publicHome = \`${'${location.pathname}${location.search}#/'}\`;
-      if (location.hash !== '#/') location.replace(publicHome);
-      routeGuardBusy = false;
-      // Keep the modal outside #app so the home rerender cannot destroy it, but
-      // defer one task so the hashchange renderer and the gate never race.
-      setTimeout(() => openLearningGate(hash), 0);
-      return;
-    }`,
+`    if (!currentUser()) {\n      routeGuardBusy = true;\n      savePendingRoute(hash);\n      history.replaceState(null, '', \`${'${location.pathname}${location.search}#/'}\`);\n      routeGuardBusy = false;\n      openLearningGate(hash);\n      return;\n    }`,
+`    if (!currentUser()) {\n      routeGuardBusy = true;\n      savePendingRoute(hash);\n      const publicHome = \`${'${location.pathname}${location.search}#/'}\`;\n      if (location.hash !== '#/') location.replace(publicHome);\n      routeGuardBusy = false;\n      // Keep the modal outside #app so the home rerender cannot destroy it, but\n      // defer one task so the hashchange renderer and the gate never race.\n      setTimeout(() => openLearningGate(hash), 0);\n      return;\n    }`,
 'signed-out gated route synchronization');
 save(certificateNamePath,certName);
 
-// 6) Cache-bust every JS asset changed by the stability/audit rounds so clients
+// 7) Cache-bust every JS asset changed by the stability/audit rounds so clients
 // cannot run a mixed old/new script generation after deployment.
 const indexPath='index.html';
 let index=load(indexPath);
@@ -149,6 +157,10 @@ const replacements=[
   ['app.js?v=20260830-guided2','app.js?v=20260830-stability3'],
   ['training-tracks.js?v=20260830-tracks2','training-tracks.js?v=20260830-stability3'],
   ['capital-mastery-live-ui.js?v=20260830-guided2','capital-mastery-live-ui.js?v=20260830-stability3'],
+  ['capital-mastery-e2e.js?v=20260829-mixedsubmit1','capital-mastery-e2e.js?v=20260830-stability3'],
+  ['ux-stability.js?v=20260828-perf1','ux-stability.js?v=20260830-stability3'],
+  ['course-continuity.js','course-continuity.js?v=20260830-stability3'],
+  ['runtime-audit-fixes.js?v=20260828-audit1','runtime-audit-fixes.js?v=20260830-stability3'],
   ['madeline.js?v=20260830-guided2','madeline.js?v=20260830-stability3'],
   ['admin-qa-simulation-fix.js?v=20260828-adminsim2','admin-qa-simulation-fix.js?v=20260830-stability3']
 ];
