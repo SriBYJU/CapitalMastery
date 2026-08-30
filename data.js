@@ -1,7 +1,9 @@
 window.CM_DATA = {
   "stats": {
-    "credentials": "48",
-    "marketingCredentials": "45+",
+    "credentials": "80",
+    "marketingCredentials": "80+",
+    "careerCredentialDefinitions": "80",
+    "academyAchievements": "8",
     "pathways": "16",
     "mastery": "80%",
     "medianWage": "$102,740",

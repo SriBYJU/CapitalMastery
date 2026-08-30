@@ -6,8 +6,10 @@ const ctx={window:{}};vm.createContext(ctx);vm.runInContext(dataCode,ctx);
 const d=ctx.window.CM_DATA;
 const errors=[];const ok=(cond,msg)=>{if(!cond)errors.push(msg)};
 ok(d.careers.length===16,`Expected 16 careers, got ${d.careers.length}`);
-ok(Number(d.stats.credentials)>=48,'Expected at least 48 credential slots');
-ok(d.stats.marketingCredentials==='45+','Homepage marketing count should be 45+');
+ok(Number(d.stats.credentials)===80,'Legacy credential count alias should match 80 Standard 2.0 career definitions');
+ok(d.stats.marketingCredentials==='80+','Marketing credential count should be 80+');
+ok(Number(d.stats.careerCredentialDefinitions)===80,'Expected exactly 80 Standard 2.0 career credential definitions');
+ok(Number(d.stats.academyAchievements)===8,'Expected 8 cross-career Academy achievements');
 for(const c of d.careers){
   ok(c.vocab.length>=10,`${c.id}: fewer than 10 vocabulary terms`);
   ok(c.concepts.length>=5,`${c.id}: fewer than 5 technical concepts`);
@@ -29,4 +31,4 @@ ok(app.includes('adminPage'),'Admin QA Lab missing');
 ok(!/adminPassword\s*[:=]/i.test(app),'Admin password must never be hard-coded');
 ok(!/adminEmail\s*[:=]/i.test(app),'Admin account email should not be hard-coded before Firebase');
 if(errors.length){console.error('STATIC AUDIT FAILED');for(const e of errors)console.error(' -',e);process.exit(1)}
-console.log(`STATIC AUDIT PASS: ${d.careers.length} careers, ${d.stats.credentials} credential slots, research/source mapping present.`);
+console.log(`STATIC AUDIT PASS: ${d.careers.length} careers, ${d.stats.careerCredentialDefinitions} Standard 2.0 career definitions + ${d.stats.academyAchievements} Academy achievements, research/source mapping present.`);
