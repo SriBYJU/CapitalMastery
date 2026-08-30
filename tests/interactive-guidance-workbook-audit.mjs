@@ -9,7 +9,10 @@ const enterprise=fs.readFileSync('enterprise-v2.js','utf8');
 const visuals=fs.readFileSync('career-professional-visuals.js','utf8');
 const live=fs.readFileSync('capital-mastery-live.js','utf8');
 
-const cacheBusted = path => new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\?v=[^"\\']+').test(index);
+const cacheBusted = path => {
+  const escaped = path.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  return new RegExp(`${escaped}\\?v=[^"'\\s>]+`).test(index);
+};
 for(const asset of ['learner-guide.css','training-tracks.css','learner-guide.js']) ok(cacheBusted(asset),`Interactive learner guide asset must be loaded with a cache-busted production URL: ${asset}`);
 for(const asset of ['app.js','enterprise-v2.js','career-professional-visuals.js']) ok(cacheBusted(asset),`Product-polish asset must be cache-busted: ${asset}`);
 ok(index.indexOf('learner-guide.css') < index.indexOf('training-tracks.css'),'Training-track mobile containment must load after learner-guide base styles');
