@@ -5,7 +5,7 @@ const guard=fs.readFileSync('state-resilience.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const app=fs.readFileSync('app.js','utf8');
 
-ok(index.includes('state-resilience.js?v=20260830-stability1'),'State resilience guard must be loaded and cache-busted');
+ok(/<script\s+src=["']state-resilience\.js\?v=[^"']+["']><\/script>/.test(index),'State resilience guard must be loaded and cache-busted');
 ok(index.indexOf('state-resilience.js') < index.indexOf('firebase-auth.js'),'State repair must run before async authentication can activate a user snapshot');
 ok(index.indexOf('state-resilience.js') < index.indexOf('account-isolation-early.js'),'State repair must run before account-isolation snapshots are read');
 ok(index.indexOf('state-resilience.js') < index.indexOf('app.js'),'State repair must run before app.js captures its in-memory state');
