@@ -3342,17 +3342,13 @@ function buildInvestmentBankingSimulation(pathway) {
     },
     {
       id: "ib-sim-qa",
-      type: "choice",
-      prompt: "Model QA finding that must be corrected before senior review",
-      answer: "Cash is being subtracted in the EV-to-equity bridge instead of added",
-      options: [
-        "Cash is being subtracted in the EV-to-equity bridge instead of added",
-        "The model uses a blue font for one assumption cell",
-        "The EBITDA margin is displayed to one decimal place",
-        "The file name includes today's date"
-      ],
-      workProduct: { section:"qa", label:"Material QA finding", instruction:"Review the planted model-check findings and escalate the one that changes valuation." }
-    },
+      type: "text",
+      prompt: "Document the material model QA error and the correction required before senior review",
+      keywords: ["cash", "add", "equity", "bridge", "enterprise"],
+      minHits: 3,
+      minWords: 14,
+      workProduct: { section:"qa", label:"Material QA finding", instruction:"Inspect the model-check notes, identify the valuation-changing error in your own words, and state how the EV-to-equity bridge must be corrected." }
+    }
     {
       id: "ib-sim-revised-equity",
       type: "numeric",
@@ -3362,12 +3358,66 @@ function buildInvestmentBankingSimulation(pathway) {
       unit: "$m",
       workProduct: { section:"update", label:"Revised Equity Value", cell:"D31", instruction:"Refresh valuation using revised NTM EBITDA of $83.5m at the same 10.25x selected multiple, then bridge to equity value." }
     }
+    {
+      id: "ib-sim-precedent-median",
+      type: "numeric",
+      prompt: "Median selected precedent EV / LTM EBITDA",
+      answer: 11.5,
+      tolerance: 0.03,
+      unit: "x",
+      workProduct: { section:"precedents", label:"Selected precedent median", cell:"E18", instruction:"Spread the four relevant precedent transactions and calculate the median EV / LTM EBITDA multiple." }
+    },
+    {
+      id: "ib-sim-precedent-equity",
+      type: "numeric",
+      prompt: "Equity value implied by the precedent median",
+      answer: 860,
+      tolerance: 0.75,
+      unit: "$m",
+      workProduct: { section:"precedents", label:"Precedent-implied Equity Value", cell:"E22", instruction:"Apply the 11.5x precedent median to Orion LTM EBITDA, then bridge enterprise value to equity value." }
+    },
+    {
+      id: "ib-sim-dcf-terminal",
+      type: "numeric",
+      prompt: "Gordon Growth terminal value",
+      answer: 1442,
+      tolerance: 1.5,
+      unit: "$m",
+      workProduct: { section:"dcf", label:"Terminal Value", cell:"J31", instruction:"Use Year-5 unlevered FCF × (1+g) ÷ (WACC−g)." }
+    },
+    {
+      id: "ib-sim-dcf-ev",
+      type: "numeric",
+      prompt: "DCF enterprise value",
+      answer: 1213.25,
+      tolerance: 1.5,
+      unit: "$m",
+      workProduct: { section:"dcf", label:"DCF Enterprise Value", cell:"J34", instruction:"Discount Years 1–5 unlevered FCF and terminal value at 9.0% WACC and sum the present values." }
+    },
+    {
+      id: "ib-sim-dcf-equity",
+      type: "numeric",
+      prompt: "DCF implied equity value",
+      answer: 1153.25,
+      tolerance: 1.75,
+      unit: "$m",
+      workProduct: { section:"dcf", label:"DCF Equity Value", cell:"J36", instruction:"Bridge DCF enterprise value to equity value using Orion debt and cash." }
+    },
+    {
+      id: "ib-sim-slide-headline",
+      type: "text",
+      prompt: "Write the senior-review valuation takeaway",
+      keywords: ["offer", "comps", "precedent", "dcf", "guidance", "valuation"],
+      minHits: 3,
+      minWords: 18,
+      workProduct: { section:"client-materials", label:"Valuation page headline", instruction:"Write one concise senior-review takeaway that reconciles the offer with trading comps, precedents and DCF, and flags the management-guidance change if it affects the recommendation." }
+    },
   ];
   return {
     version: "2.0-workbench",
     itemType: "simulation",
     questions,
-    writingPrompt: "Draft the email you would send to your Associate. State whether Northstar should continue diligence on Orion, cite the most decision-relevant valuation evidence, explain the impact of the new management guidance, identify at least two material risks or diligence items, and state the next step you recommend.",
+    writingPrompt: "Draft the email you would send to your Associate. State whether Northstar should continue diligence on Orion; reconcile the offer against trading comps, precedent transactions and DCF; explain the impact of the new management guidance; identify at least two material risks or diligence items; and state the next step you recommend.",
     simulationProfile: {
       kind: "ib-deal-workbench-v2",
       project: "Project Northstar",
@@ -3378,9 +3428,9 @@ function buildInvestmentBankingSimulation(pathway) {
       client: "Northstar Technologies",
       target: "Orion Systems",
       deadline: "5:30 PM — same day",
-      objective: "Update the buy-side valuation materials and send the Associate a defensible recommendation before the VP review.",
+      objective: "Complete the same-day buy-side valuation refresh: transaction model, trading comps, precedent transactions, DCF, management update, model QA and senior-review recommendation before the VP review.",
       inbox: [
-        { time:"9:08 AM", from:"Maya Chen · Associate", subject:"Northstar / Orion — valuation refresh before VP review", body:"Please update the transaction snapshot, trading comps output and recommendation using the attached capitalization, forecast and peer files. Check the model carefully before you send anything up. I need your revised output before 5:30 PM." },
+        { time:"9:08 AM", from:"Maya Chen · Associate", subject:"Northstar / Orion — valuation refresh before VP review", body:"Please refresh the transaction model, trading comps, precedents and DCF using the attached files, then update the senior-review takeaway. Check the model carefully before you send anything up. I need your revised output before 5:30 PM." },
         { time:"2:17 PM", from:"Maya Chen · Associate", subject:"NEW INFO — management guidance changed", body:"Orion just lowered Year 1 revenue guidance by 5% from the $480m case. Update the forecast and every dependent valuation output. Flag what changed and whether it affects our recommendation." }
       ],
       files: [
@@ -3388,7 +3438,9 @@ function buildInvestmentBankingSimulation(pathway) {
         { id:"forecast", name:"02_Orion_Management_Forecast.xlsx", type:"Excel", label:"Forecast", rows:[["LTM Revenue","$445m"],["LTM EBITDA","$80m"],["NTM Revenue — initial","$480m"],["NTM EBITDA — initial","$88m"],["NTM EBITDA — revised","$83.5m"]] },
         { id:"comps", name:"03_Trading_Comps.xlsx", type:"Excel", label:"Trading comps", rows:[["Peer","Enterprise Value","NTM EBITDA","Business fit"],["Aster Cloud","$1,020m","$100m","High"],["Beacon Software","$1,240m","$120m","High"],["Cobalt Systems","$820m","$80m","High"],["Delta Apps","$1,075m","$100m","High"],["Mega Hardware","$4,800m","$240m","Low — hardware-heavy"]] },
         { id:"qa", name:"04_Model_Check_Notes.txt", type:"QA", label:"Model check", rows:[["Check","Observation"],["EV bridge","Formula currently subtracts cash"],["Share count","Matches capitalization file"],["Units","All model outputs in $m"],["Sensitivity","Updates when selected multiple changes"]] },
-        { id:"process", name:"05_Diligence_Request_List.pdf", type:"PDF", label:"Diligence", rows:[["Priority","Request"],["High","Top-10 customer revenue and renewal dates"],["High","Revenue bridge: recurring vs services"],["High","Synergy build and one-time implementation costs"],["Medium","Employee retention / key technical staff"]] }
+        { id:"process", name:"05_Diligence_Request_List.pdf", type:"PDF", label:"Diligence", rows:[["Priority","Request"],["High","Top-10 customer revenue and renewal dates"],["High","Revenue bridge: recurring vs services"],["High","Synergy build and one-time implementation costs"],["Medium","Employee retention / key technical staff"]] },
+        { id:"precedents", name:"06_Precedent_Transactions.xlsx", type:"Excel", label:"Precedent transactions", rows:[["Transaction","Enterprise Value","LTM EBITDA","EV / LTM EBITDA"],["Atlas / Nova","$972m","$90m","10.8x"],["Cedar / Prism","$1,140m","$100m","11.4x"],["Elm / Vector","$1,044m","$90m","11.6x"],["Granite / Pulse","$1,220m","$100m","12.2x"]] },
+        { id:"dcf", name:"07_Orion_DCF.xlsx", type:"Excel", label:"DCF assumptions", rows:[["Metric","Year 1","Year 2","Year 3","Year 4","Year 5"],["Unlevered FCF","$60m","$66m","$72m","$78m","$84m"],["WACC","9.0%","","","",""],["Terminal growth","3.0%","","","",""]] }
       ],
       workflow: [
         { id:"model", title:"1 · Transaction Model", subtitle:"Build the EV bridge and headline transaction multiple." },

@@ -568,13 +568,13 @@
     if(final && score>=PASS) issueIfEligible(c,'career');
     saveState();
     const passed=score>=PASS;
-    const next = final ? (passed?`achievement/${c.id}/career`:`final/${c.id}`) : n===5 ? (passed?`simulation/${c.id}`:`quiz/${c.id}/5`) : n===2 ? (passed?`achievement/${c.id}/foundations`:`quiz/${c.id}/${n}`) : n===4 ? (passed?`achievement/${c.id}/applied`:`quiz/${c.id}/${n}`) : (passed?`career/${c.id}`:`quiz/${c.id}/${n}`);
+    const next = final ? (passed?`achievement/${c.id}/career`:`final/${c.id}`) : n===5 ? (passed?`official-simulation/${c.id}`:`quiz/${c.id}/5`) : n===2 ? (passed?`achievement/${c.id}/foundations`:`quiz/${c.id}/${n}`) : n===4 ? (passed?`achievement/${c.id}/applied`:`quiz/${c.id}/${n}`) : (passed?`career/${c.id}`:`quiz/${c.id}/${n}`);
     const results=document.createElement('div'); results.className='quiz-result'; results.innerHTML=`<div class="${passed?'pass':'fail'}"><div class="score-big">${score}%</div><h2>${passed?'Passed':'Not yet'}</h2><p>${passed?'You met the Capital Mastery 80% standard.':'Review the explanations and try a new variant. You need 80%.'}</p><a class="btn ${passed?'btn-gold':'btn-primary'}" href="#/${next}">${passed?(final||n===2||n===4?'View Achievement':'Continue'):'Try Again'} →</a></div>`; form.prepend(results); form.querySelector('button[type=submit]').disabled=true; window.scrollTo({top:0,behavior:'smooth'});
   }
 
   function simulationPage(c, forceAdminPreview=false){
     const adminPreview = forceAdminPreview && qaMode();
-    if(c.id==='investment-banking' && !adminPreview && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }
+    if(!adminPreview && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }
     const cs=getCareerState(c.id); if(!adminPreview && !qaMode() && Number(cs.simulationKnowledge||0)<PASS){ toast('Pass the Part 5 knowledge check first.','warn'); return nav(`learn/${c.id}/5`); }
     const sim=simFor(c);
     render(`<div class="sim-shell"><div class="sim-topbar"><div class="container"><div><h2>${esc(sim.name)}</h2><div class="sim-role">${esc(c.role)}${c.track?` · ${esc(c.track)}`:''}</div></div><div class="small">Assessment Mode · Practical Simulation</div></div></div><div class="container sim-layout"><nav class="sim-nav">${['Inbox','Brief','Data','Workspace','Review','Results'].map((x,i)=>`<button class="${i===0?'active':''}" data-sim-tab="${x.toLowerCase()}">${simIcon(x)} ${x}</button>`).join('')}</nav><section class="sim-panel" id="sim-panel">${simInbox(c,sim)}</section></div></div>`,'learning');
@@ -598,7 +598,7 @@
   function simReview(c,sim){ const cs=getCareerState(c.id); return `<h1>Manager Review</h1>${cs.simResponses?.writing?`<div class="feedback-box"><strong>${esc(c.ladder[1]||'Manager')} comments:</strong><p>${Number(cs.simulationScore||0)>=PASS?'Your recommendation is directionally defensible. Tighten assumptions and preserve the strongest downside point for senior review.':'The work needs a clearer link between case evidence, calculation and recommendation. Revisit the weakest technical answer and make the downside case explicit.'}</p></div><h3>Your submitted recommendation</h3><p>${esc(cs.simResponses.writing)}</p>`:`<p>You have not submitted the workspace yet. Complete the analysis first.</p>`}`; }
   function simResults(c,sim){ const cs=getCareerState(c.id),s=Number(cs.simulationScore||0); const passed=s>=PASS; return `<h1>Simulation Results</h1>${s?`<div class="score-grid"><div class="score-cell"><small>Overall</small><strong>${s}</strong><span>/100</span></div><div class="score-cell"><small>Standard</small><strong>${PASS}</strong><span>required</span></div><div class="score-cell"><small>Status</small><strong>${passed?'PASS':'RETRY'}</strong></div></div><div class="feedback-box"><strong>${passed?'Strong performance.':'Not yet at the standard.'}</strong> ${passed?'You demonstrated the practical mastery required to move to the Professional Readiness Final.':'Reopen Workspace, revise your analysis and resubmit a new attempt.'}</div>${passed?`<a class="btn btn-gold" href="#/final/${c.id}">Take Professional Readiness Final →</a>`:`<button class="btn btn-primary" onclick="document.querySelector('[data-sim-tab=workspace]').click()">Revise Simulation</button>`}`:`<p>No simulation result yet. Complete Workspace and submit.</p>`}`; }
 
-  function finalPage(c){ const cs=getCareerState(c.id); if(!qaMode() && Number(cs.simulationScore||0)<PASS){toast('Pass the practical simulation first.','warn');return nav(`simulation/${c.id}`);} quizPage(c,5,true); }
+  function finalPage(c){ const cs=getCareerState(c.id); if(!qaMode() && Number(cs.simulationScore||0)<PASS){toast('Pass the practical simulation first.','warn');return nav(`official-simulation/${c.id}`);} quizPage(c,5,true); }
 
   function achievementPage(c,type){
     issueIfEligible(c,type);
