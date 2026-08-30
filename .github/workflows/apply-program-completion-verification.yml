@@ -1,0 +1,61 @@
+name: Apply program completion verification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/apply-program-completion-verification.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prove-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply guarded patch in runner
+        run: |
+          set -euo pipefail
+          node tools/patch-program-completion-public-verification.mjs
+          node --check v2/worker-v2-phase1-release.js
+          node --check capital-mastery-live.js
+          node --check public-certificate-verify.js
+
+      - name: Static, privacy and compatibility gates
+        run: |
+          set -euo pipefail
+          node tests/program-completion-public-verification-audit.mjs
+          node tests/public-credential-hierarchy-audit.mjs
+          node tests/career-skills-assignment-scope-audit.mjs
+          node tests/career-skills-five-level-boundary-audit.mjs
+          node tests/career-skills-report-export-audit.mjs
+          node tests/account-deletion-audit.mjs
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Chromium program-completion proof
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory dist-pages >/tmp/cm-program-completion-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break || sleep 1; done
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/program-completion-public-browser-audit.cjs
+
+      - name: Commit product only after all gates pass
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add v2/worker-v2-phase1-release.js capital-mastery-live.js public-certificate-verify.js
+          git diff --cached --check
+          git commit -m 'Add public Career Skills completion verification'
+          git push
