@@ -21,6 +21,12 @@ for (const forbidden of ['v2', 'tests', 'migrations', 'docs', 'tools', 'function
   ok(!fs.existsSync(path.join(output, forbidden)), `Production bundle must exclude ${forbidden}`);
 }
 
+const bundledIndex = fs.readFileSync(path.join(output, 'index.html'), 'utf8');
+const bundledGuardIndex = bundledIndex.indexOf('admin-route-guard.js');
+const bundledAppIndex = bundledIndex.indexOf('app.js');
+ok(fs.existsSync(path.join(output, 'admin-route-guard.js')), 'Production bundle must include the pre-router admin security gate');
+ok(bundledGuardIndex >= 0 && bundledAppIndex >= 0 && bundledGuardIndex < bundledAppIndex, 'Production bundle must load admin-route-guard.js before app.js');
+
 const headers = fs.readFileSync(path.join(output, '_headers'), 'utf8');
 for (const control of ['X-Content-Type-Options: nosniff', 'X-Frame-Options: DENY', 'Permissions-Policy:', 'Strict-Transport-Security:']) {
   ok(headers.includes(control), `Production response headers are missing ${control}`);
@@ -28,5 +34,4 @@ for (const control of ['X-Content-Type-Options: nosniff', 'X-Frame-Options: DENY
 
 ok(fs.existsSync(path.join(output, 'assets', 'seal.svg')), 'Credential seal must ship in the production asset set');
 ok(fs.existsSync(path.join(output, 'assets', 'founder-signature.png')), 'Certificate signature asset must ship in the production asset set');
-console.log('PAGES PRODUCTION BUNDLE AUDIT PASS: complete frontend allowlist + backend/test artifact exclusion + baseline security headers');
-
+console.log('PAGES PRODUCTION BUNDLE AUDIT PASS: complete frontend allowlist + pre-router admin guard + backend/test artifact exclusion + baseline security headers');
