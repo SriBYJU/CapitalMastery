@@ -1,0 +1,91 @@
+name: Live production read-only audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '*.js'
+      - '*.css'
+      - 'assets/**'
+      - 'tests/**'
+      - 'tools/build-pages.mjs'
+      - '.github/workflows/live-production-readonly-audit.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: live-production-readonly-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  live-production-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIVE_URL: https://capitalmastery.pages.dev
+      WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Cloudflare serves the audited generation
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 --retry-all-errors "$LIVE_URL/" -o /tmp/live-index.html
+          for marker in \
+            'brand-asset-resilience.js?v=20260830-stability1' \
+            'runtime-audit-fixes.js?v=20260830-stability4' \
+            'ux-stability.js?v=20260830-stability4' \
+            'learner-guide.css?v=20260830-stability4' \
+            'training-tracks.css?v=20260830-stability4'; do
+            grep -Fq "$marker" /tmp/live-index.html || {
+              echo "LIVE_GENERATION_MISMATCH: missing $marker"
+              exit 1
+            }
+          done
+          grep -Fq '<link rel="canonical" href="https://capitalmastery.pages.dev/"' /tmp/live-index.html
+          echo 'LIVE_GENERATION_MATCH=1'
+
+      - name: Verify live security headers
+        run: |
+          set -euo pipefail
+          curl -fsSI --retry 3 --retry-all-errors "$LIVE_URL/" -o /tmp/live-headers.txt
+          tr -d '\r' < /tmp/live-headers.txt | tr '[:upper:]' '[:lower:]' > /tmp/live-headers-lower.txt
+          grep -Eq '^x-content-type-options:[[:space:]]*nosniff$' /tmp/live-headers-lower.txt
+          grep -Eq '^x-frame-options:[[:space:]]*deny$' /tmp/live-headers-lower.txt
+          grep -Eq '^referrer-policy:[[:space:]]*strict-origin-when-cross-origin$' /tmp/live-headers-lower.txt
+          grep -Eq '^permissions-policy:.*camera=\(\).*microphone=\(\).*geolocation=\(\)' /tmp/live-headers-lower.txt
+          echo 'LIVE_SECURITY_HEADERS=PASS'
+
+      - name: Verify Worker CORS and auth boundary
+        run: |
+          set -euo pipefail
+          preflight_status=$(curl -sS --retry 3 --retry-all-errors -D /tmp/worker-preflight-headers.txt -o /tmp/worker-preflight-body.txt \
+            -w '%{http_code}' -X OPTIONS "$WORKER_URL/auth-check" \
+            -H 'Origin: https://capitalmastery.pages.dev' \
+            -H 'Access-Control-Request-Method: GET' \
+            -H 'Access-Control-Request-Headers: authorization,content-type')
+          case "$preflight_status" in 200|204) ;; *) echo "Unexpected preflight status: $preflight_status"; cat /tmp/worker-preflight-body.txt; exit 1;; esac
+          tr -d '\r' < /tmp/worker-preflight-headers.txt | tr '[:upper:]' '[:lower:]' > /tmp/worker-preflight-lower.txt
+          grep -Eq '^access-control-allow-origin:[[:space:]]*https://capitalmastery\.pages\.dev$' /tmp/worker-preflight-lower.txt
+          unauth_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-unauth-body.txt -w '%{http_code}' "$WORKER_URL/auth-check" \
+            -H 'Origin: https://capitalmastery.pages.dev')
+          case "$unauth_status" in 401|403) ;; *) echo "Worker auth boundary expected 401/403, got $unauth_status"; cat /tmp/worker-unauth-body.txt; exit 1;; esac
+          echo 'WORKER_PUBLIC_BOUNDARY=PASS'
+
+      - name: Install headless browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser audit against live Cloudflare assets
+        run: |
+          set -euo pipefail
+          CM_AUDIT_URL="$LIVE_URL" node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL="$LIVE_URL" node tests/failure-seeking-browser-audit.mjs
+          CM_AUDIT_URL="$LIVE_URL" node tests/learner-guide-mobile-browser-audit.cjs
+          CM_AUDIT_URL="$LIVE_URL" node tests/all-career-browser-sweep.cjs
+          CM_AUDIT_URL="$LIVE_URL" node tests/employer-public-browser-audit.cjs
+          echo 'LIVE_BROWSER_AUDIT=PASS'
