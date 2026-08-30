@@ -24,7 +24,10 @@ must(tracks.includes('5 Standard 2.0 career credentials'),'Professional Readines
 must(enterprise.includes('programCompletions?.find'),'Employer UI must resolve program completion separately from credential ladder');
 must(enterprise.includes('verifiedCredentialCount:professional?5:3'),'Employer evidence export must distinguish the verified credential counts');
 must(verify.includes('not a sixth Standard 2.0 credential'),'Public verification must disclose that Career Skills completion is not a sixth credential');
-must(worker.includes("credential_level='career'"),'Legacy/current career completion records must remain compatible');
+// Backward compatibility is behavioral: self-directed/legacy Career completion can
+// still be earned and its existing credentials-table public token can still verify.
+// Employer assignment completion is intentionally no longer inferred from that row.
+must(worker.includes('if (level === "career")')&&worker.includes('issueEligibleCredentials')&&worker.includes('WHERE public_token = ?'),'Legacy/current public Career completion issuance and verification must remain compatible');
 must(data?.careers?.length===16,`Expected 16 careers in public data; got ${data?.careers?.length}`);
 must(Number(data?.stats?.credentials)===80,'Legacy credential-count alias must stay aligned to 80 Standard 2.0 career definitions');
 must(data?.stats?.marketingCredentials==='80+','Public marketing credential-count alias must stay at 80+');
