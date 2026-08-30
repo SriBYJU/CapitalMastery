@@ -75,6 +75,7 @@
 
   function adminQaPreviewActive() {
     return window.CM_AUTH?.ready === true &&
+      window.CM_AUTH?.backendVerified === true &&
       window.CM_AUTH?.isAdmin === true &&
       localStorage.getItem('capitalMasteryQaPreviewV1') === 'true';
   }

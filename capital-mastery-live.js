@@ -356,9 +356,9 @@
     const p = hashParts();
     const [root, a, b] = p;
     const adminQaPreview = window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem('capitalMasteryQaPreviewV1') === 'true';
-    // Admin QA deliberately falls back to the local preview renderer for knowledge/final assessments.
+    // Admin QA deliberately falls back to the local preview renderer for knowledge, final, and simulation routes.
     // It does not call the authoritative submit endpoint, write D1 scores, or issue credentials.
-    if (adminQaPreview && (root === 'quiz' || root === 'final')) return;
+    if (adminQaPreview && (root === 'quiz' || root === 'final' || root === 'official-simulation')) return;
     if (root === 'quiz' && a && b) {
       await renderAssessment(a, `part-${Number(b)}`);
       return;

@@ -163,7 +163,7 @@
     if (namedCareer && /(what is|tell me|career|pathway|course|role|learn|do in)/.test(q)) return careerInfo(namedCareer);
 
     if (/(what is capital mastery|about capital mastery|what does capital mastery do)/.test(q)) {
-      return `Capital Mastery is a free finance-career learning platform built around <b>Learn it. Practice it. Prove it.</b> It has 16 career pathways with two program levels: Career Skills (4 verified credentials) and Professional Readiness (5 career credentials), with an ${PASS}% mastery standard on required assessed work.${action('Explore careers','#/careers')}`;
+      return `Capital Mastery is a free finance-career learning platform built around <b>Learn it. Practice it. Prove it.</b> It has 16 career pathways with two program levels: Career Skills (3 verified Standard 2.0 credentials + 1 program-completion certificate) and Professional Readiness (5 verified career credentials), with an ${PASS}% mastery standard on required assessed work.${action('Explore careers','#/careers')}`;
     }
 
     if (/(how do i start|where do i start|start learning|begin|new here|first step)/.test(q)) {
@@ -197,7 +197,7 @@
     if (/(credential id|certificate id|where.* id|find.* id)/.test(q)) return credentialHelp(true);
 
     if (/(two program|program levels|career skills|professional readiness|three certificates|3 certificates|credential levels|foundations certificate|applied skills|career certificate|how.*certificates work)/.test(q)) {
-      return `<b>Every career has two program levels:</b><br>• <b>Career Skills:</b> 4 verified credentials — Foundations, Essentials, Applied Skills, and the Career Skills Certificate after the practical capstone.<br>• <b>Professional Readiness:</b> 5 career credentials — Foundations, Essentials, Applied Skills, Role Lab, and the flagship Professional Readiness credential.<br><br>Career Skills work carries forward if you upgrade; you do not repeat earned stages.${action('View Credentials','#/credentials')}`;
+      return `<b>Every career has two program levels:</b><br>• <b>Career Skills:</b> 3 verified Standard 2.0 credentials — Foundations, Essentials, and Applied Skills — plus a separate Career Skills Program Completion Certificate after the practical capstone.<br>• <b>Professional Readiness:</b> 5 verified career credentials — Foundations, Essentials, Applied Skills, Role Lab, and the flagship Professional Readiness credential.<br><br>Career Skills work carries forward if you upgrade; you do not repeat earned stages.${action('View Credentials','#/credentials')}`;
     }
 
     if (/(linkedin|add.*credential|share.*credential|post.*certificate)/.test(q)) {

@@ -22,7 +22,7 @@ ok(app.includes('data-cm-admin-sim-preview="true" href="#/simulation/investment-
 ok(app.includes('Legacy Credential Compatibility Lab'),'Admin credential preview must not imply the legacy three-level model is the current full credential architecture');
 
 ok(madeline.includes('How do the two program levels work?'),'Madeline quick help must use current two-track terminology');
-ok(madeline.includes('Career Skills (4 verified credentials)')&&madeline.includes('Professional Readiness (5 career credentials)'),'Madeline must explain current credential counts');
+ok(madeline.includes('Career Skills (3 verified Standard 2.0 credentials + 1 program-completion certificate)')&&madeline.includes('Professional Readiness (5 verified career credentials)'),'Madeline must explain current credential counts without misclassifying the Career Skills completion certificate');
 ok(madeline.includes("track==='professional-readiness'"),'Madeline next-step guidance must be program-aware');
 ok(madeline.includes('Career Skills does not require this final'),'Madeline must not tell Career Skills learners the Professional Final is required');
 ok(!madeline.includes('It has 16 career pathways and 3 credential levels per pathway'),'Madeline must not expose stale three-credential product copy');

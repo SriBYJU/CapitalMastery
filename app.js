@@ -688,6 +688,14 @@
       if(root==='career'){const c=careerById(a);return c?careerPage(c):home();}
       if(root==='learn'){const c=careerById(a);return c?learnPage(c,Number(b||1)):home();}
       if(root==='quiz'){const c=careerById(a);return c?quizPage(c,Number(b||1),false):home();}
+      if(root==='official-simulation'){
+        const c=careerById(a);
+        const adminQaPreview=window.CM_AUTH?.ready===true&&window.CM_AUTH?.backendVerified===true&&window.CM_AUTH?.isAdmin===true&&qaMode();
+        if(adminQaPreview) return c?simulationPage(c):home();
+        // The secure assessment router owns this route for normal learners. Do not
+        // render Home first; that created a visible Home -> loading -> simulation flicker.
+        return;
+      }
       if(root==='simulation'){const c=careerById(a);return c?simulationPage(c):home();}
       if(root==='final'){const c=careerById(a);return c?finalPage(c):home();}
       if(root==='achievement'){const c=careerById(a);return c?achievementPage(c,b||'career'):credentialsPage();}

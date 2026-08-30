@@ -10,7 +10,9 @@
   }
 
   function isAdmin() {
-    return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true;
+    return window.CM_AUTH?.ready === true &&
+      window.CM_AUTH?.backendVerified === true &&
+      window.CM_AUTH?.isAdmin === true;
   }
 
   function qaMode() {
