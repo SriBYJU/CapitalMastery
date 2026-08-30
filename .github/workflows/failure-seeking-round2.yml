@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/failure-seeking-hardening-round2.mjs'
+      - 'tools/fix-learner-guide-mobile-overflow.mjs'
       - 'tests/failure-seeking-round2-audit.mjs'
       - 'tests/failure-seeking-browser-audit.mjs'
       - '.github/workflows/failure-seeking-round2.yml'
@@ -23,7 +24,9 @@ jobs:
           fetch-depth: 0
 
       - name: Apply failure-seeking hardening
-        run: node tools/failure-seeking-hardening-round2.mjs
+        run: |
+          node tools/failure-seeking-hardening-round2.mjs
+          node tools/fix-learner-guide-mobile-overflow.mjs
 
       - name: Syntax validation
         run: |
@@ -92,6 +95,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add certificate-name.js admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js app.js capital-mastery-e2e.js ux-stability.js course-continuity.js runtime-audit-fixes.js index.html
-          git commit -m 'Harden Admin QA, account gating, and client stability'
+          git add learner-guide.css certificate-name.js admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js app.js capital-mastery-e2e.js ux-stability.js course-continuity.js runtime-audit-fixes.js index.html
+          git commit -m 'Harden Admin QA, account gating, and mobile client stability'
           git push origin HEAD:main
