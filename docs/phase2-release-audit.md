@@ -55,7 +55,7 @@ Evidence:
 
 The release-width sweep covers 375, 430, 768 and ~1440 px.
 
-The audited build reports **42 root frontend files plus `assets/` and `_headers`**. The deterministic release-packaging job below counts **53 emitted deployable files** in total.
+The audited build reports **42 root frontend files plus `assets/` and `_headers`**. Deterministic release packaging counts **53 emitted deployable files** in total.
 
 ## 2. Deterministic release artifacts
 
@@ -105,18 +105,50 @@ Worker packaging checks passed:
 
 Production Worker promotion must preserve existing Cloudflare binding inheritance, including the protected `ADMIN_UID` secret, D1 binding, Firebase project, origin allowlist, compatibility settings and observability.
 
+### Fresh deployment-preflight artifact
+
+A fresh preflight was executed after repository cleanup:
+
+**Preflight commit:** `c8844ad6140aa42b60e0d219eac206aee6c20563`  
+**Workflow run:** `33294066702`  
+**Artifact:** `capitalmastery-pages-c8844ad6140aa42b60e0d219eac206aee6c20563`  
+**Artifact ID:** `9726843899`  
+**Artifact ZIP size:** `852,090 bytes`  
+**Artifact ZIP digest:** `sha256:e8b6e6b2bfd78a264517d89d87830a4e6dd021bed083da12a8d51b93095081f1`  
+**Deployable file count:** `53`
+
+The production Pages bundle audit passed before upload. The preflight then failed only because both deployment secrets were absent:
+
+- `CLOUDFLARE_API_TOKEN_PRESENT=false`
+- `CLOUDFLARE_ACCOUNT_ID_PRESENT=false`
+- `CLOUDFLARE_DEPLOY_READY=false`
+
+No secret value was printed or exposed.
+
 ## 3. Post-gate repository cleanup proof
 
 The fully audited product commit is `ebcb93dd0c8315afa33e33b48ac9f9e22810d81a`.
 
-After that gate, the repository received only:
+After that gate, repository work was intentionally limited to non-deployable engineering hygiene and release documentation:
 
-- stronger deterministic Pages/Worker packaging workflows; and
-- deletion of one-use credential-migration workflows/scripts.
+- stronger deterministic Pages/Worker packaging workflows;
+- deletion of one-use migration, patch and hardening workflows;
+- deletion of corresponding one-use mutation/diagnostic scripts;
+- correction of credential-system and training-track documentation;
+- archival of superseded Phase 1 root QA/checklist/live-release files under `docs/archive/`;
+- refresh of the Phase 2 release record; and
+- a non-deploying Cloudflare credential-presence preflight.
 
-A GitHub compare from `ebcb93dd...` through cleanup commit `b9b05f4f89f90a258ea563ce7c6b63ad83926f53` shows **no deployable frontend file and no Worker source change**. The temporary malformed workflow that generated false-red Actions checks was removed.
+A GitHub compare from `ebcb93dd...` through preflight commit `c8844ad6140aa42b60e0d219eac206aee6c20563` shows **no deployable frontend file and no Worker source change**. Current `main` therefore retains the same deployable product generation that passed the full adversarial source gate.
 
-Therefore the product bytes packaged above are the same product generation that passed the full adversarial source gate.
+The workflow folder is now reduced to six permanent release/QA workflows:
+
+- `cloudflare-deploy-readiness.yml`
+- `failure-seeking-round2.yml`
+- `live-production-readonly-audit.yml`
+- `package-pages-release.yml`
+- `package-worker-release.yml`
+- `phase2-current-source-audit.yml`
 
 ## 4. D1 integrity release contract
 
@@ -186,14 +218,15 @@ GitHub Pages has continued to build successfully from current `main`. This is us
 
 ### Cloudflare production promotion
 
-1. Promote the exact audited Worker source while preserving production binding inheritance and protected settings.
-2. Re-probe `/health`, bad Origin, unauthenticated protected routes and `/admin/integrity`; the integrity route must be present and protected rather than `404`.
-3. With the configured Capital Mastery administrator, execute `/admin/integrity`; require `quick_check = ok`, zero foreign-key violations and record table counts.
-4. Promote the exact audited `dist-pages/` artifact to the `capitalmastery` Pages project.
-5. Verify generation markers and security headers against `capitalmastery.pages.dev`.
-6. Rerun all six Chromium suites against the canonical Cloudflare host.
+1. Add repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, or provide an equivalent authorized Cloudflare deployment connection.
+2. Promote the exact audited Worker source while preserving production binding inheritance and protected settings.
+3. Re-probe `/health`, bad Origin, unauthenticated protected routes and `/admin/integrity`; the integrity route must be present and protected rather than `404`.
+4. With the configured Capital Mastery administrator, execute `/admin/integrity`; require `quick_check = ok`, zero foreign-key violations and record table counts.
+5. Promote the exact audited `dist-pages/` artifact to the `capitalmastery` Pages project.
+6. Verify generation markers and security headers against `capitalmastery.pages.dev`.
+7. Rerun all six Chromium suites against the canonical Cloudflare host.
 
-No Cloudflare deployment connector/plugin or usable deployment credential is available in the current tool environment. Production must not be changed by guessing credentials, bindings, account IDs or deployment parameters.
+Current deploy-preflight evidence proves that **both required GitHub Actions Cloudflare secrets are absent**. No Cloudflare connector/plugin is available in the current tool environment. Production must not be changed by guessing credentials, bindings, account IDs or deployment parameters.
 
 ### Firebase authorized-domain verification
 
