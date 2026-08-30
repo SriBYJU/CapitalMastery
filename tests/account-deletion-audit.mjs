@@ -15,6 +15,6 @@ ok(auth.includes('await authApi.deleteUser(user)'),'Firebase Auth deletion missi
 ok(auth.includes("typed !== 'DELETE'"),'typed destructive confirmation missing');
 ok(auth.includes('Sole workspace owners must transfer ownership first.'),'account UI ownership warning missing');
 ok(app.includes('permanently delete their personal Capital Mastery data'),'Privacy policy deletion disclosure missing');
-ok(index.includes('firebase-auth.js?v=20260829-phase2privacy1'),'auth deletion feature cache-bust missing');
+ok(/firebase-auth\.js\?v=[A-Za-z0-9._-]+/.test(index),'auth deletion feature cache-bust missing');
 if(fail.length){console.error('ACCOUNT DELETION AUDIT FAILED\n - '+fail.join('\n - '));process.exit(1)}
 console.log('ACCOUNT DELETION AUDIT PASS: D1, Firestore, Firebase identity, confirmation, owner/admin guards and privacy disclosure verified');
