@@ -66,9 +66,13 @@ async function stableState(page,label,wait=900){
     s=await stableState(page,'Legacy official route normalization');
     assert(s.hash==='#/admin-preview/simulation/investment-banking','Verified Admin QA official route did not normalize to protected preview namespace: '+s.hash);
 
-    // Start a real secure request, then switch to Admin preview before its delayed response arrives.
+    // Start a real Career Skills secure request, then switch to Admin preview before its delayed response arrives.
     // A stale response/error must be aborted or ignored and can never repaint the Admin DOM.
-    await page.evaluate(key=>{localStorage.removeItem(key);location.hash='#/official-simulation/investment-banking';},QA_KEY);
+    await page.evaluate(key=>{
+      window.CM_TRAINING_TRACKS?.setTrack('investment-banking','career-skills');
+      localStorage.removeItem(key);
+      location.hash='#/official-simulation/investment-banking';
+    },QA_KEY);
     await page.waitForSelector('.cm-live-card',{timeout:5000});
     await page.waitForTimeout(120);
     assert(secureRequests>=1,'Secure assessment race setup never issued the delayed request');
