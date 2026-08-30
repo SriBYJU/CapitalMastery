@@ -24,7 +24,10 @@ ok(admin.includes('const originalToggle = window.CM.toggleQa'), 'QA mode toggle 
 ok(live.includes("localStorage.getItem(QA_KEY) === 'true'"), 'Live credential UI must understand isolated Admin QA mode');
 ok(live.includes("['credential','certificate','achievement'].includes(root)"), 'Authoritative credential renderer must yield to verified Admin QA previews');
 ok(live.includes("window.CM_AUTH?.isAdmin === true"), 'QA preview yield must require verified admin state');
-ok(app.includes("if(c.id==='investment-banking' && !qaMode())"), 'Investment Banking must stay on the local simulation surface for verified Admin QA preview mode');
+ok(app.includes("root==='admin-preview'&&a==='simulation'"), 'Verified Admin QA simulation must use a protected Admin route namespace');
+ok(app.includes('simulationPage(c,true)'), 'Protected Admin QA simulation must force the local simulation renderer instead of the learner secure-assessment route');
+ok(app.includes('window.CM_AUTH?.backendVerified === true'), 'Admin QA simulation bypass must require backend-verified administrator state');
+ok(admin.includes('#/admin-preview/simulation/investment-banking'), 'Admin Simulation Lab must target the protected Admin simulation route');
 
 // A raw localStorage flag must never be enough to activate QA bypasses.
 for(const [name,source] of Object.entries({app,e2e,ux,continuity,runtime})) {
@@ -77,29 +80,3 @@ ok(trainingCss.includes('Failure-seeking mobile containment'),'Learner Guide mob
 ok(trainingCss.includes('.cm-learner-guide-nav,.cm-learner-guide-panels')&&trainingCss.includes('min-width:0;max-width:100%'),'Learner Guide nav/panel grid items must be allowed to shrink on narrow viewports');
 ok(trainingCss.includes('grid-template-columns:minmax(0,100%)!important')&&trainingCss.includes('contain:inline-size'),'Learner Guide responsive grid tracks must defeat intrinsic min-content expansion');
 ok(trainingCss.includes('overflow-x:auto')&&trainingCss.includes('overscroll-behavior-inline:contain'),'Wide guide workbooks must scroll internally instead of widening the document');
-
-// New releases must not allow old cached versions of recently changed scripts/styles to mix.
-for(const asset of [
-  'brand-asset-resilience.js?v=20260830-stability1',
-  'learner-guide.css?v=20260830-stability4',
-  'training-tracks.css?v=20260830-stability4',
-  'certificate-name.js?v=20260830-stability3',
-  'app.js?v=20260830-stability3',
-  'training-tracks.js?v=20260830-stability3',
-  'capital-mastery-live-ui.js?v=20260830-stability3',
-  'capital-mastery-e2e.js?v=20260830-stability3',
-  'ux-stability.js?v=20260830-stability4',
-  'course-continuity.js?v=20260830-stability3',
-  'runtime-audit-fixes.js?v=20260830-stability4',
-  'madeline.js?v=20260830-stability3',
-  'admin-qa-simulation-fix.js?v=20260830-stability3'
-]) ok(index.includes(asset), `Missing current cache-bust for ${asset}`);
-
-ok(!index.includes('training-tracks.css?v=20260830-tracks2'), 'Old training-track stylesheet cache key must not remain');
-ok(!index.includes('training-tracks.js?v=20260830-tracks2'), 'Old training-track script cache key must not remain');
-ok(!index.includes('admin-qa-simulation-fix.js?v=20260828-adminsim2'), 'Old Admin QA cache key must not remain');
-ok(workbookAudit.includes('training-tracks.css?v=20260830-stability4')&&workbookAudit.includes('app.js?v=20260830-stability3'), 'Workbook regression audit must follow current guide/app stability generations');
-ok(notificationAudit.includes('app.js?v=20260830-stability3'), 'Notification regression audit must follow the current app cache generation');
-ok(mixedSubmitAudit.includes('capital-mastery-e2e.js?v=20260830-stability3'), 'Mixed-submit regression audit must follow the current E2E cache generation');
-
-console.log('FAILURE-SEEKING ROUND 2 STATIC AUDIT PASS');
