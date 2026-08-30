@@ -6,6 +6,7 @@ const tracks=fs.readFileSync('training-tracks.js','utf8');
 const madeline=fs.readFileSync('madeline.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const workbookAudit=fs.readFileSync('tests/interactive-guidance-workbook-audit.mjs','utf8');
+const notificationAudit=fs.readFileSync('tests/notification-discovery-audit.mjs','utf8');
 
 // Admin QA must be both server-admin gated and isolated from authoritative UI.
 ok(admin.includes("if (!isAdmin())") && admin.includes('QA control blocked: administrator verification required'), 'Non-admin callers must not be able to run QA score/progress controls');
@@ -33,6 +34,7 @@ for(const asset of [
 
 ok(!index.includes('training-tracks.js?v=20260830-tracks2'), 'Old training-track cache key must not remain');
 ok(!index.includes('admin-qa-simulation-fix.js?v=20260828-adminsim2'), 'Old Admin QA cache key must not remain');
-ok(workbookAudit.includes('app.js?v=20260830-stability3'), 'Older regression audits must follow the current app cache generation instead of failing on an intentional cache-bust');
+ok(workbookAudit.includes('app.js?v=20260830-stability3'), 'Older workbook regression audit must follow the current app cache generation');
+ok(notificationAudit.includes('app.js?v=20260830-stability3'), 'Notification regression audit must follow the current app cache generation');
 
 console.log('FAILURE-SEEKING ROUND 2 STATIC AUDIT PASS');
