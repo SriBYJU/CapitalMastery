@@ -44,6 +44,7 @@ jobs:
           node --check capital-mastery-live.js
           node --check enterprise-v2.js
           node --check v2/worker-v2-phase1-release.js
+          node --check tests/adversarial-chaos-browser-audit.cjs
           node tests/d1-integrity-endpoint-audit.mjs
           node tests/release-security-abuse-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
@@ -54,6 +55,7 @@ jobs:
             echo "=== $test_file ==="
             node "$test_file"
           done
+          npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
 
       - name: Build exact production Pages bundle
         run: |
@@ -135,6 +137,7 @@ jobs:
           set -euo pipefail
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
@@ -147,12 +150,13 @@ jobs:
 
           This proves:
           - current source/static regression gate passed
+          - Worker dry-run packaging passed before deployment
           - Worker deployed with configured bindings
           - Worker public/auth/origin boundaries passed
           - protected /admin/integrity route exists
           - exact production Pages allowlist deployed
           - canonical generation/security headers passed
-          - six canonical Chromium suites passed
+          - seven canonical Chromium suites passed, including adversarial chaos/race testing
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts
