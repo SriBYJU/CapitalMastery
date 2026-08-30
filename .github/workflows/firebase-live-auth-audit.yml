@@ -1,0 +1,45 @@
+name: Firebase live authentication audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/firebase-live-auth-audit.yml'
+      - 'tests/live-firebase-auth-browser-audit.cjs'
+      - 'tests/firebase-authorized-domain-browser-audit.cjs'
+      - 'firebase-auth.js'
+      - 'firebase-config.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firebase-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate audit syntax
+        run: |
+          set -euo pipefail
+          node --check firebase-auth.js
+          node --check tests/live-firebase-auth-browser-audit.cjs
+          node --check tests/firebase-authorized-domain-browser-audit.cjs
+          node tests/deployable-encoding-audit.mjs
+
+      - name: Install Chromium
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Probe canonical Google authorized-domain configuration
+        run: |
+          set -euo pipefail
+          CM_CANONICAL_URL=https://capitalmastery.pages.dev/ node tests/firebase-authorized-domain-browser-audit.cjs
+
+      - name: Disposable real Firebase email/password lifecycle on live fallback
+        run: |
+          set -euo pipefail
+          CM_AUDIT_URL=https://sribyju.github.io/CapitalMastery/ node tests/live-firebase-auth-browser-audit.cjs
