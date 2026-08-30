@@ -1,0 +1,94 @@
+name: Failure-seeking audit round 2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/failure-seeking-hardening-round2.mjs'
+      - 'tests/failure-seeking-round2-audit.mjs'
+      - 'tests/failure-seeking-browser-audit.mjs'
+      - '.github/workflows/failure-seeking-round2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  adversarial-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply failure-seeking hardening
+        run: node tools/failure-seeking-hardening-round2.mjs
+
+      - name: Syntax validation
+        run: |
+          node --check admin-qa-simulation-fix.js
+          node --check capital-mastery-live-ui.js
+          node --check training-tracks.js
+          node --check madeline.js
+          node --check app.js
+          node --check runtime-audit-fixes.js
+          node --check capital-mastery-e2e.js
+
+      - name: Failure-seeking static audits
+        run: |
+          node tests/failure-seeking-round2-audit.mjs
+          node tests/admin-runtime-stability-audit.mjs
+          node tests/training-track-architecture-audit.mjs
+          node tests/career-skills-track-audit.mjs
+          node tests/two-track-consistency-audit.mjs
+          node tests/two-track-notification-reporting-audit.mjs
+          node tests/public-credential-hierarchy-audit.mjs
+          node tests/phase2-security-a11y-audit.mjs
+
+      - name: Full regression suite
+        run: |
+          set -e
+          count=0
+          for test_file in tests/*.mjs; do
+            if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then
+              continue
+            fi
+            echo "=== $test_file ==="
+            node "$test_file"
+            count=$((count+1))
+          done
+          echo "TOTAL_STATIC_TEST_FILES=$count"
+
+      - name: Build production Pages artifact
+        run: |
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Install headless browser
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Browser torture audit
+        run: |
+          python3 -m http.server 4173 > /tmp/capital-mastery-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
+
+      - name: Commit hardened source
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js index.html
+          git commit -m 'Harden Admin QA, simulation routing, and client stability'
+          git push origin HEAD:main
