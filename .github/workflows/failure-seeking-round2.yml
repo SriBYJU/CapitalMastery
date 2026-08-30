@@ -39,6 +39,7 @@ jobs:
           node --check madeline.js
           node --check app.js
           node --check capital-mastery-e2e.js
+          node --check enterprise-v2.js
           node --check ux-stability.js
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
@@ -60,6 +61,7 @@ jobs:
           node tests/phase2-security-a11y-audit.mjs
           node tests/state-resilience-audit.mjs
           node tests/employer-mobile-containment-audit.mjs
+          node tests/csv-export-security-audit.mjs
 
       - name: Full regression suite
         run: |
