@@ -66,26 +66,25 @@ function assert(condition, message) {
     await page.locator('#cm-signin-form input[name="email"]').waitFor({state:'visible',timeout:10000});
   }
 
-  async function requireNameSaveSuccess() {
-    await page.waitForFunction(() => {
-      const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
-      return window.CM_CERT_NAME?.confirmed?.() === true || (!!error && !error.hidden && !!error.textContent.trim());
-    }, null, {timeout:15000});
-    const state = await page.evaluate(() => {
+  async function postSaveFailureSnapshot() {
+    return page.evaluate(() => {
       let local = null;
       try { local = JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1') || 'null'); } catch (_) {}
       const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
       return {
-        confirmed:window.CM_CERT_NAME?.confirmed?.() === true,
+        href:location.href,
+        authReady:window.CM_AUTH?.ready,
+        email:window.CM_AUTH?.user?.email || '',
         displayName:window.CM_AUTH?.user?.displayName || '',
+        confirmed:window.CM_CERT_NAME?.confirmed?.() === true,
         syncReady:window.CM_SYNC?.ready,
         syncStatus:window.CM_SYNC?.status || '',
         syncError:window.CM_SYNC?.error || '',
         modalError:error && !error.hidden ? error.textContent.trim() : '',
+        modalPresent:!!document.getElementById('cm-full-name-onboarding'),
         localProfile:local?.profile || null
       };
-    });
-    if (!state.confirmed) throw new Error(`Credential-name persistence failed. SNAPSHOT=${JSON.stringify(state)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
+    }).catch(error => ({snapshotError:String(error?.message || error)}));
   }
 
   try {
@@ -115,18 +114,21 @@ function assert(condition, message) {
 
     await page.locator('#cm-full-name-onboarding').waitFor({state:'visible',timeout:20000});
     await page.locator('#cm-full-name-input').fill(fullName);
+    const postSaveReload = page.waitForEvent('domcontentloaded', {timeout:30000});
     await page.locator('#cm-full-name-form button[type="submit"]').click();
-    await page.waitForFunction(expected => window.CM_AUTH?.user?.displayName === expected, fullName, {timeout:30000});
-    await requireNameSaveSuccess();
+    try {
+      await postSaveReload;
+      await page.waitForFunction(([expectedEmail,expectedName]) =>
+        window.CM_AUTH?.ready === true &&
+        window.CM_AUTH?.user?.email === expectedEmail &&
+        window.CM_AUTH?.user?.displayName === expectedName &&
+        window.CM_CERT_NAME?.confirmed?.() === true,
+        [email,fullName], {timeout:30000});
+    } catch (error) {
+      const snapshot = await postSaveFailureSnapshot();
+      throw new Error(`Credential-name save did not complete its intentional reload contract. SNAPSHOT=${JSON.stringify(snapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))} CAUSE=${error.message}`);
+    }
 
-    // Successful onboarding deliberately reloads the app. Wait for the reloaded
-    // auth/name modules before sampling the persisted result.
-    await page.waitForFunction(([expectedEmail,expectedName]) =>
-      window.CM_AUTH?.ready === true &&
-      window.CM_AUTH?.user?.email === expectedEmail &&
-      window.CM_AUTH?.user?.displayName === expectedName &&
-      window.CM_CERT_NAME?.confirmed?.() === true,
-      [email,fullName], {timeout:30000});
     lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
     const afterSave = await page.evaluate(() => ({
       name:window.CM_AUTH.user?.displayName || '',
@@ -181,7 +183,7 @@ function assert(condition, message) {
 
     await deleteFirestoreDocs();
     await deleteIdentity();
-    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> one-time full-name save -> post-save reload -> fresh-state Firestore recovery -> REST cleanup');
+    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> one-time full-name save -> intentional reload -> fresh-state Firestore recovery -> REST cleanup');
   } finally {
     try {
       if (created) {
