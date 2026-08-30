@@ -40,10 +40,11 @@ jobs:
           import fs from 'node:fs';
           const w=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
           const ok=(v,m)=>{if(!v)throw new Error(m)};
-          const s=w.indexOf('url.pathname === "/admin/integrity"');
-          const e=w.indexOf('const parts = url.pathname.split',s);
+          const anchor=w.indexOf('url.pathname === "/admin/integrity"');
+          const s=w.lastIndexOf('if (request.method === "GET"',anchor);
+          const e=w.indexOf('const parts = url.pathname.split',anchor);
           const route=w.slice(s,e);
-          ok(s>=0&&e>s,'Admin D1 integrity route missing');
+          ok(anchor>=0&&s>=0&&e>anchor,'Admin D1 integrity route missing');
           ok(route.includes('request.method === "GET"'),'Integrity route must be GET/read-only');
           ok(route.includes('await requireAdmin(request, env)'),'Integrity route must require verified admin access');
           ok(route.includes('PRAGMA quick_check'),'Integrity route must execute SQLite quick_check');
