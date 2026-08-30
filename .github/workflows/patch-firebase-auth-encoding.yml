@@ -1,0 +1,51 @@
+name: Patch Firebase auth encoding
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-firebase-auth-encoding.mjs'
+      - '.github/workflows/patch-firebase-auth-encoding.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  prove-and-apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply guarded encoding repair
+        run: |
+          set -euo pipefail
+          node tools/patch-firebase-auth-encoding.mjs
+          node --check firebase-auth.js
+
+      - name: Prove deployable encoding and bundle integrity
+        run: |
+          set -euo pipefail
+          node tests/deployable-encoding-audit.mjs
+          grep -Fq 'Opening Google sign-in…' firebase-auth.js
+          grep -Fq 'Verified ✓' firebase-auth.js
+          grep -Fq 'My Learning →' firebase-auth.js
+          grep -Fq 'Checking administrator access…' firebase-auth.js
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+          node tests/admin-runtime-stability-audit.mjs
+          node tests/admin-route-boundary-audit.mjs
+          node tests/phase2-security-a11y-audit.mjs
+
+      - name: Commit repaired product only after gates pass
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add firebase-auth.js
+          git diff --cached --check
+          git commit -m 'Repair Firebase account UI encoding'
+          git push
