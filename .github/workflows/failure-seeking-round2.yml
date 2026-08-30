@@ -6,6 +6,7 @@ on:
     paths:
       - 'tools/failure-seeking-hardening-round2.mjs'
       - 'tools/fix-learner-guide-mobile-overflow.mjs'
+      - 'tools/instrument-browser-overflow-diagnostics.mjs'
       - 'tests/failure-seeking-round2-audit.mjs'
       - 'tests/failure-seeking-browser-audit.mjs'
       - '.github/workflows/failure-seeking-round2.yml'
@@ -27,6 +28,7 @@ jobs:
         run: |
           node tools/failure-seeking-hardening-round2.mjs
           node tools/fix-learner-guide-mobile-overflow.mjs
+          node tools/instrument-browser-overflow-diagnostics.mjs
 
       - name: Syntax validation
         run: |
@@ -40,6 +42,7 @@ jobs:
           node --check ux-stability.js
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
+          node --check tests/failure-seeking-browser-audit.mjs
 
       - name: Failure-seeking static audits
         run: |
