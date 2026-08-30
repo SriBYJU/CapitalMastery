@@ -15,7 +15,7 @@
     'Why do I need Mark Complete?',
     'How do I add a credential to LinkedIn?',
     'My progress looks wrong',
-    'How do the 3 certificates work?',
+    'How do the two program levels work?',
     'Can I retake a quiz?'
   ];
 
@@ -45,6 +45,11 @@
 
   function currentCareerState(c=currentCareer()) {
     return c ? readState()?.careers?.[c.id] || {} : {};
+  }
+
+  function selectedTrack(c=currentCareer()) {
+    if(!c) return 'professional-readiness';
+    return window.CM_TRAINING_TRACKS?.getTrack?.(c.id) || 'professional-readiness';
   }
 
   function firstName() {
@@ -108,11 +113,14 @@
       if (!learned.includes(p)) return `In <b>${esc(c.title)}</b>, your next step is Part ${p}. Finish the lesson, then click <b>Mark Learning Complete</b>.${action(`Open Part ${p}`,`#/learn/${c.id}/${p}`)}`;
       if (!done.includes(p) || Number(quizzes[p] || 0) < PASS) return `You finished the Part ${p} lesson. Now pass the official Part ${p} assessment with <b>${PASS}%+</b>.${action(`Take Part ${p} assessment`,`#/quiz/${c.id}/${p}`)}`;
     }
-    if (!learned.includes(5)) return `Next is Part 5, the Job Simulation section. Read the briefing and click <b>Mark Learning Complete</b>.${action('Open Part 5',`#/learn/${c.id}/5`)}`;
-    if (Number(cs.simulationKnowledge || 0) < PASS) return `Next, pass the Part 5 knowledge check with <b>${PASS}%+</b>.${action('Take Part 5 knowledge check',`#/quiz/${c.id}/5`)}`;
-    if (Number(cs.simulationScore || 0) < PASS) return `You’re ready for the <b>official server-graded job simulation</b>.${action('Open official simulation',`#/official-simulation/${c.id}`)}`;
-    if (Number(cs.finalScore || 0) < PASS) return `You passed the simulation. Your next step is the <b>Professional Readiness Final</b>.${action('Take readiness final',`#/final/${c.id}`)}`;
-    return `You’ve met the recorded pathway requirements. Check your verified credentials.${action('Open Credentials','#/credentials')}`;
+    const track=selectedTrack(c);
+    if(track==='professional-readiness') {
+      return `You’re on <b>Professional Readiness</b>. After the shared learning stages, continue through the verified advanced sequence on the career page: baseline diagnostic, Essentials, Applied Skills, Role Lab, Professional Final, then readiness evidence. I’ll send you to the authoritative pathway instead of a legacy simulation/final route.${action(`Continue ${c.title}`,`#/career/${c.id}`)}`;
+    }
+    if (!learned.includes(5)) return `Next is the <b>Career Skills capstone</b> section. Read the briefing and click <b>Mark Learning Complete</b>.${action('Open capstone learning',`#/learn/${c.id}/5`)}`;
+    if (Number(cs.simulationKnowledge || 0) < PASS) return `Next, pass the Career Skills capstone knowledge check with <b>${PASS}%+</b>.${action('Take capstone knowledge check',`#/quiz/${c.id}/5`)}`;
+    if (Number(cs.simulationScore || 0) < PASS) return `You’re ready for the <b>Career Skills practical simulation</b>.${action('Open Career Skills capstone',`#/simulation/${c.id}`)}`;
+    return `You’ve completed the recorded Career Skills capstone requirements. Check your verified credentials, or upgrade to Professional Readiness without repeating earned stages.${action('Open Credentials','#/credentials')}${action('View Professional Readiness option',`#/career/${c.id}`)}`;
   }
 
   function progress() {
@@ -155,7 +163,7 @@
     if (namedCareer && /(what is|tell me|career|pathway|course|role|learn|do in)/.test(q)) return careerInfo(namedCareer);
 
     if (/(what is capital mastery|about capital mastery|what does capital mastery do)/.test(q)) {
-      return `Capital Mastery is a free finance-career learning platform built around <b>Learn it. Practice it. Prove it.</b> It has 16 career pathways and 3 credential levels per pathway, with an ${PASS}% mastery standard.${action('Explore careers','#/careers')}`;
+      return `Capital Mastery is a free finance-career learning platform built around <b>Learn it. Practice it. Prove it.</b> It has 16 career pathways with two program levels: Career Skills (4 verified credentials) and Professional Readiness (5 career credentials), with an ${PASS}% mastery standard on required assessed work.${action('Explore careers','#/careers')}`;
     }
 
     if (/(how do i start|where do i start|start learning|begin|new here|first step)/.test(q)) {
@@ -174,7 +182,7 @@
     }
 
     if (/(pass score|mastery|how many.*correct|what score|80 percent|80%)/.test(q)) {
-      return `The mastery standard is <b>${PASS}%</b> on every required assessment, including the job simulation and Professional Readiness Final.`;
+      return `The mastery standard is <b>${PASS}%</b> on required assessed work. Career Skills ends with its practical capstone; Professional Readiness adds the advanced Role Lab and Professional Final.`;
     }
 
     if (/(retake|try again|failed|fail quiz|didn't pass|did not pass)/.test(q)) {
@@ -188,8 +196,8 @@
     if (/(where.*certificate|find.*certificate|my certificate|view certificate|download certificate)/.test(q)) return credentialHelp(false);
     if (/(credential id|certificate id|where.* id|find.* id)/.test(q)) return credentialHelp(true);
 
-    if (/(three certificates|3 certificates|credential levels|foundations certificate|applied skills|career certificate|how.*certificates work)/.test(q)) {
-      return `<b>Each pathway has 3 credential levels:</b><br>• <b>Foundations:</b> pass Parts 1–2.<br>• <b>Applied Skills:</b> pass Parts 1–4.<br>• <b>Career Certificate:</b> pass Parts 1–5, the official simulation, and the Professional Readiness Final.<br><br>Required assessments use the ${PASS}% standard.${action('View Credentials','#/credentials')}`;
+    if (/(two program|program levels|career skills|professional readiness|three certificates|3 certificates|credential levels|foundations certificate|applied skills|career certificate|how.*certificates work)/.test(q)) {
+      return `<b>Every career has two program levels:</b><br>• <b>Career Skills:</b> 4 verified credentials — Foundations, Essentials, Applied Skills, and the Career Skills Certificate after the practical capstone.<br>• <b>Professional Readiness:</b> 5 career credentials — Foundations, Essentials, Applied Skills, Role Lab, and the flagship Professional Readiness credential.<br><br>Career Skills work carries forward if you upgrade; you do not repeat earned stages.${action('View Credentials','#/credentials')}`;
     }
 
     if (/(linkedin|add.*credential|share.*credential|post.*certificate)/.test(q)) {
@@ -217,11 +225,11 @@
     }
 
     if (/(simulation|job simulation|practical simulation)/.test(q)) {
-      return `The official job simulation unlocks after the Part 5 knowledge check. It is server graded and stored in official progress; the Career Certificate requires ${PASS}%+ on it.${action('My Learning','#/passport')}`;
+      return `Career Skills ends with a practical role-specific capstone simulation. Professional Readiness goes further with the advanced Role Lab, review/revision evidence, and Professional Final. Open the selected career to see the correct simulation for your program level.${action('My Learning','#/passport')}`;
     }
 
     if (/(final exam|final examination|20 question)/.test(q)) {
-      return `The <b>Professional Readiness Final</b> comes after the official job simulation and checks knowledge, calculations and workflow judgment. It is a separate ${PASS}% gate; it does not replace the practical work product.`;
+      return `The <b>Professional Readiness Final</b> belongs only to the advanced Professional Readiness program. It comes after the Role Lab and checks knowledge, calculations, and workflow judgment; Career Skills does not require this final.`;
     }
 
     if (/(how many careers|career pathways|how many pathways|45|48 credentials|credentials total)/.test(q)) {

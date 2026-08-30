@@ -68,6 +68,12 @@
     return storedTrack(careerId) || PROFESSIONAL;
   }
 
+  function adminQaPreviewActive() {
+    return window.CM_AUTH?.ready === true &&
+      window.CM_AUTH?.isAdmin === true &&
+      localStorage.getItem('capitalMasteryQaPreviewV1') === 'true';
+  }
+
   function setTrack(careerId, track) {
     if (!careerId || !TRACKS[track]) return;
     localStorage.setItem(STORE_PREFIX + careerId, track);
@@ -108,7 +114,7 @@
   function selectedStatusHtml(track) {
     const t = TRACKS[track];
     const professional = track === PROFESSIONAL;
-    return `<div class="cm-track-status" data-cm-track-status>
+    return `<div class="cm-track-status" data-cm-track-status data-cm-track-status-id="${track}">
       <div>
         <strong>${esc(t.name)}</strong>
         <span class="cm-track-badge">${t.verifiedCredentialCount} credentials</span>
@@ -159,7 +165,7 @@
       badge.className = 'cm-track-badge';
       finalHeading.appendChild(badge);
     }
-    badge.textContent = 'Professional Readiness only';
+    if(badge.textContent !== 'Professional Readiness only') badge.textContent = 'Professional Readiness only';
     setAdvancedGateState(finalStep, careerId, track);
   }
 
@@ -173,7 +179,8 @@
       badge.className = 'cm-track-badge';
       capstone.appendChild(badge);
     }
-    badge.textContent = track === PROFESSIONAL ? 'Builds toward Role Lab' : 'Career Skills capstone';
+    const badgeCopy=track === PROFESSIONAL ? 'Builds toward Role Lab' : 'Career Skills capstone';
+    if(badge.textContent!==badgeCopy) badge.textContent=badgeCopy;
   }
 
   function apiPathway(careerId) {
@@ -209,7 +216,7 @@
       ['03','Applied Skills','Complete Toolkit + Applied Work',`#/learn/${id}/3`],
       ['04','Career Skills Capstone','Complete the realistic job simulation and earn Career Skills',`#/simulation/${id}`]
     ];
-    return `<section class="cm-track-sequence" data-cm-track-sequence><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Four verified credentials. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
+    return `<section class="cm-track-sequence" data-cm-track-sequence data-cm-track-id="${trackId}"><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Four verified credentials. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
   }
 
   function shapeCareerPath(root, careerId, trackId) {
@@ -224,7 +231,9 @@
       legacySimulation.hidden=hide;
       legacySimulation.setAttribute('aria-hidden',String(hide));
     }
-    root.querySelector('[data-cm-track-sequence]')?.remove();
+    const existing=root.querySelector('[data-cm-track-sequence]');
+    if(existing?.dataset.cmTrackId===trackId) return;
+    if(existing) existing.remove();
     pathList.insertAdjacentHTML('afterend',trackSequenceHtml(careerId,trackId));
   }
 
@@ -267,12 +276,15 @@
 
     const track = getTrack(careerId);
     chooser.querySelectorAll('[data-cm-track-card]').forEach(card => {
-      card.dataset.selected = String(card.dataset.cmTrackCard === track);
+      const value=String(card.dataset.cmTrackCard === track);
+      if(card.dataset.selected!==value) card.dataset.selected=value;
     });
     chooser.querySelectorAll('[data-cm-select-track]').forEach(button => {
       const selected = button.dataset.cmSelectTrack === track;
-      button.setAttribute('aria-pressed', String(selected));
-      button.textContent = selected ? 'Selected' : 'Choose this program';
+      const pressed=String(selected);
+      const label=selected ? 'Selected' : 'Choose this program';
+      if(button.getAttribute('aria-pressed')!==pressed) button.setAttribute('aria-pressed',pressed);
+      if(button.textContent!==label) button.textContent=label;
       button.classList.toggle('btn-gold', selected);
       button.classList.toggle('btn-outline', !selected);
       button.onclick = () => setTrack(careerId, button.dataset.cmSelectTrack);
@@ -280,11 +292,14 @@
 
     const pathList = root.querySelector('.career-summary .path-list');
     if (pathList) {
-      root.querySelector('[data-cm-track-status]')?.remove();
-      pathList.insertAdjacentHTML('beforebegin', selectedStatusHtml(track));
-      root.querySelector('[data-cm-switch-track]')?.addEventListener('click', e => {
-        setTrack(careerId, e.currentTarget.dataset.cmSwitchTrack);
-      });
+      let status=root.querySelector('[data-cm-track-status]');
+      if(!status || status.dataset.cmTrackStatusId!==track){
+        status?.remove();
+        pathList.insertAdjacentHTML('beforebegin', selectedStatusHtml(track));
+        status=root.querySelector('[data-cm-track-status]');
+      }
+      const switchButton=status?.querySelector('[data-cm-switch-track]');
+      if(switchButton) switchButton.onclick = e => setTrack(careerId, e.currentTarget.dataset.cmSwitchTrack);
     }
 
     updateFinalGate(root, careerId, track);
@@ -294,8 +309,9 @@
 
   function decorateCareerDirectory() {
     document.querySelectorAll('.career-card .cred-count').forEach(el => {
-      el.textContent = 'Career Skills: 4 credentials · Professional Readiness: 5 credentials';
-      el.classList.add('cm-track-count');
+      const copy='Career Skills: 4 credentials · Professional Readiness: 5 credentials';
+      if(el.textContent!==copy) el.textContent=copy;
+      if(!el.classList.contains('cm-track-count')) el.classList.add('cm-track-count');
     });
   }
 
@@ -380,7 +396,7 @@
       sessionStorage.setItem(NOTICE_KEY,'The legacy final is no longer a program gate. Career Skills ends at its capstone; Professional Readiness uses the Standard 2.0 Role Lab and Professional Final shown on the pathway.');
       location.replace(`#/career/${encodeURIComponent(pathwayId)}`); return true;
     }
-    if(route==='simulation'&&pathwayId&&getTrack(pathwayId)===PROFESSIONAL){
+    if(route==='simulation'&&pathwayId&&getTrack(pathwayId)===PROFESSIONAL&&!adminQaPreviewActive()){
       sessionStorage.setItem(NOTICE_KEY,'Professional Readiness uses the deeper Role Lab instead of the shorter Career Skills capstone.');
       location.replace(`#/career/${encodeURIComponent(pathwayId)}`); return true;
     }
