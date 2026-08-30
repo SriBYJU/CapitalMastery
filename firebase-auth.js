@@ -71,7 +71,7 @@
       auth = authApi.getAuth(firebaseApp);
 
       CM_AUTH.googleSignIn = async () => {
-        setMessage('Opening Google sign-inâ¦');
+        setMessage('Opening Google sign-in…');
         const provider = new authApi.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
         const result = await authApi.signInWithPopup(auth, provider);
@@ -79,13 +79,13 @@
       };
 
       CM_AUTH.emailSignIn = async (email, password) => {
-        setMessage('Signing inâ¦');
+        setMessage('Signing in…');
         const result = await authApi.signInWithEmailAndPassword(auth, email, password);
         return result.user;
       };
 
       CM_AUTH.emailCreate = async (name, email, password) => {
-        setMessage('Creating your accountâ¦');
+        setMessage('Creating your account…');
         const result = await authApi.createUserWithEmailAndPassword(auth, email, password);
         if (name && name.trim()) await authApi.updateProfile(result.user, { displayName: name.trim() });
         await result.user.reload();
@@ -184,7 +184,7 @@
 
   function accountHtml() {
     if (!CM_AUTH.ready) {
-      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ACCOUNT</div><h1 class="serif">Connecting securelyâ¦</h1><p>Loading Firebase Authentication and the Capital Mastery secure backend.</p></div></div></section>`;
+      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ACCOUNT</div><h1 class="serif">Connecting securely…</h1><p>Loading Firebase Authentication and the Capital Mastery secure backend.</p></div></div></section>`;
     }
 
     if (currentUser) {
@@ -196,13 +196,13 @@
         ${message ? `<div class="cm-auth-message ${esc(messageType)}">${esc(message)}</div>` : ''}
         <div class="cm-account-grid">
           <div><span>Email</span><strong>${esc(currentUser.email || 'Not provided')}</strong></div>
-          <div><span>Backend</span><strong>${CM_AUTH.backendVerified ? 'Verified â' : 'Not verified'}</strong></div>
+          <div><span>Backend</span><strong>${CM_AUTH.backendVerified ? 'Verified ✓' : 'Not verified'}</strong></div>
           <div><span>Role</span><strong>${CM_AUTH.isAdmin ? 'Administrator' : 'Learner'}</strong></div>
           <div><span>User ID</span><strong class="cm-uid">${esc(currentUser.uid)}</strong></div>
         </div>
         <div class="cm-auth-actions">
-          <a class="btn btn-primary" href="#/passport">My Learning â</a>
-          ${CM_AUTH.isAdmin ? '<a class="btn btn-gold" href="#/admin-preview">Admin â</a>' : ''}
+          <a class="btn btn-primary" href="#/passport">My Learning →</a>
+          ${CM_AUTH.isAdmin ? '<a class="btn btn-gold" href="#/admin-preview">Admin →</a>' : ''}
           <button class="btn btn-outline" type="button" data-cm-auth-action="signout">Sign out</button>
         </div>
         <div class="cm-account-privacy"><div><b>Privacy & account data</b><p>Export your enterprise data, or permanently remove your personal Capital Mastery data and Firebase account. Sole workspace owners must transfer ownership first.</p></div><div><a class="btn btn-outline btn-sm" href="#/my-data">Export My Data</a><button class="btn btn-danger btn-sm" type="button" data-cm-auth-action="delete-account">Delete Account & Data</button></div></div>
@@ -242,7 +242,7 @@
 
   function adminBlockedHtml() {
     if (!currentUser) {
-      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ADMIN</div><h1 class="serif">Sign in required.</h1><p>The Capital Mastery admin area is protected by the secure backend.</p><a class="btn btn-primary" href="#/login">Sign in â</a></div></div></section>`;
+      return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ADMIN</div><h1 class="serif">Sign in required.</h1><p>The Capital Mastery admin area is protected by the secure backend.</p><a class="btn btn-primary" href="#/login">Sign in →</a></div></div></section>`;
     }
     return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card"><div class="eyebrow">ADMIN</div><h1 class="serif">Access denied.</h1><p>Your Firebase account is authenticated, but the secure Capital Mastery API did not authorize this account as an administrator.</p><a class="btn btn-primary" href="#/">Return home</a></div></div></section>`;
   }
@@ -275,7 +275,7 @@
       const stamp = `admin-block:${CM_AUTH.ready}:${currentUser?.uid || 'out'}:${CM_AUTH.isAdmin}`;
       if (force || main.dataset.cmAuthView !== stamp) {
         main.dataset.cmAuthView = stamp;
-        main.innerHTML = CM_AUTH.ready ? adminBlockedHtml() : `<section class="section"><div class="container"><div class="card"><h1>Checking administrator accessâ¦</h1></div></div></section>`;
+        main.innerHTML = CM_AUTH.ready ? adminBlockedHtml() : `<section class="section"><div class="container"><div class="card"><h1>Checking administrator access…</h1></div></div></section>`;
       }
     }
   }
