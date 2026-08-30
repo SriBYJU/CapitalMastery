@@ -1,0 +1,68 @@
+name: Harden Admin QA and runtime stability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/harden-admin-runtime-stability.mjs'
+      - 'tests/admin-runtime-stability-audit.mjs'
+      - '.github/workflows/harden-admin-runtime-stability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  harden-and-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply Admin QA and runtime stability hardening
+        run: node tools/harden-admin-runtime-stability.mjs
+
+      - name: Syntax validation
+        run: |
+          node --check training-tracks.js
+          node --check admin-qa-simulation-fix.js
+          node --check app.js
+          node --check madeline.js
+
+      - name: Focused Admin/runtime audits
+        run: |
+          node tests/admin-runtime-stability-audit.mjs
+          node tests/admin-demo-lab-audit.mjs
+          node tests/admin-demo-state-audit.mjs
+          node tests/training-track-architecture-audit.mjs
+          node tests/career-skills-track-audit.mjs
+          node tests/runtime-smoke.mjs
+
+      - name: Full regression suite
+        run: |
+          set -e
+          count=0
+          for test_file in tests/*.mjs; do
+            echo "=== $test_file ==="
+            node "$test_file"
+            count=$((count+1))
+          done
+          echo "TOTAL_TEST_FILES=$count"
+
+      - name: Build and verify production Pages artifact
+        run: |
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Commit hardened source
+        run: |
+          if git diff --quiet; then
+            echo 'No source changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add training-tracks.js app.js madeline.js
+          git commit -m 'Fix Admin simulation preview and render-loop glitches'
+          git push origin HEAD:main
