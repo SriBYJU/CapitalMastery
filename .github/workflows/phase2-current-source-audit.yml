@@ -1,0 +1,39 @@
+name: Phase 2 current-source audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/phase2-current-source-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Syntax validation
+        run: |
+          node --check app.js
+          node --check training-tracks.js
+          node --check enterprise-v2.js
+          node --check capital-mastery-live.js
+          node --check public-certificate-verify.js
+          node --check v2/worker-v2-phase1-release.js
+      - name: Build production Pages artifact
+        run: node tools/build-pages.mjs
+      - name: Run every automated audit
+        run: |
+          set -e
+          count=0
+          for test_file in tests/*.mjs; do
+            echo "=== $test_file ==="
+            node "$test_file"
+            count=$((count+1))
+          done
+          echo "TOTAL_TEST_FILES=$count"
+      - name: Verify production bundle after full audit
+        run: node tests/pages-production-bundle-audit.mjs
