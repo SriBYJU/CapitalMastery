@@ -75,10 +75,10 @@
   function certificateHtml(c, valid) {
     const info = levelInfo(c.level);
     const levelKey = String(c.level || '').toLowerCase();
-    const isProgramCompletion = levelKey === 'career';
+    const isProgramCompletion = c.recordType === 'program_completion' || levelKey === 'career';
     const isProfessional = levelKey === 'professional_readiness';
     const isFlagship = isProfessional;
-    const statusText = valid ? 'Verified Active Credential' : `Credential ${String(c.status || 'not active')}`;
+    const statusText = isProgramCompletion ? (valid ? 'Verified Active Program Completion' : `Program completion ${String(c.status || 'not active')}`) : (valid ? 'Verified Active Credential' : `Credential ${String(c.status || 'not active')}`);
     const verify = currentVerifyUrl();
 
     return `
@@ -86,8 +86,8 @@
         <div class="cm-public-cert-heading">
           <div>
             <div class="eyebrow">CERTIFICATE</div>
-            <h2>The earned certificate</h2>
-            <p>This certificate is generated from the same authoritative credential record shown above.</p>
+            <h2>${isProgramCompletion ? 'The program-completion certificate' : 'The earned certificate'}</h2>
+            <p>${isProgramCompletion ? 'This certificate is generated from the authoritative D1 program-completion record shown above.' : 'This certificate is generated from the same authoritative credential record shown above.'}</p>
           </div>
           ${valid ? '<button class="btn btn-outline cm-public-cert-print" type="button" data-cm-live-print>Download PDF</button>' : ''}
         </div>
@@ -117,7 +117,7 @@
                 </div>
                 <div class="cert-meta">
                   <div id="cm-live-cert-mark" class="cert-qr"></div>
-                  <span>CREDENTIAL ID</span>
+                  <span>${isProgramCompletion ? 'COMPLETION ID' : 'CREDENTIAL ID'}</span>
                   <strong>${esc(c.credentialId)}</strong>
                 </div>
               </div>
@@ -128,8 +128,8 @@
         </div>
 
         <div class="cm-public-cert-proof ${valid ? 'active' : 'inactive'}">
-          <strong>${valid ? '✓ Verified certificate' : 'Credential is not currently active'}</strong>
-          <span>${esc(statusText)} · Verified through the Capital Mastery secure API and D1 credential record.</span>
+          <strong>${valid ? (isProgramCompletion ? '✓ Verified program completion' : '✓ Verified certificate') : (isProgramCompletion ? 'Program completion is not currently active' : 'Credential is not currently active')}</strong>
+          <span>${esc(statusText)} · Verified through the Capital Mastery secure API and D1 ${isProgramCompletion ? 'program-completion' : 'credential'} record.</span>
         </div>
       </section>`;
   }

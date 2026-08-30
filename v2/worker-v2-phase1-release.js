@@ -1036,7 +1036,7 @@ export default {
       }
 
       // --------------------------------------------------
-      // CURRENT USER CREDENTIALS
+      // CURRENT USER CREDENTIALS + PROGRAM COMPLETIONS
       //
       // GET /credentials/me
       // --------------------------------------------------
@@ -1047,8 +1047,8 @@ export default {
       ) {
         const user = await requireUser(request, env);
 
-        const result = await env.DB
-          .prepare(`
+        const [result, completionResult] = await Promise.all([
+          env.DB.prepare(`
             SELECT
               credential_id,
               public_token,
@@ -1065,14 +1065,30 @@ export default {
             FROM credentials
             WHERE uid = ?
             ORDER BY issued_at DESC
-          `)
-          .bind(user.sub)
-          .all();
+          `).bind(user.sub).all(),
+          env.DB.prepare(`
+            SELECT
+              completion_id,
+              public_token,
+              pathway_id,
+              program_code,
+              completion_title,
+              status,
+              capstone_score,
+              issued_at,
+              revoked_at,
+              revocation_reason
+            FROM program_completion_records
+            WHERE uid = ?
+            ORDER BY issued_at DESC
+          `).bind(user.sub).all()
+        ]);
 
         return json(
           {
             ok: true,
-            credentials: result.results || []
+            credentials: result.results || [],
+            programCompletions: completionResult.results || []
           },
           200,
           env
@@ -1080,7 +1096,7 @@ export default {
       }
 
       // --------------------------------------------------
-      // PUBLIC CREDENTIAL VERIFICATION
+      // PUBLIC CREDENTIAL / PROGRAM COMPLETION VERIFICATION
       //
       // GET /verify/:token
       // --------------------------------------------------
@@ -1095,7 +1111,7 @@ export default {
         if (!publicToken || publicToken.length > 200) {
           throw new HttpError(
             400,
-            "Invalid credential token"
+            "Invalid verification token"
           );
         }
 
@@ -1118,36 +1134,131 @@ export default {
           .bind(publicToken)
           .first();
 
-        if (!credential) {
+        if (credential) {
+          return json(
+            {
+              ok: true,
+              valid: credential.status === "active",
+              recordType: "credential",
+              credential: {
+                recordType: "credential",
+                credentialId: credential.credential_id,
+                holderName: credential.holder_name,
+                pathwayId: credential.pathway_id,
+                level: credential.credential_level,
+                title: credential.credential_title,
+                status: credential.status,
+                issuedAt: credential.issued_at,
+                revokedAt: credential.revoked_at || null
+              }
+            },
+            200,
+            env
+          );
+        }
+
+        const completion = await env.DB
+          .prepare(`
+            SELECT
+              completion_id,
+              holder_name,
+              pathway_id,
+              program_code,
+              completion_title,
+              status,
+              capstone_score,
+              evidence_summary_json,
+              issued_at,
+              revoked_at
+            FROM program_completion_records
+            WHERE public_token = ?
+            LIMIT 1
+          `)
+          .bind(publicToken)
+          .first();
+
+        if (!completion) {
           return json(
             {
               ok: false,
               valid: false,
-              error: "Credential not found"
+              error: "Verification record not found"
             },
             404,
             env
           );
         }
 
+        const summary = v2ParseJson(completion.evidence_summary_json, {});
+        const verifiedCredentials = Array.isArray(summary.verifiedCredentials)
+          ? summary.verifiedCredentials.slice(0, 3).map(row => ({
+              level: cleanString(row.level || '', 60),
+              title: cleanString(row.title || '', 180),
+              standardVersion: cleanString(row.standardVersion || V2_STANDARD_VERSION, 60),
+              issuedAt: cleanString(row.issuedAt || '', 80)
+            }))
+          : [];
+        const capstoneScore = Number(completion.capstone_score);
+
         return json(
           {
             ok: true,
-            valid: credential.status === "active",
+            valid: completion.status === "active",
+            recordType: "program_completion",
             credential: {
-              credentialId: credential.credential_id,
-              holderName: credential.holder_name,
-              pathwayId: credential.pathway_id,
-              level: credential.credential_level,
-              title: credential.credential_title,
-              status: credential.status,
-              issuedAt: credential.issued_at,
-              revokedAt: credential.revoked_at || null
-            }
+              recordType: "program_completion",
+              credentialId: completion.completion_id,
+              completionId: completion.completion_id,
+              holderName: completion.holder_name,
+              pathwayId: completion.pathway_id,
+              level: "career",
+              programCode: completion.program_code,
+              title: completion.completion_title,
+              status: completion.status,
+              standardVersion: cleanString(summary.standardVersion || V2_STANDARD_VERSION, 60),
+              issuedAt: completion.issued_at,
+              revokedAt: completion.revoked_at || null,
+              description: "Completed the Career Skills program after earning three verified Standard 2.0 credentials and passing the practical capstone. This is a program-completion certificate, not a sixth Standard 2.0 credential."
+            },
+            evidence: [{
+              type: "program_completion",
+              title: "Career Skills practical capstone",
+              score: Number.isFinite(capstoneScore) ? capstoneScore : null,
+              minimumScore: PASS_SCORE,
+              requiredVerifiedCredentials: 3,
+              verifiedCredentials
+            }]
           },
           200,
           env
         );
+      }
+
+      // --------------------------------------------------
+      // ADMIN REVOKE PROGRAM COMPLETION
+      //
+      // POST /admin/program-completions/:id/revoke
+      // --------------------------------------------------
+
+      if (
+        request.method === "POST" &&
+        parts[0] === "admin" &&
+        parts[1] === "program-completions" &&
+        parts.length === 4 &&
+        parts[3] === "revoke"
+      ) {
+        const admin = await requireAdmin(request, env);
+        const completionId = cleanId(parts[2]);
+        const body = await readJson(request);
+        const reason = cleanString(body.reason || "Administrative revocation", 250);
+        const completion = await env.DB.prepare(`SELECT * FROM program_completion_records WHERE completion_id=? LIMIT 1`).bind(completionId).first();
+        if (!completion) throw new HttpError(404, "Program completion not found");
+        if (completion.status !== "active") throw new HttpError(409, "Only an active program completion can be revoked");
+        await env.DB.batch([
+          env.DB.prepare(`UPDATE program_completion_records SET status='revoked',revoked_at=CURRENT_TIMESTAMP,revocation_reason=? WHERE completion_id=? AND status='active'`).bind(reason, completionId),
+          enterpriseAuditStatement(env, completion.org_id, admin.sub, 'program_completion.revoked', 'program_completion', completionId, { reason, assignmentId:completion.assignment_id, pathwayId:completion.pathway_id })
+        ]);
+        return json({ok:true,completionId,status:'revoked'},200,env);
       }
 
       // --------------------------------------------------

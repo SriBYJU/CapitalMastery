@@ -444,7 +444,12 @@
     // authoritative. This only applies to a backend-verified admin with QA mode on.
     if (adminQaPreviewActive() && ['credential','certificate','achievement'].includes(root)) return;
 
-    if (root === 'credentials') return renderCredentials();
+    if (root === 'credentials') {
+      // capital-mastery-live.js is the single authoritative owner of the credentials
+      // index, including separate Standard credentials and Program Completions.
+      // This richer UI layer continues to own detail/certificate/achievement routes.
+      return;
+    }
     if (root === 'credential' && a && b) return renderCredentialDetail(a, b);
     if (root === 'certificate' && a && b) return renderCertificate(a, b);
     if (root === 'achievement' && a && b) return renderAchievement(a, b);
