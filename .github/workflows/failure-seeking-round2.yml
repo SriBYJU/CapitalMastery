@@ -11,6 +11,8 @@ on:
       - 'v2/**'
       - 'tests/**'
       - 'tools/build-pages.mjs'
+      - 'tools/prepare-production-d1.mjs'
+      - '.github/workflows/cloudflare-production-release.yml'
       - '.github/workflows/failure-seeking-round2.yml'
   workflow_dispatch:
 
@@ -37,12 +39,14 @@ jobs:
           node --check admin-qa-simulation-fix.js
           node --check capital-mastery-live.js
           node --check capital-mastery-live-ui.js
+          node --check public-certificate-verify.js
           node --check training-tracks.js
           node --check madeline.js
           node --check app.js
           node --check capital-mastery-e2e.js
           node --check enterprise-v2.js
           node --check v2/worker-v2-phase1-release.js
+          node --check tools/prepare-production-d1.mjs
           node --check ux-stability.js
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
@@ -50,6 +54,7 @@ jobs:
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
           node --check tests/admin-simulation-route-stability-browser-audit.cjs
+          node --check tests/program-completion-public-browser-audit.cjs
           node --check tests/learner-guide-mobile-browser-audit.cjs
           node --check tests/all-career-browser-sweep.cjs
           node --check tests/employer-public-browser-audit.cjs
@@ -67,6 +72,8 @@ jobs:
           node tests/two-track-consistency-audit.mjs
           node tests/two-track-notification-reporting-audit.mjs
           node tests/public-credential-hierarchy-audit.mjs
+          node tests/program-completion-public-verification-audit.mjs
+          node tests/production-d1-release-order-audit.mjs
           node tests/phase2-security-a11y-audit.mjs
           node tests/state-resilience-audit.mjs
           node tests/employer-mobile-containment-audit.mjs
@@ -97,7 +104,6 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      # This stage intentionally includes the real delayed-auth Admin simulation race.
       - name: Browser torture audits
         run: |
           python3 -m http.server 4173 --directory dist-pages > /tmp/capital-mastery-http.log 2>&1 &
@@ -112,6 +118,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-simulation-route-stability-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/program-completion-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
