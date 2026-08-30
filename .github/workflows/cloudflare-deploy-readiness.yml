@@ -25,6 +25,15 @@ jobs:
           set -euo pipefail
           node tools/build-pages.mjs
           node tests/pages-production-bundle-audit.mjs
+          printf '%s\n' "commit=$GITHUB_SHA" "built_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist-pages/RELEASE-METADATA.txt
+
+      - name: Upload exact audited Pages bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: capitalmastery-pages-${{ github.sha }}
+          path: dist-pages/
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Check Cloudflare deploy secrets without revealing values
         run: |
