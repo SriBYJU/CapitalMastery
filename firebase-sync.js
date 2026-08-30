@@ -280,6 +280,12 @@
       email: user.email || null,
       lastSeenAt: fs.serverTimestamp()
     };
+    const credentialName = String(state.profile?.certificateName || '').replace(/\s+/g, ' ').trim();
+    if (state.profile?.certificateNameConfirmed === true && looksLikeFullName(credentialName)) {
+      base.credentialName = credentialName;
+      base.credentialNameConfirmed = true;
+      base.credentialNameUpdatedAt = fs.serverTimestamp();
+    }
 
     if (rootProfileInitializedForUid !== uid) {
       const snap = await fs.getDoc(ref);
