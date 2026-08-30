@@ -23,6 +23,16 @@
     return document.querySelector('#app main#main');
   }
 
+  // Every async renderer captures the route it started on. A response that
+  // arrives after navigation is stale and must never repaint the current page.
+  function currentRouteKey() {
+    return location.hash || '#/';
+  }
+
+  function routeIsCurrent(expectedRoute) {
+    return currentRouteKey() === expectedRoute;
+  }
+
   function adminQaPreviewActive() {
     return window.CM_AUTH?.ready === true &&
       window.CM_AUTH?.isAdmin === true &&
@@ -193,6 +203,7 @@
   }
 
   async function renderCredentials() {
+    const expectedRoute = currentRouteKey();
     if (!window.CM_AUTH?.ready) return renderLoading('Checking your account…');
     if (!window.CM_AUTH?.user) {
       const el = main();
@@ -202,25 +213,29 @@
     renderLoading('Loading your verified credentials…');
     try {
       const credentials = await fetchCredentials();
+      if (!routeIsCurrent(expectedRoute)) return;
       const el = main();
       if (!el) return;
       el.innerHTML = `<section class="credentials-hero"><div class="container"><div class="eyebrow">YOUR VERIFIED ACHIEVEMENTS</div><h1>Credentials that show what you proved.</h1><p>These records come directly from the authoritative Capital Mastery D1 credential database.</p></div></section><section class="section-tight"><div class="container">${credentials.length ? `<div class="grid grid-3">${credentials.map(c => `<article class="card cm-live-credential"><span class="cm-status ${esc(c.status)}">${esc(c.status)}</span><div class="eyebrow">${esc(levelLabel(c.credential_level))}</div><h3>${esc(c.credential_title)}</h3><p><strong>Issued to</strong><br>${esc(c.holder_name)}</p><p><strong>Credential ID</strong><br><span class="small">${esc(c.credential_id)}</span></p><p><strong>Issued</strong><br>${formatDate(c.issued_at)}</p>${c.status === 'active' ? `<div class="cm-live-actions"><a class="btn btn-gold btn-block" href="#/certificate/${encodeURIComponent(c.pathway_id)}/${encodeURIComponent(c.credential_level)}">View Certificate</a><a class="btn btn-outline btn-block" href="#/credential/${encodeURIComponent(c.pathway_id)}/${encodeURIComponent(c.credential_level)}">Credential Details</a><button class="btn btn-outline btn-block" data-cm-live-linkedin="${esc(c.credential_id)}">Add to LinkedIn</button><a class="btn btn-soft btn-block" href="#/verify/${encodeURIComponent(c.public_token)}">Public Verification</a></div>` : `<div class="cm-live-warning">This credential is ${esc(c.status)} and is not currently active.</div>`}</article>`).join('')}</div>` : `<div class="card"><h2>No verified credentials yet.</h2><p>Complete official assessments at 80% or higher to earn credentials automatically.</p><a class="btn btn-primary" href="#/careers">Explore pathways →</a></div>`}</div></section>`;
       bindCredentialButtons(credentials);
     } catch (error) {
-      renderError('Could not load credentials.', error.message);
+      if (routeIsCurrent(expectedRoute)) renderError('Could not load credentials.', error.message);
     }
   }
 
   async function renderCredentialDetail(pathwayId, level) {
+    const expectedRoute = currentRouteKey();
     renderLoading('Loading credential details…');
     try {
       const credential = await findCredential(pathwayId, level);
+      if (!routeIsCurrent(expectedRoute)) return;
       if (!credential) throw new Error('No issued credential was found for this pathway and level.');
       const c = careerById(pathwayId);
       let evidenceData = null;
       if (isV2Level(level)) {
         try { evidenceData = await v2ApiFetch(`/enterprise/credentials/${encodeURIComponent(credential.credential_id)}/evidence`); }
         catch (error) { console.warn('V2 credential evidence unavailable:', error); }
+        if (!routeIsCurrent(expectedRoute)) return;
       }
       const profile = evidenceData?.evidence?.find(x => x.type === 'competency_profile')?.data?.competencies || [];
       const skills = profile.length ? profile.map(x => `${x.name} · ${Number(x.score)}%`) : (c ? [...new Set([...(c.vocab || []).slice(0, 5), ...(c.deliverables || []).slice(0, 4)])] : []);
@@ -231,14 +246,16 @@
       el.innerHTML = `<section class="section"><div class="container credential-detail"><article class="credential-summary"><span class="verify-status">✓ VERIFIED ACTIVE</span><div class="eyebrow" style="margin-top:20px">${esc(levelLabel(level).toUpperCase())} CERTIFICATE</div><h1>${esc(credential.credential_title)}</h1><p>Issued to <strong>${esc(credential.holder_name)}</strong> on ${formatDate(credential.issued_at)}.</p><div class="grid grid-2" style="margin:20px 0"><div class="data-card"><div class="label">Credential ID</div><p style="word-break:break-word"><strong>${esc(credential.credential_id)}</strong></p></div><div class="data-card"><div class="label">Status</div><p><strong>${esc(credential.status)}</strong></p></div></div>${skills.length ? `<h3>${profile.length?'Measured competencies':'Skills represented by this pathway'}</h3><div class="skills-wrap">${skills.map(s => `<span class="skill">${esc(s)}</span>`).join('')}</div>` : ''}${evidenceHtml}<div class="feedback-box" style="margin-top:20px"><strong>Authoritative record:</strong> this credential is issued and verified by the Capital Mastery secure API and D1 database.</div></article><aside class="share-panel"><h3>Use your credential</h3><a class="btn btn-gold btn-block" href="#/certificate/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">View Certificate</a><button class="btn btn-outline btn-block" style="margin-top:8px" data-cm-live-linkedin="${esc(credential.credential_id)}">Add to LinkedIn</button><button class="btn btn-outline btn-block" style="margin-top:8px" data-cm-live-post="${esc(credential.credential_id)}">Create LinkedIn Post</button><a class="btn btn-outline btn-block" style="margin-top:8px" href="#/verify/${encodeURIComponent(credential.public_token)}">Open Public Verification</a><label>Credential ID</label><div class="copy-row">${esc(credential.credential_id)}</div><button class="btn btn-soft btn-sm" data-cm-live-copy="${esc(credential.credential_id)}">Copy ID</button><label style="display:block;margin-top:14px">Credential URL</label><div class="copy-row">${esc(verifyUrl(credential))}</div><button class="btn btn-soft btn-sm" data-cm-live-copy="${esc(verifyUrl(credential))}">Copy Link</button></aside></div></section>`;
       bindCredentialButtons([credential]);
     } catch (error) {
-      renderError('Credential unavailable.', error.message);
+      if (routeIsCurrent(expectedRoute)) renderError('Credential unavailable.', error.message);
     }
   }
 
   async function renderCertificate(pathwayId, level) {
+    const expectedRoute = currentRouteKey();
     renderLoading('Preparing your verified certificate…');
     try {
       const credential = await findCredential(pathwayId, level);
+      if (!routeIsCurrent(expectedRoute)) return;
       if (!credential || credential.status !== 'active') throw new Error('An active issued credential is required to view this certificate.');
       const c = careerById(pathwayId);
       const isCareer = level === 'career';
@@ -265,14 +282,16 @@
         else window.print();
       });
     } catch (error) {
-      renderError('Certificate unavailable.', error.message);
+      if (routeIsCurrent(expectedRoute)) renderError('Certificate unavailable.', error.message);
     }
   }
 
   async function renderAchievement(pathwayId, level) {
+    const expectedRoute = currentRouteKey();
     renderLoading('Opening your achievement…');
     try {
       const credential = await findCredential(pathwayId, level);
+      if (!routeIsCurrent(expectedRoute)) return;
       if (!credential || credential.status !== 'active') throw new Error('No active verified credential was found.');
       const c = careerById(pathwayId);
       const el = main();
@@ -280,7 +299,7 @@
       const topSkills = c ? [...new Set([...(c.deliverables || []).slice(0, 3), ...(c.vocab || []).slice(0, 3)])] : [];
       el.innerHTML = `<section class="achievement-hero"><div class="confetti-field" aria-hidden="true">${Array.from({ length: 24 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</div><div class="container achievement-wrap"><div class="achievement-seal"><img src="assets/seal.svg" alt=""></div><div class="eyebrow">${esc(levelLabel(level).toUpperCase())} CERTIFICATE EARNED</div><h1>Milestone unlocked.</h1><h2>${esc(credential.credential_title)}</h2><p>Your official result was recorded by the secure Capital Mastery backend and this credential was automatically issued from D1.</p>${topSkills.length ? `<div class="achievement-skills"><span>Skills represented</span>${topSkills.map(x => `<b>${esc(x)}</b>`).join('')}</div>` : ''}<div class="hero-actions" style="justify-content:center"><a class="btn btn-gold" href="#/certificate/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">View Certificate →</a><a class="btn btn-outline achievement-outline" href="#/credential/${encodeURIComponent(pathwayId)}/${encodeURIComponent(level)}">Share & Add to LinkedIn</a></div><p class="achievement-date">Issued ${formatDate(credential.issued_at)} · ${esc(credential.credential_id)}</p></div></section>`;
     } catch (error) {
-      renderError('Achievement unavailable.', error.message);
+      if (routeIsCurrent(expectedRoute)) renderError('Achievement unavailable.', error.message);
     }
   }
 
@@ -406,10 +425,12 @@
   }
 
   async function route() {
+    const expectedRoute = currentRouteKey();
     const [root, a, b] = hashParts();
 
     if (a && careerById(a) && window.CM_AUTH?.ready && window.CM_AUTH?.user && ['career', 'learn', 'quiz', 'official-simulation', 'simulation', 'final', 'achievement', 'credential', 'certificate'].includes(root)) {
       const changed = await syncOfficialProgress(a);
+      if (!routeIsCurrent(expectedRoute)) return;
       const key = `${location.hash}|${window.CM_AUTH.user.uid}`;
       if (changed && rerenderGuard !== key && !['credential', 'certificate', 'achievement'].includes(root)) {
         rerenderGuard = key;

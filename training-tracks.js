@@ -356,7 +356,7 @@
     hero.insertAdjacentHTML('afterend', `<section class="section-tight" data-cm-track-guide><div class="container"><div class="card">
       <div class="eyebrow">TWO PROGRAM LEVELS</div>
       <h2>Choose depth without losing progress.</h2>
-      <p><strong>Career Skills</strong> is the shorter practical route with four verified credentials: Foundations, Essentials, Applied Skills and the Career Skills Certificate. <strong>Professional Readiness</strong> is the advanced five-credential Standard 2.0 route with the full Role Lab and flagship readiness credential. Work earned in the shorter route carries forward.</p>
+      <p><strong>Career Skills</strong> is the shorter practical route with three verified Standard 2.0 credentials—Foundations, Essentials and Applied Skills—plus a separate Career Skills Program Completion Certificate after the practical capstone. <strong>Professional Readiness</strong> is the advanced five-credential Standard 2.0 route with the full Role Lab and flagship readiness credential. Work earned in the shorter route carries forward.</p>
       <div class="cm-track-mini">
         <div><strong>Career Skills</strong>Shorter practical route</div>
         <div><strong>3 verified + completion certificate</strong>Ends with Career Skills Certificate</div>
@@ -376,7 +376,7 @@
     firstSection.insertAdjacentHTML('afterend', `<section class="section-tight" data-cm-track-credential-model><div class="container"><div class="card cm-track-credential-model">
       <div class="eyebrow">CREDENTIAL MODEL</div>
       <h2>Stackable evidence, not certificate spam.</h2>
-      <p>Career Skills produces four verified credentials: Foundations, Essentials, Applied Skills and the Career Skills Certificate, which requires the practical capstone simulation. Professional Readiness is the five-level Standard 2.0 career stack: Foundations, Essentials, Applied Skills, Role Lab and Professional Readiness. The two end credentials are intentionally different so a Career Skills completion is never mistaken for full Professional Readiness.</p>
+      <p>Career Skills produces three verified Standard 2.0 credentials—Foundations, Essentials and Applied Skills—plus a separate Career Skills Program Completion Certificate after the practical capstone simulation. Professional Readiness is the five-level Standard 2.0 career stack: Foundations, Essentials, Applied Skills, Role Lab and Professional Readiness. The two end credentials are intentionally different so a Career Skills completion is never mistaken for full Professional Readiness.</p>
     </div></div></section>`);
   }
 
