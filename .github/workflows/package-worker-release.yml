@@ -1,0 +1,47 @@
+name: Package audited Worker release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v2/worker-v2-phase1-release.js'
+      - 'tests/d1-integrity-endpoint-audit.mjs'
+      - 'tests/release-security-abuse-audit.mjs'
+      - 'tests/all-career-v2-core-audit.mjs'
+      - 'tests/enterprise-v2-audit.mjs'
+      - 'tests/enterprise-least-privilege-audit.mjs'
+      - 'tests/account-deletion-audit.mjs'
+      - '.github/workflows/package-worker-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Audit Worker release source
+        run: |
+          set -e
+          node --check v2/worker-v2-phase1-release.js
+          node tests/d1-integrity-endpoint-audit.mjs
+          node tests/release-security-abuse-audit.mjs
+          node tests/all-career-v2-core-audit.mjs
+          node tests/enterprise-v2-audit.mjs
+          node tests/enterprise-least-privilege-audit.mjs
+          node tests/account-deletion-audit.mjs
+          sha256sum v2/worker-v2-phase1-release.js | tee worker-release-sha256.txt
+
+      - name: Upload exact audited Worker source
+        uses: actions/upload-artifact@v4
+        with:
+          name: capitalmastery-worker-${{ github.sha }}
+          path: |
+            v2/worker-v2-phase1-release.js
+            worker-release-sha256.txt
+          if-no-files-found: error
+          retention-days: 14
