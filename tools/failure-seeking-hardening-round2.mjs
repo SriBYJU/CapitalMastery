@@ -112,11 +112,40 @@ madeline=once(madeline,
 'Madeline authoritative Career Skills capstone');
 save(madelinePath,madeline);
 
-// 5) Cache-bust every JS asset changed by the stability/audit rounds so clients
+// 5) Signed-out gating must not leave the URL on Home while stale gated content
+// remains rendered underneath the modal. A real hash navigation keeps the URL,
+// rendered page, Back behavior, and pending-route state synchronized.
+const certificateNamePath='certificate-name.js';
+let certName=load(certificateNamePath);
+certName=once(certName,
+`    if (!currentUser()) {
+      routeGuardBusy = true;
+      savePendingRoute(hash);
+      history.replaceState(null, '', \`${'${location.pathname}${location.search}#/'}\`);
+      routeGuardBusy = false;
+      openLearningGate(hash);
+      return;
+    }`,
+`    if (!currentUser()) {
+      routeGuardBusy = true;
+      savePendingRoute(hash);
+      const publicHome = \`${'${location.pathname}${location.search}#/'}\`;
+      if (location.hash !== '#/') location.replace(publicHome);
+      routeGuardBusy = false;
+      // Keep the modal outside #app so the home rerender cannot destroy it, but
+      // defer one task so the hashchange renderer and the gate never race.
+      setTimeout(() => openLearningGate(hash), 0);
+      return;
+    }`,
+'signed-out gated route synchronization');
+save(certificateNamePath,certName);
+
+// 6) Cache-bust every JS asset changed by the stability/audit rounds so clients
 // cannot run a mixed old/new script generation after deployment.
 const indexPath='index.html';
 let index=load(indexPath);
 const replacements=[
+  ['certificate-name.js','certificate-name.js?v=20260830-stability3'],
   ['app.js?v=20260830-guided2','app.js?v=20260830-stability3'],
   ['training-tracks.js?v=20260830-tracks2','training-tracks.js?v=20260830-stability3'],
   ['capital-mastery-live-ui.js?v=20260830-guided2','capital-mastery-live-ui.js?v=20260830-stability3'],
