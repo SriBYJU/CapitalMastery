@@ -1,0 +1,47 @@
+name: Patch admin simulation route ownership
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-admin-simulation-route-ownership.mjs'
+      - '.github/workflows/patch-admin-simulation-route-ownership.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply guarded route ownership patch
+        run: |
+          set -euo pipefail
+          node --check tools/patch-admin-simulation-route-ownership.mjs
+          node tools/patch-admin-simulation-route-ownership.mjs
+          node --check app.js
+          node --check training-tracks.js
+          node --check capital-mastery-live.js
+          node --check admin-qa-simulation-fix.js
+          node --check madeline.js
+          node --check tests/admin-simulation-route-ownership-audit.mjs
+          node --check tests/admin-simulation-route-stability-browser-audit.cjs
+          node tests/admin-simulation-route-ownership-audit.mjs
+          node tests/admin-runtime-stability-audit.mjs
+          git diff --check
+      - name: Commit product fix and permanent regressions
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- app.js training-tracks.js capital-mastery-live.js admin-qa-simulation-fix.js madeline.js tests/admin-runtime-stability-audit.mjs tests/admin-simulation-route-ownership-audit.mjs tests/admin-simulation-route-stability-browser-audit.cjs .github/workflows/failure-seeking-round2.yml; then
+            echo 'Admin simulation route ownership patch produced no changes.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js training-tracks.js capital-mastery-live.js admin-qa-simulation-fix.js madeline.js tests/admin-runtime-stability-audit.mjs tests/admin-simulation-route-ownership-audit.mjs tests/admin-simulation-route-stability-browser-audit.cjs .github/workflows/failure-seeking-round2.yml
+          git commit -m 'Stabilize Admin simulation route ownership'
+          git push origin HEAD:main
