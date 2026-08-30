@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/apply-program-completion-verification.yml'
+      - 'tests/public-credential-hierarchy-audit.mjs'
   workflow_dispatch:
 
 permissions:
