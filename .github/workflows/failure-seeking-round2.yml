@@ -42,6 +42,7 @@ jobs:
           node --check capital-mastery-live.js
           node --check capital-mastery-live-ui.js
           node --check public-certificate-verify.js
+          node --check firebase-auth.js
           node --check training-tracks.js
           node --check madeline.js
           node --check app.js
@@ -52,6 +53,7 @@ jobs:
           node --check ux-stability.js
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
+          node --check tests/deployable-encoding-audit.mjs
           node --check tests/github-pages-publish-boundary-audit.mjs
           node --check tests/failure-seeking-browser-audit.mjs
           node --check tests/adversarial-chaos-browser-audit.cjs
@@ -77,6 +79,7 @@ jobs:
           node tests/public-credential-hierarchy-audit.mjs
           node tests/program-completion-public-verification-audit.mjs
           node tests/production-d1-release-order-audit.mjs
+          node tests/deployable-encoding-audit.mjs
           node tests/github-pages-publish-boundary-audit.mjs
           node tests/phase2-security-a11y-audit.mjs
           node tests/state-resilience-audit.mjs
