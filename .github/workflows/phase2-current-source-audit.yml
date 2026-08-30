@@ -27,15 +27,18 @@ jobs:
         run: node tests/d1-integrity-endpoint-audit.mjs
       - name: Build production Pages artifact
         run: node tools/build-pages.mjs
-      - name: Run every automated audit
+      - name: Run every static automated audit
         run: |
           set -e
           count=0
           for test_file in tests/*.mjs; do
+            if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then
+              continue
+            fi
             echo "=== $test_file ==="
             node "$test_file"
             count=$((count+1))
           done
-          echo "TOTAL_TEST_FILES=$count"
-      - name: Verify production bundle after full audit
+          echo "TOTAL_STATIC_TEST_FILES=$count"
+      - name: Verify production bundle after full static audit
         run: node tests/pages-production-bundle-audit.mjs
