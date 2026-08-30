@@ -150,7 +150,18 @@
   function refreshFromBfcache(event) {
     if (!event.persisted) return;
     const [root] = routeParts();
-    if (STATEFUL_ROOTS.has(root) && window.CM_AUTH?.user) location.reload();
+
+    // A restored bfcache document already has every local asset needed to render.
+    // Hard-reloading here used to make Back/Forward dependent on the network and
+    // could replace the working app with a browser error page if connectivity
+    // changed at the same moment. Re-run the route listeners instead: app.js and
+    // the authoritative/runtime layers reconcile the current hash without losing
+    // the loaded shell, while sync is attempted opportunistically when available.
+    if (STATEFUL_ROOTS.has(root) && window.CM_AUTH?.user) {
+      window.CM_SYNC?.flush?.().catch(() => {});
+      setTimeout(() => window.dispatchEvent(new HashChangeEvent('hashchange')), 0);
+    }
+    scheduleEnhance(20);
   }
 
   function repairCredentialRendererRace() {
