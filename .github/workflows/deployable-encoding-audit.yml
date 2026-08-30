@@ -1,0 +1,25 @@
+name: Deployable encoding audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/deployable-encoding-audit.yml'
+      - 'tests/deployable-encoding-audit.mjs'
+      - '*.js'
+      - '*.css'
+      - 'index.html'
+      - 'assets/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  encoding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan exact deployable text surface for mojibake
+        run: node tests/deployable-encoding-audit.mjs
