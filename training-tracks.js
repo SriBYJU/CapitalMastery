@@ -299,6 +299,37 @@
     });
   }
 
+  function publicTrackOverviewHtml(audience='learner') {
+    const employer=audience==='employer';
+    return `<section class="section cm-track-public-overview" data-cm-track-public-overview><div class="container">
+      <div class="section-head"><div><div class="eyebrow">TWO PROGRAM LEVELS · EVERY CAREER</div><h2>Choose the depth that matches the goal.</h2></div><p>Both routes teach before they test and require real application. Professional Readiness goes further into full role simulation, review and readiness evidence.</p></div>
+      <div class="cm-track-public-grid">
+        <article class="card"><div class="cm-track-public-top"><span>CAREER SKILLS</span><b>4 verified credentials</b></div><h3>Shorter. Practical. Still real work.</h3><p>Foundations → Essentials → Applied Skills → Career Skills Capstone. Built for meaningful role preparation without requiring the full advanced onboarding-style sequence.</p><ul><li>Role-native learning and guided practice</li><li>Applied work, not MCQ-only completion</li><li>Realistic practical capstone</li><li>Upgrade later without repeating earned stages</li></ul><a class="btn btn-outline" href="#/careers">${employer?'Preview Career Skills':'Explore Career Skills'} →</a></article>
+        <article class="card cm-track-public-flagship"><div class="cm-track-public-top"><span>PROFESSIONAL READINESS</span><b>5 verified credentials</b></div><h3>Full job-readiness preparation.</h3><p>Foundations → Essentials → Applied Skills → Role Lab → Professional Readiness, with the baseline, advanced simulation, revision cycle and Professional Final supporting the flagship evidence standard.</p><ul><li>Full role-specific professional workflow</li><li>Manager-style review and revisions</li><li>Professional Final + evidence coverage</li><li>Flagship Professional Readiness credential</li></ul><a class="btn btn-primary" href="#/careers">${employer?'Preview Professional Readiness':'Explore Professional Readiness'} →</a></article>
+      </div>
+      <div class="cm-track-public-note"><strong>Shared foundation:</strong> Foundations, Essentials and Applied Skills carry forward when a learner moves from Career Skills into Professional Readiness. The shorter credential never substitutes for the advanced Role Lab or Professional Readiness credential.</div>
+      ${employer?'<p class="cm-track-employer-use"><strong>Employer use:</strong> assign Career Skills for shorter practical preparation or Professional Readiness for internship, new-hire and pre-Day-1 role readiness. Reporting and completion rules stay separate automatically.</p>':''}
+    </div></section>`;
+  }
+
+  function decorateHomeTrackOverview() {
+    const { route }=routeContext();
+    if(route!=='') return;
+    const root=document.querySelector('#app main#main')||document.querySelector('#app');
+    if(!root||root.querySelector('[data-cm-track-public-overview]')) return;
+    const hero=root.querySelector('section');
+    if(hero) hero.insertAdjacentHTML('afterend',publicTrackOverviewHtml('learner'));
+  }
+
+  function decorateEmployerTrackOverview() {
+    const { route }=routeContext();
+    if(route!=='employers') return;
+    const root=document.querySelector('#app main#main')||document.querySelector('#app');
+    if(!root||root.querySelector('[data-cm-track-public-overview]')) return;
+    const hero=root.querySelector('section');
+    if(hero) hero.insertAdjacentHTML('afterend',publicTrackOverviewHtml('employer'));
+  }
+
   function decorateLearnerGuide() {
     const { route } = routeContext();
     if (route !== 'learner-guide') return;
@@ -364,6 +395,8 @@
   function apply() {
     if (guardAdvancedRoute()) return;
     decorateCareerDirectory();
+    decorateHomeTrackOverview();
+    decorateEmployerTrackOverview();
     const { route, pathwayId } = routeContext();
     if (route === 'career' && pathwayId) decorateCareerPage(pathwayId);
     if (['learn','quiz'].includes(route) && pathwayId) decorateLearningRoute(pathwayId);
