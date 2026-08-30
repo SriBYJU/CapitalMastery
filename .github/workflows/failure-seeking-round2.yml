@@ -96,7 +96,7 @@ jobs:
 
       - name: Browser torture audits
         run: |
-          python3 -m http.server 4173 > /tmp/capital-mastery-http.log 2>&1 &
+          python3 -m http.server 4173 --directory dist-pages > /tmp/capital-mastery-http.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID || true' EXIT
           for i in {1..30}; do
