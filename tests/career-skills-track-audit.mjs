@@ -21,7 +21,8 @@ must(enterprise.includes('career_skills: ['), 'Employer curriculum stages must i
 must(enterprise.includes('value="career_skills"'), 'Quick Assign must offer Career Skills');
 must(enterprise.includes("credentialTarget:track==='professional'?'professional_readiness':'career'"), 'Quick Assign must target Career Certificate for Career Skills');
 must(enterprise.includes("stage.id==='career-capstone'"), 'Assigned program must show Career Skills capstone evidence state');
-must(enterprise.includes('#/simulation/${encodeURIComponent(publicPathId(a.pathwayId))}'), 'Assigned Career Skills program must link to the capstone simulation');
+must(enterprise.includes('#/official-simulation/${encodeURIComponent(publicPathId(a.pathwayId))}?assignment=${encodeURIComponent(a.id)}'), 'Assigned Career Skills program must link directly to the authoritative capstone with assignment scope preserved');
+must(!enterprise.includes('#/simulation/${encodeURIComponent(publicPathId(a.pathwayId))}'), 'Assigned Career Skills must not use the legacy unscoped simulation route');
 
 const localCareer=app.match(/function eligible\(c,type\)[\s\S]*?return \[1,2,3,4,5\][^;]+;/)?.[0]||'';
 must(localCareer.includes('simulationScore'), 'Local Career Certificate must require the job simulation');
