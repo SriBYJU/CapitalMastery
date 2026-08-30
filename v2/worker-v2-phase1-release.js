@@ -721,6 +721,32 @@ export default {
         );
       }
 
+      // --------------------------------------------------
+      // ADMIN D1 INTEGRITY (read-only)
+      // --------------------------------------------------
+      if (request.method === "GET" && url.pathname === "/admin/integrity") {
+        await requireAdmin(request, env);
+        const [quick, foreignKeys, tableRows] = await Promise.all([
+          env.DB.prepare(`PRAGMA quick_check`).all(),
+          env.DB.prepare(`PRAGMA foreign_key_check`).all(),
+          env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all()
+        ]);
+        const tableCounts = {};
+        for (const row of tableRows.results || []) {
+          const name = String(row.name || '');
+          if (!/^[A-Za-z0-9_]+$/.test(name)) continue;
+          const countRow = await env.DB.prepare(`SELECT COUNT(*) AS count FROM "${name}"`).first();
+          tableCounts[name] = Number(countRow?.count || 0);
+        }
+        return json({
+          ok: true,
+          checkedAt: new Date().toISOString(),
+          quickCheck: quick.results || [],
+          foreignKeyViolations: foreignKeys.results || [],
+          tableCounts
+        }, 200, env);
+      }
+
       const parts = url.pathname.split("/").filter(Boolean);
 
       if (request.method === "GET" && url.pathname === "/enterprise/admin/demo") {

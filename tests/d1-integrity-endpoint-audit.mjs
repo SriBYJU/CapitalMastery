@@ -1,0 +1,18 @@
+import fs from 'node:fs';
+const w=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
+const ok=(v,m)=>{if(!v)throw new Error(m)};
+const anchor=w.indexOf('url.pathname === "/admin/integrity"');
+const s=w.lastIndexOf('if (request.method === "GET"',anchor);
+const e=w.indexOf('const parts = url.pathname.split',anchor);
+const route=w.slice(s,e);
+ok(anchor>=0&&s>=0&&e>anchor,'Admin D1 integrity route missing');
+ok(route.includes('request.method === "GET"'),'Integrity route must be GET/read-only');
+ok(route.includes('await requireAdmin(request, env)'),'Integrity route must require verified admin access');
+ok(route.includes('PRAGMA quick_check'),'Integrity route must execute SQLite quick_check');
+ok(route.includes('PRAGMA foreign_key_check'),'Integrity route must execute SQLite foreign_key_check');
+ok(route.includes("SELECT name FROM sqlite_master WHERE type='table'"),'Integrity route must enumerate actual D1 tables');
+ok(route.includes('/^[A-Za-z0-9_]+$/.test(name)'),'Dynamic table count identifiers must be strictly sanitized');
+ok(route.includes('SELECT COUNT(*) AS count'),'Integrity response must report table counts');
+ok(!route.includes('SELECT * FROM'),'Integrity route must not expose arbitrary table rows');
+ok(!route.includes('INSERT ')&&!route.includes('UPDATE ')&&!route.includes('DELETE '),'Integrity route must not mutate D1');
+console.log('D1 INTEGRITY ENDPOINT AUDIT PASS: admin-only read-only quick_check, foreign_key_check and table counts verified');
