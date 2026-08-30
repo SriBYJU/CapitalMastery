@@ -7,12 +7,14 @@ on:
       - '*.js'
       - '*.css'
       - 'index.html'
+      - '_config.yml'
       - 'assets/**'
       - 'v2/**'
       - 'tests/**'
       - 'tools/build-pages.mjs'
       - 'tools/prepare-production-d1.mjs'
       - '.github/workflows/cloudflare-production-release.yml'
+      - '.github/workflows/github-pages-live-readonly-audit.yml'
       - '.github/workflows/failure-seeking-round2.yml'
   workflow_dispatch:
 
@@ -50,6 +52,7 @@ jobs:
           node --check ux-stability.js
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
+          node --check tests/github-pages-publish-boundary-audit.mjs
           node --check tests/failure-seeking-browser-audit.mjs
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
@@ -74,6 +77,7 @@ jobs:
           node tests/public-credential-hierarchy-audit.mjs
           node tests/program-completion-public-verification-audit.mjs
           node tests/production-d1-release-order-audit.mjs
+          node tests/github-pages-publish-boundary-audit.mjs
           node tests/phase2-security-a11y-audit.mjs
           node tests/state-resilience-audit.mjs
           node tests/employer-mobile-containment-audit.mjs
