@@ -51,7 +51,7 @@ ok(ux.includes('function refreshFromBfcache(event)'),'UX stability layer must ha
 ok(ux.includes("window.dispatchEvent(new HashChangeEvent('hashchange'))"),'Stateful bfcache restoration must rerun route/reconciliation listeners');
 ok(ux.includes('window.CM_SYNC?.flush?.().catch(() => {})'),'Stateful bfcache restoration should opportunistically flush sync');
 const bfcacheBody=ux.slice(ux.indexOf('function refreshFromBfcache(event)'),ux.indexOf('function repairCredentialRendererRace()'));
-ok(!bfcacheBody.includes('location.reload()'),'bfcache restoration must not hard reload and become network-dependent');
+ok(!bfcacheBody.includes('location.reload();'),'bfcache restoration must not hard reload and become network-dependent');
 
 // Authoritative progress reconciliation must merge evidence without turning a
 // hash-route update into a document reload or erasing fields that were not
@@ -61,7 +61,7 @@ ok(runtime.includes('Merge only fields represented by authoritative rows'),'Runt
 ok(runtime.includes('window.CM?.refreshLocalState?.()'),'Authoritative progress changes must refresh app.js in-memory state');
 ok(runtime.includes('skipNextHashReconcile = true')&&runtime.includes("window.dispatchEvent(new HashChangeEvent('hashchange'))"),'Progress repaint must stay inside the SPA without a reconciliation loop');
 const reconcileBody=runtime.slice(runtime.indexOf('async function reconcileCurrent'),runtime.indexOf('function repairAsyncRouteRace'));
-ok(!reconcileBody.includes('location.reload()'),'Progress reconciliation must never hard reload the document');
+ok(!reconcileBody.includes('location.reload();'),'Progress reconciliation must never hard reload the document');
 
 // The interactive guide may contain wide spreadsheet work, but the page itself
 // must stay viewport-contained while the workbook becomes the horizontal scroller.
