@@ -53,3 +53,26 @@
 .cm-track-sequence{margin:18px 0 0;padding:18px;border:1px solid #dce4ec;border-radius:16px;background:#fbfcfd}.cm-track-sequence-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:12px}.cm-track-sequence-head h3{margin:3px 0}.cm-track-sequence-head>span{border-radius:999px;background:#071a33;color:#fff;padding:6px 9px;font-size:.75rem;font-weight:800}.cm-track-sequence-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.cm-track-sequence-grid a{display:grid;grid-template-columns:auto 1fr;grid-template-areas:'n title' 'n copy';column-gap:10px;padding:12px;border:1px solid #e2e7ec;border-radius:12px;background:#fff;text-decoration:none}.cm-track-sequence-grid a>b{grid-area:n;color:#b28736}.cm-track-sequence-grid a>strong{grid-area:title;color:#071a33}.cm-track-sequence-grid a>span{grid-area:copy;color:#667487;font-size:.8rem;margin-top:2px}@media(max-width:700px){.cm-track-sequence-grid{grid-template-columns:1fr}.cm-track-sequence-head{flex-direction:column}}
 
 .cm-track-public-overview{background:#f7f9fb}.cm-track-public-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.cm-track-public-grid article{display:flex;flex-direction:column}.cm-track-public-grid article h3{margin:10px 0 6px}.cm-track-public-grid article ul{padding-left:20px;margin:12px 0 18px}.cm-track-public-grid article li{margin:6px 0}.cm-track-public-grid article .btn{margin-top:auto;align-self:flex-start}.cm-track-public-top{display:flex;align-items:center;justify-content:space-between;gap:10px}.cm-track-public-top span{font-size:.76rem;letter-spacing:.11em;font-weight:850;color:#647286}.cm-track-public-top b{font-size:.78rem;border-radius:999px;padding:6px 9px;background:#eef3f8;color:#26384d}.cm-track-public-flagship{border:1px solid #d7bc7d;box-shadow:0 12px 30px rgba(7,26,51,.07)}.cm-track-public-flagship .cm-track-public-top b{background:#f3e6c7;color:#604816}.cm-track-public-note,.cm-track-employer-use{margin-top:14px;padding:13px 15px;border-radius:12px;background:#fff;border:1px solid #dde4eb;color:#526174}.cm-track-public-note strong,.cm-track-employer-use strong{color:#071a33}@media(max-width:760px){.cm-track-public-grid{grid-template-columns:1fr}.cm-track-public-top{align-items:flex-start;flex-direction:column}}
+
+/* Failure-seeking mobile containment — loaded after learner-guide.css */
+.cm-learner-guide-shell,.cm-learner-guide-nav,.cm-learner-guide-panels,.cm-learner-guide-panel,.cm-guide-role-card,.cm-guide-case-update,.cm-guide-workbook{min-width:0;max-width:100%}
+.cm-learner-guide-shell{width:100%}
+.cm-learner-guide-nav,.cm-learner-guide-panels,.cm-learner-guide-panel{width:100%;max-width:100%;justify-self:stretch}
+.cm-learner-guide-nav,.cm-learner-guide-panels{contain:inline-size}
+.cm-learner-guide-nav button{width:100%;max-width:100%;min-width:0;grid-template-columns:38px minmax(0,1fr)}
+.cm-learner-guide-nav button div,.cm-learner-guide-nav button b,.cm-learner-guide-nav button small,.cm-guide-role-card *,.cm-guide-case-update *{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.cm-guide-career-picker,.cm-guide-career-picker select{min-width:0;max-width:100%;width:100%}
+.cm-guide-workbook{width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain}
+.cm-guide-workbook-title,.cm-guide-workbook-ribbon,.cm-guide-workbook-formula,.cm-guide-workbook-tabs{max-width:100%}
+.cm-guide-workbook-title>*{min-width:0;overflow-wrap:anywhere}
+@media(max-width:980px){
+  .cm-learner-guide-hero>.container,.cm-learner-guide-shell{grid-template-columns:minmax(0,100%)!important;width:100%;max-width:100%}
+  .cm-learner-guide-shell>.cm-learner-guide-nav,.cm-learner-guide-shell>.cm-learner-guide-panels{min-width:0;width:100%;max-width:100%}
+  .cm-learner-guide-nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .cm-learner-guide-nav{grid-template-columns:minmax(0,100%)!important}
+  .cm-learner-guide-panel{padding:16px}
+  .cm-guide-learning-loop>div,.cm-guide-case-update,.cm-guide-role-card{min-width:0;max-width:100%}
+  .cm-guide-workbook table{min-width:520px}
+}
