@@ -1,8 +1,7 @@
 const { chromium, request } = require('playwright');
 
 const BASE = process.env.CM_AUDIT_URL || 'https://sribyju.github.io/CapitalMastery/';
-const runTag = `${Date.now()}-${Math.floor(Math.random()*1e9)}`;
-const email = `cm.phase2.${runTag}@example.com`;
+const email = `cm.phase2.${Date.now()}-${Math.floor(Math.random()*1e9)}@example.com`;
 const password = `CmPhase2!${Date.now()}Aa9`;
 const fullName = 'Phase Two Audit';
 let apiKey = '';
@@ -14,7 +13,7 @@ function assert(condition, message) {
 }
 
 (async () => {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({ headless:true });
   const context = await browser.newContext();
   const page = await context.newPage();
   const api = await request.newContext();
@@ -23,141 +22,129 @@ function assert(condition, message) {
   page.on('pageerror', error => pageErrors.push(String(error?.message || error)));
   page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
 
-  async function deleteFirestoreTestDocs() {
-    if (!created) return;
+  async function identityToken() {
+    if (lastToken) return lastToken;
+    if (!created || !apiKey) return '';
+    const response = await api.post(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
+      data:{ email, password, returnSecureToken:true }
+    });
+    if (!response.ok()) return '';
+    return (await response.json()).idToken || '';
+  }
+
+  async function deleteFirestoreDocs() {
+    if (!created || !windowUserPossible()) return;
     await page.evaluate(async () => {
       const user = window.CM_AUTH?.user;
       if (!user) return;
       const SDK = '12.18.0';
       const appApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-app.js`);
-      const fsApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-firestore.js`);
+      const fs = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-firestore.js`);
       const app = appApi.getApps().length ? appApi.getApp() : appApi.initializeApp(window.CAPITAL_MASTERY_FIREBASE_CONFIG);
-      const db = fsApi.getFirestore(app);
-      await fsApi.deleteDoc(fsApi.doc(db, 'users', user.uid, 'progress', 'state'));
-      await fsApi.deleteDoc(fsApi.doc(db, 'users', user.uid));
+      const db = fs.getFirestore(app);
+      await fs.deleteDoc(fs.doc(db, 'users', user.uid, 'progress', 'state'));
+      await fs.deleteDoc(fs.doc(db, 'users', user.uid));
     });
   }
 
-  async function cleanupIdentity() {
+  function windowUserPossible() {
+    return !page.isClosed();
+  }
+
+  async function deleteIdentity() {
     if (!apiKey) return;
-    let token = lastToken;
-    if (!token && created) {
-      const signIn = await api.post(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(apiKey)}`, {
-        data: { email, password, returnSecureToken: true }
-      });
-      if (signIn.ok()) token = (await signIn.json()).idToken || '';
-    }
+    const token = await identityToken();
     if (!token) return;
-    const deleted = await api.post(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${encodeURIComponent(apiKey)}`, {
-      data: { idToken: token }
+    const response = await api.post(`https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${encodeURIComponent(apiKey)}`, {
+      data:{ idToken:token }
     });
-    if (!deleted.ok()) {
-      const body = await deleted.text();
-      throw new Error(`Firebase cleanup failed (${deleted.status()}): ${body.slice(0,500)}`);
-    }
+    if (!response.ok()) throw new Error(`Firebase identity cleanup failed (${response.status()}): ${(await response.text()).slice(0,500)}`);
+    lastToken = '';
+    created = false;
   }
 
-  async function requireAuthForms() {
-    try {
-      await page.locator('#cm-create-form input[name="email"]').waitFor({ state:'visible', timeout:7000 });
-      await page.locator('#cm-signin-form input[name="email"]').waitFor({ state:'visible', timeout:7000 });
-    } catch (error) {
-      const snapshot = await page.evaluate(() => {
-        const main = document.querySelector('main#main');
-        return {
-          hash: location.hash,
-          authReady: window.CM_AUTH?.ready,
-          authUser: window.CM_AUTH?.user ? { uid:window.CM_AUTH.user.uid, email:window.CM_AUTH.user.email } : null,
-          backendVerified: window.CM_AUTH?.backendVerified,
-          mainAuthView: main?.dataset?.cmAuthView || '',
-          mainText: (main?.innerText || '').slice(0,1600),
-          mainHtml: (main?.innerHTML || '').slice(0,2600),
-          createForms: document.querySelectorAll('#cm-create-form').length,
-          signinForms: document.querySelectorAll('#cm-signin-form').length
-        };
-      });
-      throw new Error(`Firebase account renderer did not own #/login after auth ready. SNAPSHOT=${JSON.stringify(snapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
-    }
+  async function authFormsReady() {
+    await page.locator('#cm-create-form input[name="email"]').waitFor({state:'visible',timeout:10000});
+    await page.locator('#cm-signin-form input[name="email"]').waitFor({state:'visible',timeout:10000});
   }
 
-  async function requireNamePersistence() {
+  async function nameSaveOutcome() {
     await page.waitForFunction(() => {
       const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
       return window.CM_CERT_NAME?.confirmed?.() === true || (!!error && !error.hidden && !!error.textContent.trim());
-    }, null, { timeout:15000 });
-    const snapshot = await page.evaluate(() => {
-      let localState = null;
-      try { localState = JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1') || 'null'); } catch (_) {}
+    }, null, {timeout:15000});
+    const state = await page.evaluate(() => {
+      let local = null;
+      try { local = JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1') || 'null'); } catch (_) {}
       const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
       return {
-        confirmed: window.CM_CERT_NAME?.confirmed?.() === true,
-        displayName: window.CM_AUTH?.user?.displayName || '',
-        syncReady: window.CM_SYNC?.ready,
-        syncStatus: window.CM_SYNC?.status || '',
-        syncError: window.CM_SYNC?.error || '',
-        modalError: error && !error.hidden ? error.textContent.trim() : '',
-        localProfile: localState?.profile || null,
-        modalPresent: !!document.getElementById('cm-full-name-onboarding')
+        confirmed:window.CM_CERT_NAME?.confirmed?.() === true,
+        displayName:window.CM_AUTH?.user?.displayName || '',
+        syncReady:window.CM_SYNC?.ready,
+        syncStatus:window.CM_SYNC?.status || '',
+        syncError:window.CM_SYNC?.error || '',
+        modalError:error && !error.hidden ? error.textContent.trim() : '',
+        localProfile:local?.profile || null
       };
     });
-    if (!snapshot.confirmed) {
-      throw new Error(`Credential-name persistence failed after Firebase displayName update. SNAPSHOT=${JSON.stringify(snapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
+    if (!state.confirmed) {
+      throw new Error(`Credential-name persistence failed. SNAPSHOT=${JSON.stringify(state)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
     }
-    return snapshot;
   }
 
   try {
-    // Keep this audit Firebase-real but D1-neutral. Worker auth verification is covered separately.
-    await page.route('**/auth-check', async route => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ ok: true, uid: 'firebase-live-audit', isAdmin: false })
-      });
-    });
+    // Exercise real Firebase Auth + Firestore, but keep D1 neutral. Worker auth
+    // verification has separate production boundary tests.
+    await page.route('**/auth-check', route => route.fulfill({
+      status:200,
+      contentType:'application/json',
+      body:JSON.stringify({ok:true,uid:'firebase-live-audit',isAdmin:false})
+    }));
 
-    await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, { waitUntil: 'domcontentloaded', timeout: 30000 });
-    await page.waitForFunction(() => window.CM_AUTH?.ready === true, null, { timeout: 30000 });
+    await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, {waitUntil:'domcontentloaded',timeout:30000});
+    await page.waitForFunction(() => window.CM_AUTH?.ready === true, null, {timeout:30000});
     apiKey = await page.evaluate(() => window.CAPITAL_MASTERY_FIREBASE_CONFIG?.apiKey || '');
-    assert(apiKey, 'Live page did not expose expected Firebase web config');
-    await requireAuthForms();
+    assert(apiKey, 'Live page is missing Firebase web configuration');
+    await authFormsReady();
+    assert(await page.locator('#cm-create-form input[name="name"]').count() === 0, 'Signup reverted to obsolete inline Name field');
 
-    // Runtime intentionally removes the early inline Name field. Account creation
-    // is email/password first, followed by a required one-time credential-name modal.
-    assert(await page.locator('#cm-create-form input[name="name"]').count() === 0, 'Signup unexpectedly reverted to the obsolete inline Name field');
     await page.locator('#cm-create-form input[name="email"]').fill(email);
     await page.locator('#cm-create-form input[name="password"]').fill(password);
     await page.locator('#cm-create-form button[type="submit"]').click();
-
-    await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, { timeout: 30000 });
+    await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, {timeout:30000});
     created = true;
     lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
 
-    await page.locator('#cm-full-name-onboarding').waitFor({ state:'visible', timeout:20000 });
+    await page.locator('#cm-full-name-onboarding').waitFor({state:'visible',timeout:20000});
     await page.locator('#cm-full-name-input').fill(fullName);
     await page.locator('#cm-full-name-form button[type="submit"]').click();
-    await page.waitForFunction(expected => window.CM_AUTH?.user?.displayName === expected, fullName, { timeout:30000 });
-    await requireNamePersistence();
-    await page.locator('#cm-full-name-onboarding').waitFor({ state:'detached', timeout:30000 });
+    await page.waitForFunction(expected => window.CM_AUTH?.user?.displayName === expected, fullName, {timeout:30000});
+    await nameSaveOutcome();
+
+    // Successful onboarding deliberately reloads the app. Wait for the reloaded
+    // auth/name modules before sampling the persisted result.
+    await page.waitForFunction(([expectedEmail,expectedName]) =>
+      window.CM_AUTH?.ready === true &&
+      window.CM_AUTH?.user?.email === expectedEmail &&
+      window.CM_AUTH?.user?.displayName === expectedName &&
+      window.CM_CERT_NAME?.confirmed?.() === true,
+      [email,fullName], {timeout:30000});
     lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
-
-    const createdState = await page.evaluate(() => ({
-      email: window.CM_AUTH.user?.email || '',
-      name: window.CM_AUTH.user?.displayName || '',
-      confirmed: window.CM_CERT_NAME?.confirmed?.() === true,
-      body: document.body.innerText
+    const afterSave = await page.evaluate(() => ({
+      name:window.CM_AUTH.user?.displayName || '',
+      confirmed:window.CM_CERT_NAME?.confirmed?.() === true,
+      body:document.body.innerText
     }));
-    assert(createdState.name === fullName, `One-time full-name onboarding did not persist to Firebase profile: ${createdState.name}`);
-    assert(createdState.confirmed, 'Credential-name onboarding did not mark the account confirmed');
-    assert(!/[âÃÂ�]/u.test(createdState.body), 'Mojibake rendered in live Firebase account/name UI');
+    assert(afterSave.name === fullName && afterSave.confirmed, 'Credential name was not stable after the intentional post-save reload');
+    assert(!/[âÃÂ�]/u.test(afterSave.body), 'Mojibake rendered in live account/name UI');
 
-    // Return to the account page, sign out, and remove all local onboarding/profile
-    // state. This simulates a fresh device so the next login must recover the name
-    // from Firebase/Firestore rather than a browser-only marker.
-    await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, { waitUntil:'domcontentloaded', timeout:30000 });
-    await page.waitForFunction(() => window.CM_AUTH?.user?.email === email, null, { timeout:30000 });
+    // Simulate a fresh device: sign out, erase every browser-only onboarding/profile
+    // marker, then sign in again. Remote Firestore state must prevent the one-time
+    // onboarding from repeating and must recover the exact credential name.
+    await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, {waitUntil:'domcontentloaded',timeout:30000});
+    await page.waitForFunction(() => window.CM_AUTH?.user?.email === email, null, {timeout:30000});
     await page.locator('[data-cm-auth-action="signout"]').click();
-    await page.waitForFunction(() => window.CM_AUTH?.user === null, null, { timeout:15000 });
+    await page.waitForFunction(() => window.CM_AUTH?.user === null, null, {timeout:15000});
     await page.evaluate(() => {
       for (const key of Object.keys(localStorage)) {
         if (key.startsWith('cmCredentialNameOnboardedV3:') ||
@@ -167,45 +154,41 @@ function assert(condition, message) {
       }
       sessionStorage.clear();
     });
-    await page.reload({ waitUntil:'domcontentloaded', timeout:30000 });
-    await page.waitForFunction(() => window.CM_AUTH?.ready === true && window.CM_AUTH?.user === null, null, { timeout:30000 });
-    await requireAuthForms();
-
+    await page.reload({waitUntil:'domcontentloaded',timeout:30000});
+    await page.waitForFunction(() => window.CM_AUTH?.ready === true && window.CM_AUTH?.user === null, null, {timeout:30000});
+    await authFormsReady();
     await page.locator('#cm-signin-form input[name="email"]').fill(email);
     await page.locator('#cm-signin-form input[name="password"]').fill(password);
     await page.locator('#cm-signin-form button[type="submit"]').click();
-    await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, { timeout:30000 });
+    await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, {timeout:30000});
     await page.waitForFunction(async expected => {
       if (window.CM_AUTH?.user?.displayName !== expected) return false;
       return window.CM_CERT_NAME?.check ? await window.CM_CERT_NAME.check() : false;
-    }, fullName, { timeout:30000 });
-    await page.waitForTimeout(500);
-
-    const signedBackIn = await page.evaluate(() => ({
-      name: window.CM_AUTH.user?.displayName || '',
-      confirmed: window.CM_CERT_NAME?.confirmed?.() === true,
-      onboardingModalPresent: !!document.getElementById('cm-full-name-onboarding'),
-      storedName: window.CM_CERT_NAME?.get?.() || '',
-      body: document.body.innerText
+    }, fullName, {timeout:30000});
+    await page.waitForTimeout(750);
+    const recovered = await page.evaluate(() => ({
+      name:window.CM_AUTH?.user?.displayName || '',
+      confirmed:window.CM_CERT_NAME?.confirmed?.() === true,
+      storedName:window.CM_CERT_NAME?.get?.() || '',
+      modalPresent:!!document.getElementById('cm-full-name-onboarding'),
+      body:document.body.innerText
     }));
-    assert(signedBackIn.name === fullName, 'Firebase display name disappeared after fresh-state sign-in');
-    assert(signedBackIn.confirmed, 'Remote credential-name confirmation was not restored after clearing local state');
-    assert(!signedBackIn.onboardingModalPresent, 'One-time full-name onboarding incorrectly repeated after remote persistence');
-    assert(signedBackIn.storedName === fullName, `Recovered credential name mismatch: ${signedBackIn.storedName}`);
-    assert(!/[âÃÂ�]/u.test(signedBackIn.body), 'Mojibake rendered after fresh-state sign-in');
+    assert(recovered.name === fullName, 'Firebase displayName disappeared after fresh-state sign-in');
+    assert(recovered.confirmed, 'Remote credential-name confirmation was not restored after local state was erased');
+    assert(recovered.storedName === fullName, `Recovered credential name mismatch: ${recovered.storedName}`);
+    assert(!recovered.modalPresent, 'One-time full-name onboarding repeated despite remote confirmation');
+    assert(!/[âÃÂ�]/u.test(recovered.body), 'Mojibake rendered after fresh-state sign-in');
     lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
 
-    await deleteFirestoreTestDocs();
-    await cleanupIdentity();
-    created = false;
-    lastToken = '';
-    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real email/password create -> required one-time full-name onboarding -> remote fresh-state recovery -> Firebase/Firestore cleanup');
+    await deleteFirestoreDocs();
+    await deleteIdentity();
+    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> one-time full-name save -> post-save reload -> fresh-state remote recovery -> Firestore/Auth cleanup');
   } finally {
     try {
       if (created) {
-        try { await deleteFirestoreTestDocs(); } catch (error) { console.error('Firestore cleanup error:', error); process.exitCode = 1; }
+        try { await deleteFirestoreDocs(); } catch (error) { console.error('Firestore cleanup error:', error); process.exitCode = 1; }
+        await deleteIdentity();
       }
-      if (created || lastToken) await cleanupIdentity();
     } catch (error) {
       console.error(error);
       process.exitCode = 1;
