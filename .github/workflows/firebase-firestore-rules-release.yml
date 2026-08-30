@@ -1,0 +1,85 @@
+name: Firebase Firestore rules release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/firebase-firestore-rules-release.yml'
+      - 'firebase.json'
+      - 'firestore.rules'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: capitalmastery-firestore-rules-release
+  cancel-in-progress: false
+
+jobs:
+  rules-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    env:
+      FIREBASE_PROJECT_ID: capital-mastery26
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_CAPITAL_MASTERY26 || secrets.FIREBASE_SERVICE_ACCOUNT || secrets.GOOGLE_APPLICATION_CREDENTIALS_JSON }}
+      FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate scoped rules contract
+        run: |
+          set -euo pipefail
+          node tests/credential-name-root-persistence-audit.mjs
+          grep -q '"rules": "firestore.rules"' firebase.json
+          grep -q "'credentialNameConfirmed'" firestore.rules
+          grep -q 'request.resource.data.credentialNameConfirmed == true' firestore.rules
+          grep -q 'request.resource.data.displayName == request.resource.data.credentialName' firestore.rules
+          echo 'Scoped Firestore credential-identity contract: PASS'
+
+      - name: Compile Firestore rules in emulator
+        run: |
+          set -euo pipefail
+          npx --yes firebase-tools@latest emulators:exec --only firestore --project demo-capital-mastery --config firebase.json "echo FIRESTORE_RULES_COMPILE_PASS"
+
+      - name: Require Firebase deployment credential
+        run: |
+          set -euo pipefail
+          if [ -n "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ]; then
+            echo 'Firebase service-account credential present: PASS'
+          elif [ -n "${FIREBASE_TOKEN:-}" ]; then
+            echo 'Firebase CI token present: PASS'
+          else
+            echo 'Missing Firebase deployment credential. Add FIREBASE_SERVICE_ACCOUNT_CAPITAL_MASTERY26 (preferred) or FIREBASE_TOKEN to the production environment/repository secrets.'
+            exit 1
+          fi
+
+      - name: Deploy Firestore rules only
+        run: |
+          set -euo pipefail
+          cleanup() { rm -f /tmp/capital-mastery-firebase-service-account.json; }
+          trap cleanup EXIT
+          if [ -n "${FIREBASE_SERVICE_ACCOUNT_JSON:-}" ]; then
+            printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > /tmp/capital-mastery-firebase-service-account.json
+            chmod 600 /tmp/capital-mastery-firebase-service-account.json
+            export GOOGLE_APPLICATION_CREDENTIALS=/tmp/capital-mastery-firebase-service-account.json
+            npx --yes firebase-tools@latest deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --config firebase.json --non-interactive
+          else
+            npx --yes firebase-tools@latest deploy --only firestore:rules --project "$FIREBASE_PROJECT_ID" --config firebase.json --token "$FIREBASE_TOKEN" --non-interactive
+          fi
+
+      - name: Install Chromium verification dependency
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Prove rules with disposable live account lifecycle
+        run: |
+          set -euo pipefail
+          CM_AUDIT_URL=https://sribyju.github.io/CapitalMastery/ node tests/live-firebase-auth-browser-audit.cjs
+
+      - name: Firestore rules release verdict
+        run: |
+          echo 'FIRESTORE RULES RELEASE GATE: PASS'
+          echo 'Only Firestore rules were deployed; Hosting, Auth providers, Functions and Cloudflare were not mutated.'
