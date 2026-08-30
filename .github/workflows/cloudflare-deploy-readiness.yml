@@ -21,6 +21,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Record hostile-green release source
+        run: |
+          set -euo pipefail
+          echo "RELEASE_SOURCE_SHA=${GITHUB_SHA}"
+          node tests/production-d1-release-order-audit.mjs
+          node tests/program-completion-public-verification-audit.mjs
+
       - name: Build audited Pages artifact
         run: |
           set -euo pipefail
