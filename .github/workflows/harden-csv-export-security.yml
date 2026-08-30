@@ -23,15 +23,20 @@ jobs:
           from pathlib import Path
           path=Path('enterprise-v2.js')
           text=path.read_text()
-          old="    const csv=rows.map(row=>row.map(v=>`\\\"${String(v??'').replace(/\\\"/g,'\\\"\\\"')}\\\"`).join(',')).join('\\\\n');"
-          new="    const csvCell=value=>{let s=String(value??'');if(/^[\\\\s]*[=+\\\\-@]/.test(s))s=`'${s}`;return `\\\"${s.replace(/\\\"/g,'\\\"\\\"')}\\\"`;};\\n    const csv=rows.map(row=>row.map(csvCell).join(',')).join('\\\\n');"
-          if old not in text:
-              if 'const csvCell=value=>' in text:
-                  print('CSV export hardening already present')
-              else:
-                  raise SystemExit('Expected CSV serializer not found; refusing broad rewrite')
+          if 'const csvCell=value=>' in text:
+              print('CSV export hardening already present')
           else:
-              path.write_text(text.replace(old,new,1))
+              start_marker='    const csv=rows.map(row=>row.map(v=>'
+              end_marker='    const blob=new Blob([csv]'
+              if text.count(start_marker)!=1:
+                  raise SystemExit(f'Expected exactly one CSV serializer start, found {text.count(start_marker)}; refusing rewrite')
+              start=text.index(start_marker)
+              end=text.index(end_marker,start)
+              old=text[start:end]
+              if 'String(v??' not in old or '.join(' not in old:
+                  raise SystemExit('CSV serializer region did not match expected shape; refusing rewrite')
+              new="    const csvCell=value=>{let s=String(value??'');if(/^[\\s]*[=+\\-@]/.test(s))s=`'${s}`;return `\"${s.replace(/\"/g,'\"\"')}\"`;};\n    const csv=rows.map(row=>row.map(csvCell).join(',')).join('\\n');\n"
+              path.write_text(text[:start]+new+text[end:])
           PY
           node --check enterprise-v2.js
 
