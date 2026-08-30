@@ -24,7 +24,7 @@ permissions:
 jobs:
   adversarial-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -45,6 +45,7 @@ jobs:
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
           node --check tests/failure-seeking-browser-audit.mjs
+          node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/learner-guide-mobile-browser-audit.cjs
           node --check tests/all-career-browser-sweep.cjs
           node --check tests/employer-public-browser-audit.cjs
@@ -101,6 +102,7 @@ jobs:
           done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
