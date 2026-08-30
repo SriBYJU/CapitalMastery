@@ -20,6 +20,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      # The source file is mutated only inside this guarded runner until every gate passes.
       - name: Apply guarded encoding repair
         run: |
           set -euo pipefail
