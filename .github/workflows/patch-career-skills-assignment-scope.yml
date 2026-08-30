@@ -1,0 +1,49 @@
+name: Patch Career Skills assignment scope
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-career-skills-assignment-scope.mjs'
+      - '.github/workflows/patch-career-skills-assignment-scope.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply guarded assignment-scope patch
+        run: |
+          set -euo pipefail
+          node --check tools/patch-career-skills-assignment-scope.mjs
+          node tools/patch-career-skills-assignment-scope.mjs
+          node --check v2/worker-v2-phase1-release.js
+          node --check enterprise-v2.js
+          node --check capital-mastery-live.js
+          node --check tests/career-skills-assignment-scope-audit.mjs
+          node tests/career-skills-assignment-scope-audit.mjs
+          node tests/account-deletion-audit.mjs
+          node tests/career-skills-five-level-boundary-audit.mjs
+          node tests/career-skills-report-export-audit.mjs
+          node tests/two-track-notification-reporting-audit.mjs
+          node tests/assigned-program-status-audit.mjs
+          git diff --check
+      - name: Commit product fix and permanent regressions
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- v2/worker-v2-phase1-release.js enterprise-v2.js capital-mastery-live.js tests/account-deletion-audit.mjs tests/career-skills-assignment-scope-audit.mjs; then
+            echo 'Career Skills assignment-scope patch produced no product changes.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add v2/worker-v2-phase1-release.js enterprise-v2.js capital-mastery-live.js tests/account-deletion-audit.mjs tests/career-skills-assignment-scope-audit.mjs
+          git commit -m 'Enforce Career Skills assignment-scoped completion'
+          git push origin HEAD:main
