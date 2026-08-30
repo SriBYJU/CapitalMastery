@@ -26,7 +26,7 @@ for(const unsupported of ['SOC 2 certified','SOC2 certified','ISO 27001 certifie
 
 // Implementation evidence behind the public claims.
 ok(worker.includes('verifyFirebaseToken')||worker.includes('verifyFirebaseIdToken'),'Worker must verify Firebase identity before authoritative actions');
-ok(worker.includes('async function requireOrgRole')&&worker.includes('Organization access denied'),'Worker must enforce organization membership/role access');
+ok(worker.includes('async function requireOrgRole')&&worker.includes('await requireOrgMember(env, uid, orgId)')&&worker.includes('Insufficient organization permission'),'Worker must enforce organization membership and allowed roles');
 ok(worker.includes('function v2PublicAssessmentQuestion(row)'),'Worker must have a public assessment serializer');
 const assessmentStart=worker.indexOf('function v2PublicAssessmentQuestion(row)');
 const assessmentEnd=worker.indexOf('async function v2GradeAssessment',assessmentStart);
@@ -40,8 +40,8 @@ ok(enterprise.includes("status:'archived'")||enterprise.includes("status:'hidden
 // purpose-built public payload rather than raw account records.
 ok(worker.includes('publicCredential')||worker.includes('verification')||worker.includes('/verify/'),'Worker must expose a purpose-built verification path');
 ok(!trust.includes('guarantee')||trust.includes('does not'),'Trust Center must not introduce performance guarantees');
-ok(app.includes('Signed-in users can export enterprise data through My Data'),'User-data export disclosure must remain visible');
-ok(app.includes('public verification excludes private account identifiers and answers'),'Verification privacy disclosure must remain visible');
+ok(trust.includes('export enterprise data through My Data'),'User-data export disclosure must remain visible in the Trust Center');
+ok(trust.includes('public verification excludes private account identifiers and answers'),'Verification privacy disclosure must remain visible');
 
 if(fail.length){console.error('TRUST CENTER CLAIMS AUDIT FAILED\n - '+fail.join('\n - '));process.exit(1)}
 console.log('TRUST CENTER CLAIMS AUDIT PASS: public security, privacy, integrity and accessibility claims remain implementation-backed and non-certificatory');
