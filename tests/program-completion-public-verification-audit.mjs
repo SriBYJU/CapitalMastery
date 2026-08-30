@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
 const live=fs.readFileSync('capital-mastery-live.js','utf8');
+const liveUi=fs.readFileSync('capital-mastery-live-ui.js','utf8');
 const cert=fs.readFileSync('public-certificate-verify.js','utf8');
 const migration=fs.readFileSync('migrations/017_phase2_program_completion_records.sql','utf8');
 const ok=(v,m)=>{if(!v)throw new Error(m);};
@@ -26,6 +27,8 @@ ok(live.includes("data-record-type=\"${isProgramCompletion?'program_completion':
 ok(live.includes('VERIFIED PROGRAM COMPLETION ✓'),'Active program completion needs distinct verification badge');
 ok(live.includes('Completion ID'),'Program completion verifier must label its identifier correctly');
 ok(live.includes('Public verification excludes private account, organization, cohort and assignment identifiers.'),'Public verifier must state its privacy boundary');
+ok(liveUi.includes("if (root === 'credentials') {")&&liveUi.includes('single authoritative owner of the credentials'),'The richer live UI must yield the credentials index to the completion-aware authoritative renderer');
+ok(!liveUi.includes("if (root === 'credentials') return renderCredentials();"),'A second credentials-index renderer must never overwrite Program Completions');
 ok(cert.includes("isProgramCompletion ? 'COMPLETION ID' : 'CREDENTIAL ID'"),'Printable certificate must use Completion ID for program completions');
 ok(cert.includes('✓ Verified program completion'),'Printable proof must distinguish program completion from credential verification');
 ok(migration.includes("status IN ('active','revoked')")&&migration.includes('public_token TEXT NOT NULL UNIQUE'),'D1 schema must support unique public tokens and revocation');
