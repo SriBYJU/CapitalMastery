@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/patch-career-skills-assignment-scope.mjs'
+      - 'tests/career-skills-five-level-boundary-audit.mjs'
       - '.github/workflows/patch-career-skills-assignment-scope.yml'
   workflow_dispatch:
 
