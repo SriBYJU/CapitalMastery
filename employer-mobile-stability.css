@@ -1,0 +1,105 @@
+/* Capital Mastery employer public UX — failure-seeking mobile containment.
+   Keep deliberately wide work/timeline surfaces internally scrollable without
+   allowing CSS Grid min-content sizing to widen the whole document. */
+
+.cmv2-employer-hero .container,
+.cmv2-hero-grid,
+.cmv2-hero-grid > *,
+.cmv2-proof-grid,
+.cmv2-proof-grid > *,
+.cmv2-readiness-thesis,
+.cmv2-readiness-thesis > *,
+.cmv2-readiness-compare,
+.cmv2-readiness-compare > *,
+.cmv2-readiness-stack,
+.cmv2-ramp-grid,
+.cmv2-ramp-grid > *,
+.cmv2-ramp-calculator,
+.cmv2-ramp-inputs,
+.cmv2-ramp-inputs > *,
+.cmv2-public-tour-shell,
+.cmv2-public-tour-shell > *,
+.cmv2-public-tour-nav,
+.cmv2-public-tour-nav > *,
+.cmv2-public-tour-panel,
+.cmv2-public-tour-panel > *,
+.cmv2-public-tour-visual,
+.cmv2-public-tour-visual > *,
+.cmv2-tour-work,
+.cmv2-tour-evidence,
+.cmv2-tour-govern,
+.cmv2-public-tour-cta,
+.cmv2-standard-split,
+.cmv2-standard-split > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.cmv2-public-tour-nav button,
+.cmv2-public-tour-panel h3,
+.cmv2-public-tour-panel p,
+.cmv2-public-tour-panel .eyebrow,
+.cmv2-public-tour-cta * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* The program pipeline is intentionally wider than a phone. It should be the
+   scroller — never the page. */
+.cmv2-tour-program {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-inline: contain;
+}
+
+@media (max-width: 1050px) {
+  .cmv2-readiness-thesis,
+  .cmv2-ramp-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .cmv2-hero-grid,
+  .cmv2-standard-split,
+  .cmv2-curriculum-grid,
+  .cmv2-two-col,
+  .cmv2-public-tour-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cmv2-public-tour-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cmv2-tour-evidence,
+  .cmv2-tour-govern {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .cmv2-proof-grid,
+  .cmv2-readiness-compare,
+  .cmv2-ramp-inputs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .cmv2-public-tour-nav,
+  .cmv2-tour-work,
+  .cmv2-tour-evidence,
+  .cmv2-tour-govern {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cmv2-public-tour-panel,
+  .cmv2-public-tour-visual {
+    width: 100%;
+  }
+}
