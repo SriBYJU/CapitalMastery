@@ -44,6 +44,11 @@
     })[c]);
   }
 
+  function safeDecodeRoutePart(value='') {
+    try { return decodeURIComponent(String(value)); }
+    catch (_) { return ''; }
+  }
+
   function routeParts() {
     return (location.hash || '#/').replace(/^#\/?/, '').split('?')[0].split('/').filter(Boolean);
   }
@@ -52,7 +57,7 @@
     const p = routeParts();
     const route = p[0] || '';
     const pathwayRoutes = new Set(['career','learn','quiz','simulation','official-simulation','final','role-lab']);
-    const pathwayId = pathwayRoutes.has(route) && p[1] ? decodeURIComponent(p[1]) : '';
+    const pathwayId = pathwayRoutes.has(route) && p[1] ? safeDecodeRoutePart(p[1]) : '';
     return { route, pathwayId, parts:p };
   }
 
@@ -239,9 +244,9 @@
 
   function advancedRouteCareer() {
     const p=routeParts();
-    if(p[0]==='role-lab'&&p[1]) return publicPathway(decodeURIComponent(p[1]));
+    if(p[0]==='role-lab'&&p[1]) return publicPathway(safeDecodeRoutePart(p[1]));
     if(p[0]==='v2-assessment'&&p[1]&&/professional-final$/i.test(p[1])) {
-      const key=decodeURIComponent(p[1]);
+      const key=safeDecodeRoutePart(p[1]);
       if(key==='ib-professional-final') return 'investment-banking';
       return publicPathway(key.replace(/-professional-final$/i,''));
     }
