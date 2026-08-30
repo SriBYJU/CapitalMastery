@@ -33,8 +33,10 @@ jobs:
           node --check training-tracks.js
           node --check madeline.js
           node --check app.js
-          node --check runtime-audit-fixes.js
           node --check capital-mastery-e2e.js
+          node --check ux-stability.js
+          node --check course-continuity.js
+          node --check runtime-audit-fixes.js
 
       - name: Failure-seeking static audits
         run: |
@@ -90,6 +92,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add certificate-name.js admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js index.html
+          git add certificate-name.js admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js app.js capital-mastery-e2e.js ux-stability.js course-continuity.js runtime-audit-fixes.js index.html
           git commit -m 'Harden Admin QA, account gating, and client stability'
           git push origin HEAD:main
