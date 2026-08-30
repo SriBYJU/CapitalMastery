@@ -38,9 +38,16 @@ jobs:
           grep -q 'request.resource.data.displayName == request.resource.data.credentialName' firestore.rules
           echo 'Scoped Firestore credential-identity contract: PASS'
 
+      - name: Set up Java 21 for Firestore emulator
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
       - name: Compile Firestore rules in emulator
         run: |
           set -euo pipefail
+          java -version
           npx --yes firebase-tools@latest emulators:exec --only firestore --project demo-capital-mastery --config firebase.json "echo FIRESTORE_RULES_COMPILE_PASS"
 
       - name: Require Firebase deployment credential
