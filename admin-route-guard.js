@@ -28,7 +28,18 @@
 
   function blockUnverifiedAdminRoute() {
     if (!isAdminRoute() || verifiedAdmin()) return false;
-    rememberPending(location.hash || ADMIN_PREFIX);
+
+    const auth = window.CM_AUTH;
+    if (auth?.ready === true && auth?.backendVerified === true && auth?.isAdmin !== true) {
+      // A verified non-admin must never retain a privileged destination that could
+      // unexpectedly reactivate later in the same browser session.
+      clearPending();
+    } else {
+      // Preserve the requested route only while signed out or while secure role
+      // verification is still pending, so a genuine admin can resume after sign-in.
+      rememberPending(location.hash || ADMIN_PREFIX);
+    }
+
     if (location.hash !== LOGIN_GATE) location.replace(LOGIN_GATE);
     return true;
   }
