@@ -30,6 +30,7 @@ jobs:
 
       - name: Syntax validation
         run: |
+          node --check state-resilience.js
           node --check certificate-name.js
           node --check admin-qa-simulation-fix.js
           node --check capital-mastery-live-ui.js
@@ -44,6 +45,7 @@ jobs:
           node --check tests/learner-guide-mobile-browser-audit.cjs
           node --check tests/all-career-browser-sweep.cjs
           node --check tests/employer-public-browser-audit.cjs
+          node --check tests/state-resilience-browser-audit.cjs
 
       - name: Failure-seeking static audits
         run: |
@@ -55,6 +57,8 @@ jobs:
           node tests/two-track-notification-reporting-audit.mjs
           node tests/public-credential-hierarchy-audit.mjs
           node tests/phase2-security-a11y-audit.mjs
+          node tests/state-resilience-audit.mjs
+          node tests/employer-mobile-containment-audit.mjs
 
       - name: Full regression suite
         run: |
@@ -93,3 +97,4 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/state-resilience-browser-audit.cjs
