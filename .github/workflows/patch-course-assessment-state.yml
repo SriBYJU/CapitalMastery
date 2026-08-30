@@ -7,6 +7,7 @@ on:
       - 'tools/patch-course-assessment-state.mjs'
       - 'tests/course-assessment-state-audit.mjs'
       - 'tests/course-assessment-state-browser-audit.cjs'
+      - 'tests/official-simulation-job-realism-audit.mjs'
       - '.github/workflows/patch-course-assessment-state.yml'
   workflow_dispatch:
 
