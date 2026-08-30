@@ -1,5 +1,6 @@
 name: Cloudflare deploy readiness
 
+# Release-preflight only. This workflow never deploys production.
 on:
   push:
     branches: [main]
