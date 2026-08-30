@@ -13,5 +13,5 @@ ok(live.includes('data-structured-writing="true"'),'Structured handoff form must
 ok(live.includes('REVIEWER ACCEPTANCE STANDARD'),'Learner must see the quality standard before submission');
 ok(live.includes('This is the quality bar your submission is reviewed against. It tells you the professional standard without exposing scoring keys or answers.'),'Acceptance standard must distinguish guidance from answer leakage');
 ok(live.includes('Submit Manager Handoff for Review'),'Simulation must end in a professional manager handoff');
-ok(index.includes('capital-mastery-live.js?v=20260830-guided2'),'Structured workbench asset must be cache-busted');
+ok(/<script\s+src=["']capital-mastery-live\.js\?v=[^"']+["']><\/script>/.test(index),'Structured workbench asset must be loaded by the production shell with a cache-busted production URL');
 console.log('STRUCTURED MANAGER HANDOFF AUDIT PASS: role-specific standard + evidence-based secure scoring');
