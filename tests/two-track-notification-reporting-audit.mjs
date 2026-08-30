@@ -5,8 +5,8 @@ const enterprise=fs.readFileSync('enterprise-v2.js','utf8');
 const must=(c,m)=>{if(!c)throw new Error(m);};
 
 must(worker.includes("a.track,a.credential_target"), 'Notification queries must load assignment track and credential target');
-must(worker.includes("a.credential_target==='career'"), 'Generated notifications must use the Career Skills completion credential');
-must(worker.includes("credential_level='career' AND status='active'"), 'Career Skills notifications must recognize active Career Skills credentials');
+must(worker.includes("a.credential_target==='career'"), 'Generated notifications must branch on the Career Skills program-completion target');
+must(worker.includes("SELECT completion_id AS credential_id FROM program_completion_records WHERE uid=? AND org_id=? AND assignment_id=? AND pathway_id=? AND program_code='career_skills' AND status='active'"), 'Career Skills notifications must recognize only the matching assignment-scoped completion record');
 must(worker.includes("const professional=a.track==='professional'"), 'Notification generation must branch by program level');
 must(worker.includes("professional&&Number(lab?.revision_count||0)>0"), 'Role Lab revision alerts must be Professional Readiness only');
 must(worker.includes("professional&&readiness"), 'Readiness-gap alerts must be Professional Readiness only');
