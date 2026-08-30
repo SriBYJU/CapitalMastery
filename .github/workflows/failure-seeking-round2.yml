@@ -97,6 +97,7 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
+      # This stage intentionally includes the real delayed-auth Admin simulation race.
       - name: Browser torture audits
         run: |
           python3 -m http.server 4173 --directory dist-pages > /tmp/capital-mastery-http.log 2>&1 &
