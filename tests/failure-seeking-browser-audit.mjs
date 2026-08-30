@@ -267,7 +267,7 @@ try {
   // Local simulation preview stays local and is not redirected to official learner mode.
   await adminPage.locator('[data-cm-admin-sim-preview]').click();
   await adminPage.waitForTimeout(220);
-  assert((await adminPage.evaluate(()=>location.hash)).startsWith('#/simulation/investment-banking'),`Admin simulation preview was redirected away: ${await adminPage.evaluate(()=>location.hash)}`);
+  assert((await adminPage.evaluate(()=>location.hash))==='#/admin-preview/simulation/investment-banking',`Admin simulation preview escaped the protected Admin namespace: ${await adminPage.evaluate(()=>location.hash)}`);
   assert(/Project Northstar|Northstar Technologies|Simulation/i.test(await adminPage.textContent('#app')||''),'Admin simulation preview did not render Project Northstar');
   const simMutations=await mutationCount(adminPage,650);
   assert(simMutations<20,`Admin simulation preview did not settle; ${simMutations} mutations`);
