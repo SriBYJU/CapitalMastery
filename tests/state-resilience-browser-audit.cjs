@@ -43,10 +43,19 @@ async function waitForMain(page){
   await page.waitForTimeout(180);
 }
 
+async function pageSnapshot(page){
+  if(page.isClosed()) return {closed:true,url:page.url()};
+  const appCount=await page.locator('#app').count().catch(()=>-1);
+  const mainCount=await page.locator('#app main#main').count().catch(()=>-1);
+  const body=await page.locator('body').innerText({timeout:1500}).catch(error=>`<body-read-failed:${error.message}>`);
+  return {closed:false,url:page.url(),appCount,mainCount,body:body.slice(0,500)};
+}
+
 (async()=>{
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:430,height:932}});
   const severe=[];
+  const navEvents=[];
   try{
     await context.addInitScript(({stateKey,userKey,uid,state})=>{
       localStorage.setItem(stateKey,JSON.stringify(state));
@@ -60,7 +69,11 @@ async function waitForMain(page){
 
     const page=await context.newPage();
     page.on('pageerror',error=>severe.push(`pageerror: ${error.message}`));
+    page.on('crash',()=>severe.push('page crashed'));
+    page.on('close',()=>severe.push('page closed unexpectedly'));
+    page.on('framenavigated',frame=>{if(frame===page.mainFrame())navEvents.push(`nav:${frame.url()}`);});
     page.on('requestfailed',request=>{
+      if(request.isNavigationRequest()) navEvents.push(`failed-nav:${request.url()}::${request.failure()?.errorText||''}`);
       if(request.url().startsWith(BASE)) severe.push(`same-origin request failed: ${request.url()}`);
     });
     page.on('console',msg=>{
@@ -82,9 +95,6 @@ async function waitForMain(page){
         credentialsArray:Array.isArray(s.credentials),
         preferencesObject:!!s.preferences&&typeof s.preferences==='object'&&!Array.isArray(s.preferences),
         createdValid:!Number.isNaN(Date.parse(s.createdAt)),
-        // The pre-boot guard removes a malformed updatedAt. Later legitimate state
-        // writes may create a fresh ISO timestamp, so the durable contract is that
-        // the corrupt value never survives: absent OR valid is correct.
         updatedRepaired:!('updatedAt' in s)||(!Number.isNaN(Date.parse(s.updatedAt))&&s.updatedAt!=='also-not-a-date')
       });
       return {current:shape(current),saved:shape(saved)};
@@ -108,19 +118,24 @@ async function waitForMain(page){
     assert((await page.textContent('#app')).includes('See exactly how you go from beginner to desk-ready.'),'Forward navigation left stale career DOM');
 
     // Once the shell/assets are loaded, losing network access must not blank local
-    // navigation. Network-backed reconciliation may pause, but the learner keeps a
-    // usable local experience and recovers after the online event.
+    // navigation. Capture the document state immediately if it does so the audit
+    // identifies full-navigation failures instead of timing out on a missing root.
+    const beforeOffline=await pageSnapshot(page);
     await context.setOffline(true);
     await page.evaluate(()=>{location.hash='#/career/private-equity';});
-    await page.waitForTimeout(350);
-    assert((await page.textContent('#app')).includes('Private Equity'),'Offline route change blanked the career page');
-    assert(await page.locator('#app main#main').count()===1,'Offline route change lost the application shell');
+    await page.waitForTimeout(500);
+    const offlineSnapshot=await pageSnapshot(page);
+    assert(offlineSnapshot.appCount===1&&offlineSnapshot.mainCount===1,
+      `Offline route change lost the loaded app shell. before=${JSON.stringify(beforeOffline)} after=${JSON.stringify(offlineSnapshot)} navEvents=${JSON.stringify(navEvents.slice(-12))}`);
+    assert(offlineSnapshot.body.includes('Private Equity'),
+      `Offline route change did not render Private Equity. snapshot=${JSON.stringify(offlineSnapshot)} navEvents=${JSON.stringify(navEvents.slice(-12))}`);
+
     await context.setOffline(false);
     await page.evaluate(()=>window.dispatchEvent(new Event('online')));
     await page.waitForTimeout(250);
     assert((await page.textContent('#app')).includes('Private Equity'),'Online recovery replaced the current career with stale content');
 
-    assert([...new Set(severe)].length===0,`State-resilience browser audit captured failures: ${[...new Set(severe)].join(' | ')}`);
+    assert([...new Set(severe)].length===0,`State-resilience browser audit captured failures: ${[...new Set(severe)].join(' | ')} navEvents=${JSON.stringify(navEvents.slice(-12))}`);
     console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed v1 snapshots, repaired timestamps, Back/Forward, offline navigation and online recovery');
   } finally {
     await context.close();
