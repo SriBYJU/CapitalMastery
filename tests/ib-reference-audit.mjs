@@ -1,9 +1,13 @@
 import fs from 'node:fs';
 const read=p=>fs.readFileSync(new URL('../'+p,import.meta.url),'utf8');
-const data=read('data.js'), live=read('capital-mastery-live.js'), admin=read('admin-qa-simulation-fix.js'), ib=read('ib-analyst-toolkit.js'), ecss=read('enterprise-v2.css'), index=read('index.html');
+const data=read('data.js'), live=read('capital-mastery-live.js'), admin=read('admin-qa-simulation-fix.js'), app=read('app.js'), ib=read('ib-analyst-toolkit.js'), ecss=read('enterprise-v2.css'), index=read('index.html');
 const must=(ok,msg)=>{if(!ok)throw new Error(msg)};
 must(ecss.includes('.cmv2-employer-hero .hero-actions .btn-outline'),'Employer Preview Career Training contrast override missing');
-must(live.includes("adminQaPreview && (root === 'quiz' || root === 'final' || root === 'official-simulation')"),'Admin QA assessment/simulation preview fallback missing');
+must(live.includes("if (root === 'admin-preview') { clearAuthWait(); return; }"),'Secure assessment runtime must yield completely to the protected Admin namespace');
+must(live.includes("adminQaPreview && root === 'official-simulation' && a"),'Verified Admin QA legacy official-simulation traffic must normalize away from the secure learner renderer');
+must(live.includes('window.CM_AUTH?.backendVerified === true'),'Admin QA secure-route yield must require backend verification');
+must(admin.includes('#/admin-preview/simulation/investment-banking'),'Admin Release Lab simulation preview must target the protected Admin namespace');
+must(app.includes("root==='admin-preview'&&a==='simulation'")&&app.includes('simulationPage(c,true)'),'Base SPA must render the protected Admin simulation locally without entering secure assessment');
 must(admin.includes('Assessment preview:'),'Admin Release Lab assessment guidance missing');
 for(const name of ['Excel Workflow Lab','Filings & Research Drill','Three-Statement Bridge','Trading Comps Builder','DCF Sensitivity Lab','M&A Mechanics Lab','Model QA — Find the Errors','Pitchbook QA — Think Like a Reviewer']) must(ib.includes(name),`IB interactive module missing: ${name}`);
 for(const topic of ['Excel workflow, shortcuts & model hygiene','Navigate SEC filings and source transaction data','Build and link a three-statement operating model','Build a DCF with sensitivities','Build M&A sources & uses and accretion/dilution','Audit a financial model and catch errors']) must(data.includes(topic),`IB curriculum mapping missing: ${topic}`);
@@ -11,7 +15,7 @@ must(index.includes('ib-analyst-toolkit.js'),'IB toolkit not loaded by productio
 must(data.includes('Jefferies — Students & Graduates Analyst Training'),'Jefferies training benchmark source missing');
 must(data.includes('Wall Street Prep — Investment Banking Training'),'Wall Street Prep training benchmark source missing');
 must(data.includes('Training The Street — Investment Banking Training'),'Training The Street benchmark source missing');
-console.log('IB REFERENCE PATHWAY AUDIT PASS: contrast, admin preview, 12 interactive analyst-tool workflows, curriculum mapping and benchmark sources verified.');
+console.log('IB REFERENCE PATHWAY AUDIT PASS: contrast, protected Admin preview ownership, 12 interactive analyst-tool workflows, curriculum mapping and benchmark sources verified.');
 
 
 // Phase 1 immersive IB reference gates
