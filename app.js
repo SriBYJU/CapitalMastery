@@ -260,7 +260,7 @@
     if(!cs.simResponses) cs.simResponses={};
     return cs;
   }
-  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }
+  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.backendVerified === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }
   function setQa(v){ localStorage.setItem(QA_KEY, v ? 'true':'false'); }
 
   function esc(v=''){ return String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':'&quot;'}[c])); }
@@ -572,9 +572,10 @@
     const results=document.createElement('div'); results.className='quiz-result'; results.innerHTML=`<div class="${passed?'pass':'fail'}"><div class="score-big">${score}%</div><h2>${passed?'Passed':'Not yet'}</h2><p>${passed?'You met the Capital Mastery 80% standard.':'Review the explanations and try a new variant. You need 80%.'}</p><a class="btn ${passed?'btn-gold':'btn-primary'}" href="#/${next}">${passed?(final||n===2||n===4?'View Achievement':'Continue'):'Try Again'} →</a></div>`; form.prepend(results); form.querySelector('button[type=submit]').disabled=true; window.scrollTo({top:0,behavior:'smooth'});
   }
 
-  function simulationPage(c){
-    if(c.id==='investment-banking' && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }
-    const cs=getCareerState(c.id); if(!qaMode() && Number(cs.simulationKnowledge||0)<PASS){ toast('Pass the Part 5 knowledge check first.','warn'); return nav(`learn/${c.id}/5`); }
+  function simulationPage(c, forceAdminPreview=false){
+    const adminPreview = forceAdminPreview && qaMode();
+    if(c.id==='investment-banking' && !adminPreview && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }
+    const cs=getCareerState(c.id); if(!adminPreview && !qaMode() && Number(cs.simulationKnowledge||0)<PASS){ toast('Pass the Part 5 knowledge check first.','warn'); return nav(`learn/${c.id}/5`); }
     const sim=simFor(c);
     render(`<div class="sim-shell"><div class="sim-topbar"><div class="container"><div><h2>${esc(sim.name)}</h2><div class="sim-role">${esc(c.role)}${c.track?` · ${esc(c.track)}`:''}</div></div><div class="small">Assessment Mode · Practical Simulation</div></div></div><div class="container sim-layout"><nav class="sim-nav">${['Inbox','Brief','Data','Workspace','Review','Results'].map((x,i)=>`<button class="${i===0?'active':''}" data-sim-tab="${x.toLowerCase()}">${simIcon(x)} ${x}</button>`).join('')}</nav><section class="sim-panel" id="sim-panel">${simInbox(c,sim)}</section></div></div>`,'learning');
     document.querySelectorAll('[data-sim-tab]').forEach(b=>b.addEventListener('click',()=>switchSimTab(c,sim,b.dataset.simTab,b)));
@@ -688,10 +689,21 @@
       if(root==='career'){const c=careerById(a);return c?careerPage(c):home();}
       if(root==='learn'){const c=careerById(a);return c?learnPage(c,Number(b||1)):home();}
       if(root==='quiz'){const c=careerById(a);return c?quizPage(c,Number(b||1),false):home();}
+      if(root==='admin-preview'&&a==='simulation'){
+        const c=careerById(b);
+        // admin-route-guard.js owns authorization for this namespace. Do not render
+        // a learner fallback while secure role verification is pending.
+        if(!qaMode()) return;
+        return c?simulationPage(c,true):adminPage();
+      }
       if(root==='official-simulation'){
         const c=careerById(a);
         const adminQaPreview=window.CM_AUTH?.ready===true&&window.CM_AUTH?.backendVerified===true&&window.CM_AUTH?.isAdmin===true&&qaMode();
-        if(adminQaPreview) return c?simulationPage(c):home();
+        if(adminQaPreview){
+          if(!c) return home();
+          location.replace(`#/admin-preview/simulation/${encodeURIComponent(c.id)}`);
+          return;
+        }
         // The secure assessment router owns this route for normal learners. Do not
         // render Home first; that created a visible Home -> loading -> simulation flicker.
         return;

@@ -58,7 +58,7 @@
     if (!isAdmin() || !qaMode()) return false;
     const [root, pathway] = parts();
     if (root !== 'official-simulation' || !pathway) return false;
-    location.replace(`#/simulation/${encodeURIComponent(pathway)}`);
+    location.replace(`#/admin-preview/simulation/${encodeURIComponent(pathway)}`);
     return true;
   }
 
@@ -100,7 +100,7 @@
         if (link) {
           link.textContent = 'Open Admin Simulation Preview';
           link.setAttribute('data-cm-admin-sim-preview', 'true');
-          link.href = '#/simulation/investment-banking';
+          link.href = '#/admin-preview/simulation/investment-banking';
         }
         if (!card.querySelector('.cm-admin-official-note')) {
           const note = document.createElement('div');
@@ -129,7 +129,7 @@
       event.preventDefault();
       event.stopPropagation();
       enableQa();
-      location.hash = adminPreview.getAttribute('href') || '#/simulation/investment-banking';
+      location.hash = adminPreview.getAttribute('href') || '#/admin-preview/simulation/investment-banking';
       return;
     }
 
@@ -139,7 +139,7 @@
     if (!pathway) return;
     event.preventDefault();
     event.stopPropagation();
-    location.hash = `#/simulation/${encodeURIComponent(pathway)}`;
+    location.hash = `#/admin-preview/simulation/${encodeURIComponent(pathway)}`;
   }, true);
 
   window.addEventListener('hashchange', schedule);
