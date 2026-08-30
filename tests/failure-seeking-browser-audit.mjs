@@ -54,6 +54,20 @@ async function assertNoOverflow(page, label) {
     `${label}: horizontal overflow ${Math.max(metrics.doc,metrics.body)}px > ${metrics.innerWidth}px`);
 }
 
+async function trackDiagnostics(page) {
+  return page.evaluate(() => ({
+    hash: location.hash,
+    trackApi: typeof window.CM_TRAINING_TRACKS,
+    trackDefinitions: Object.keys(window.CM_TRAINING_TRACKS?.definitions || {}),
+    heroCount: document.querySelectorAll('#app .page-hero').length,
+    chooserCount: document.querySelectorAll('[data-cm-track-chooser]').length,
+    statusCount: document.querySelectorAll('[data-cm-track-status]').length,
+    sequenceCount: document.querySelectorAll('[data-cm-track-sequence]').length,
+    trainingScript: [...document.scripts].map(s=>s.src).find(src=>src.includes('training-tracks.js')) || '',
+    mainText: (document.querySelector('#app main#main')?.innerText || '').slice(0,1200)
+  }));
+}
+
 const browser = await chromium.launch({ headless:true });
 const context = await browser.newContext();
 const page = await context.newPage();
@@ -65,8 +79,6 @@ page.on('requestfailed', request => {
 page.on('console', msg => {
   if (msg.type() !== 'error') return;
   const text = msg.text();
-  // External auth/network failures are not ignored when they surface as uncaught
-  // page errors; console-only SDK noise is kept out of this local UI torture test.
   if (/favicon|ERR_BLOCKED_BY_CLIENT/i.test(text)) return;
   if (/Firebase|auth-check|Failed to fetch/i.test(text)) return;
   errors.push(`console.error: ${text}`);
@@ -80,6 +92,18 @@ try {
   // 1) Repeated two-track switching must settle, not create a mutation loop.
   // -------------------------------------------------------------------------
   await gotoHash(page, '#/career/investment-banking');
+  try {
+    await page.waitForSelector('[data-cm-track-chooser]', { timeout:2500 });
+  } catch (_) {
+    const diag=await trackDiagnostics(page);
+    // Trigger the documented render event once only as a diagnostic. If this
+    // suddenly repairs the UI, the failure is event/scheduling related rather
+    // than a selector or timing assumption.
+    await page.evaluate(() => window.dispatchEvent(new CustomEvent('capitalmastery:rendered')));
+    await page.waitForTimeout(180);
+    diag.afterExplicitRenderEvent = await page.locator('[data-cm-track-chooser]').count();
+    throw new Error(`Career track chooser missing in real browser. diagnostics=${JSON.stringify(diag)} runtimeErrors=${JSON.stringify(errors)}`);
+  }
   assert(await page.locator('[data-cm-track-chooser]').count() === 1, 'Career page must have exactly one track chooser');
   assert(await page.locator('[data-cm-track-status]').count() === 1, 'Career page must have exactly one selected-track status');
   assert(await page.locator('[data-cm-track-sequence]').count() === 1, 'Career page must have exactly one track sequence');
@@ -95,7 +119,6 @@ try {
   const settledMutations = await mutationCount(page, 800);
   assert(settledMutations < 20, `Career page did not settle after track switching; ${settledMutations} child-list mutations in 800ms`);
 
-  // Keyboard semantics: chooser controls stay true buttons with one selected state.
   const chooserSemantics = await page.evaluate(() => {
     const buttons=[...document.querySelectorAll('[data-cm-select-track]')];
     return { count:buttons.length, pressed:buttons.filter(b=>b.getAttribute('aria-pressed')==='true').length, tags:buttons.map(b=>b.tagName) };
@@ -135,8 +158,6 @@ try {
   const adminSimMutations = await mutationCount(page, 650);
   assert(adminSimMutations < 20, `Admin simulation preview did not settle; ${adminSimMutations} mutations`);
 
-  // Admin Credential Lab must remain a local preview instead of being replaced
-  // by the authoritative live credential renderer.
   await gotoHash(page, '#/admin-preview');
   const foundationPreview = page.locator('a[href="#/certificate/investment-banking/foundations"]').first();
   assert(await foundationPreview.count() === 1, 'Admin legacy credential preview link missing');
@@ -203,9 +224,6 @@ try {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // 7) Same-origin asset failures and uncaught runtime errors are release blockers.
-  // -------------------------------------------------------------------------
   const severe = [...new Set(errors)];
   assert(severe.length === 0, `Browser audit captured runtime failures:\n${severe.join('\n')}`);
 
