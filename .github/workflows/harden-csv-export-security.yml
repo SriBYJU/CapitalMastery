@@ -23,9 +23,8 @@ jobs:
           from pathlib import Path
           path=Path('enterprise-v2.js')
           text=path.read_text()
-          old="""    const csv=rows.map(row=>row.map(v=>`\"${String(v??'').replace(/\"/g,'\"\"')}\"`).join(',')).join('\\n');"""
-          new="""    const csvCell=value=>{let s=String(value??'');if(/^[\\s]*[=+\\-@]/.test(s))s=`'${s}`;return `\"${s.replace(/\"/g,'\"\"')}\"`;};
-    const csv=rows.map(row=>row.map(csvCell).join(',')).join('\\n');"""
+          old="    const csv=rows.map(row=>row.map(v=>`\\\"${String(v??'').replace(/\\\"/g,'\\\"\\\"')}\\\"`).join(',')).join('\\\\n');"
+          new="    const csvCell=value=>{let s=String(value??'');if(/^[\\\\s]*[=+\\\\-@]/.test(s))s=`'${s}`;return `\\\"${s.replace(/\\\"/g,'\\\"\\\"')}\\\"`;};\\n    const csv=rows.map(row=>row.map(csvCell).join(',')).join('\\\\n');"
           if old not in text:
               if 'const csvCell=value=>' in text:
                   print('CSV export hardening already present')
