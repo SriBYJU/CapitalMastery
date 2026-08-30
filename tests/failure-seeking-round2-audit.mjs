@@ -3,6 +3,7 @@ function ok(v,m){if(!v)throw new Error(m);}
 const admin=fs.readFileSync('admin-qa-simulation-fix.js','utf8');
 const live=fs.readFileSync('capital-mastery-live-ui.js','utf8');
 const tracks=fs.readFileSync('training-tracks.js','utf8');
+const trainingCss=fs.readFileSync('training-tracks.css','utf8');
 const madeline=fs.readFileSync('madeline.js','utf8');
 const certName=fs.readFileSync('certificate-name.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
@@ -10,7 +11,6 @@ const e2e=fs.readFileSync('capital-mastery-e2e.js','utf8');
 const ux=fs.readFileSync('ux-stability.js','utf8');
 const continuity=fs.readFileSync('course-continuity.js','utf8');
 const runtime=fs.readFileSync('runtime-audit-fixes.js','utf8');
-const guideCss=fs.readFileSync('learner-guide.css','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const workbookAudit=fs.readFileSync('tests/interactive-guidance-workbook-audit.mjs','utf8');
 const notificationAudit=fs.readFileSync('tests/notification-discovery-audit.mjs','utf8');
@@ -48,14 +48,15 @@ ok(certName.includes('setTimeout(() => openLearningGate(hash), 0)'), 'Account re
 
 // The interactive guide may contain wide spreadsheet work, but the page itself
 // must stay viewport-contained while the workbook becomes the horizontal scroller.
-ok(guideCss.includes('Failure-seeking mobile containment'),'Learner Guide mobile overflow hardening marker missing');
-ok(guideCss.includes('.cm-learner-guide-nav,.cm-learner-guide-panels')&&guideCss.includes('min-width:0;max-width:100%'),'Learner Guide nav/panel grid items must be allowed to shrink on narrow viewports');
-ok(guideCss.includes('.cm-learner-guide-shell{grid-template-columns:minmax(0,1fr)}')&&guideCss.includes('.cm-learner-guide-nav{grid-template-columns:minmax(0,1fr)}'),'Learner Guide responsive grid tracks must use minmax(0,1fr) to prevent min-content expansion');
-ok(guideCss.includes('overflow-x:auto')&&guideCss.includes('overscroll-behavior-inline:contain'),'Wide guide workbooks must scroll internally instead of widening the document');
+ok(trainingCss.includes('Failure-seeking mobile containment'),'Learner Guide mobile overflow hardening marker missing from loaded CSS');
+ok(trainingCss.includes('.cm-learner-guide-nav,.cm-learner-guide-panels')&&trainingCss.includes('min-width:0;max-width:100%'),'Learner Guide nav/panel grid items must be allowed to shrink on narrow viewports');
+ok(trainingCss.includes('grid-template-columns:minmax(0,100%)!important')&&trainingCss.includes('contain:inline-size'),'Learner Guide responsive grid tracks must defeat intrinsic min-content expansion');
+ok(trainingCss.includes('overflow-x:auto')&&trainingCss.includes('overscroll-behavior-inline:contain'),'Wide guide workbooks must scroll internally instead of widening the document');
 
 // New releases must not allow old cached versions of recently changed scripts/styles to mix.
 for(const asset of [
   'learner-guide.css?v=20260830-stability4',
+  'training-tracks.css?v=20260830-stability4',
   'certificate-name.js?v=20260830-stability3',
   'app.js?v=20260830-stability3',
   'training-tracks.js?v=20260830-stability3',
@@ -68,9 +69,10 @@ for(const asset of [
   'admin-qa-simulation-fix.js?v=20260830-stability3'
 ]) ok(index.includes(asset), `Missing current cache-bust for ${asset}`);
 
-ok(!index.includes('training-tracks.js?v=20260830-tracks2'), 'Old training-track cache key must not remain');
+ok(!index.includes('training-tracks.css?v=20260830-tracks2'), 'Old training-track stylesheet cache key must not remain');
+ok(!index.includes('training-tracks.js?v=20260830-tracks2'), 'Old training-track script cache key must not remain');
 ok(!index.includes('admin-qa-simulation-fix.js?v=20260828-adminsim2'), 'Old Admin QA cache key must not remain');
-ok(workbookAudit.includes('learner-guide.css?v=20260830-stability4')&&workbookAudit.includes('app.js?v=20260830-stability3'), 'Workbook regression audit must follow current guide/app stability generations');
+ok(workbookAudit.includes('training-tracks.css?v=20260830-stability4')&&workbookAudit.includes('app.js?v=20260830-stability3'), 'Workbook regression audit must follow current guide/app stability generations');
 ok(notificationAudit.includes('app.js?v=20260830-stability3'), 'Notification regression audit must follow the current app cache generation');
 ok(mixedSubmitAudit.includes('capital-mastery-e2e.js?v=20260830-stability3'), 'Mixed-submit regression audit must follow the current E2E cache generation');
 
