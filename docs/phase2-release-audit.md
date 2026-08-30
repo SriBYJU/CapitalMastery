@@ -135,20 +135,25 @@ After that gate, repository work was intentionally limited to non-deployable eng
 - deletion of one-use migration, patch and hardening workflows;
 - deletion of corresponding one-use mutation/diagnostic scripts;
 - correction of credential-system and training-track documentation;
-- archival of superseded Phase 1 root QA/checklist/live-release files under `docs/archive/`;
-- refresh of the Phase 2 release record; and
-- a non-deploying Cloudflare credential-presence preflight.
+- archival of superseded Phase 1 root QA/checklist/live-release files under `docs/archive/` with an archive index;
+- refresh of the Phase 2 release record;
+- a non-deploying Cloudflare credential-presence preflight;
+- a guarded manual-only `Cloudflare production release` workflow; and
+- a turnkey production deployment/rollback runbook.
 
-A GitHub compare from `ebcb93dd...` through preflight commit `c8844ad6140aa42b60e0d219eac206aee6c20563` shows **no deployable frontend file and no Worker source change**. Current `main` therefore retains the same deployable product generation that passed the full adversarial source gate.
+A GitHub compare from `ebcb93dd...` through cleanup commit `9bf92327113f43871d09edb7ce39b2e034709524` shows **no deployable frontend file and no Worker source change**. Current `main` therefore retains the same deployable product generation that passed the full adversarial source gate.
 
-The workflow folder is now reduced to six permanent release/QA workflows:
+The workflow folder now contains seven permanent release/QA workflows:
 
 - `cloudflare-deploy-readiness.yml`
+- `cloudflare-production-release.yml`
 - `failure-seeking-round2.yml`
 - `live-production-readonly-audit.yml`
 - `package-pages-release.yml`
 - `package-worker-release.yml`
 - `phase2-current-source-audit.yml`
+
+The production-release workflow is `workflow_dispatch` only. It requires an explicit `RELEASE` confirmation and does not auto-deploy from ordinary commits.
 
 ## 4. D1 integrity release contract
 
@@ -214,17 +219,32 @@ Do not interpret old-production browser failures as current-source failures; dep
 
 GitHub Pages has continued to build successfully from current `main`. This is useful fallback/deployment evidence but does **not** replace the required canonical Cloudflare release and production checks.
 
-## 7. Remaining Phase 2 blockers
+## 7. Production promotion path
+
+A permanent guarded workflow now exists at:
+
+`.github/workflows/cloudflare-production-release.yml`
+
+Once both Cloudflare Actions secrets are configured, run **Cloudflare production release** manually and enter exactly `RELEASE`. The workflow:
+
+1. refuses to run without both Cloudflare credentials;
+2. reruns the source/static release gate;
+3. rebuilds and audits the exact Pages allowlist;
+4. deploys the Worker first using checked-in `wrangler.jsonc`;
+5. verifies `/health`, bad-Origin rejection, unauthenticated auth blocking and protected `/admin/integrity` existence;
+6. deploys exactly `dist-pages/` to project `capitalmastery`;
+7. verifies canonical generation markers and security headers; and
+8. runs all six Chromium release suites against `capitalmastery.pages.dev`.
+
+It deliberately does **not** claim Phase 2 closure because authenticated D1/Firebase/tenant/cleanup evidence remains separate.
+
+## 8. Remaining Phase 2 blockers
 
 ### Cloudflare production promotion
 
 1. Add repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, or provide an equivalent authorized Cloudflare deployment connection.
-2. Promote the exact audited Worker source while preserving production binding inheritance and protected settings.
-3. Re-probe `/health`, bad Origin, unauthenticated protected routes and `/admin/integrity`; the integrity route must be present and protected rather than `404`.
-4. With the configured Capital Mastery administrator, execute `/admin/integrity`; require `quick_check = ok`, zero foreign-key violations and record table counts.
-5. Promote the exact audited `dist-pages/` artifact to the `capitalmastery` Pages project.
-6. Verify generation markers and security headers against `capitalmastery.pages.dev`.
-7. Rerun all six Chromium suites against the canonical Cloudflare host.
+2. Run the guarded `Cloudflare production release` workflow with confirmation `RELEASE`.
+3. With the configured Capital Mastery administrator, execute `/admin/integrity`; require `quick_check = ok`, zero foreign-key violations and record table counts.
 
 Current deploy-preflight evidence proves that **both required GitHub Actions Cloudflare secrets are absent**. No Cloudflare connector/plugin is available in the current tool environment. Production must not be changed by guessing credentials, bindings, account IDs or deployment parameters.
 
@@ -256,7 +276,7 @@ After both Cloudflare surfaces are current:
 - authenticated D1 integrity execution
 - disposable QA account/data cleanup and post-cleanup integrity verification
 
-## 8. Closure rule
+## 9. Closure rule
 
 Do **not** declare Phase 2 complete until:
 
