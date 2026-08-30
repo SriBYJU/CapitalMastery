@@ -9,6 +9,7 @@
   let domScheduled = false;
   let routeEpoch = 0;
   let lastRaceRepair = '';
+  let skipNextHashReconcile = false;
 
   function esc(v='') {
     return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -77,53 +78,89 @@
   }
 
   function applyOfficial(state, pathway, rows) {
+    // An empty server result means "no authoritative rows to merge", not "erase
+    // every local field". Returning before creating/mutating a pathway also keeps
+    // first-visit/offline recovery from manufacturing a state change that would
+    // trigger unnecessary UI refresh work.
+    if (!Array.isArray(rows) || !rows.length) return false;
+
     state.careers ||= {};
     state.careers[pathway] ||= { learningComplete:[], completedParts:[], quizScores:{}, simulationKnowledge:null, simulationScore:null, finalScore:null, applied:{}, simResponses:{}, readiness:null };
     const cs = state.careers[pathway];
     cs.learningComplete = Array.isArray(cs.learningComplete) ? [...new Set(cs.learningComplete.map(Number).filter(Number.isFinite))] : [];
+    cs.completedParts = Array.isArray(cs.completedParts) ? [...new Set(cs.completedParts.map(Number).filter(Number.isFinite))] : [];
+    cs.quizScores = cs.quizScores && typeof cs.quizScores === 'object' && !Array.isArray(cs.quizScores) ? { ...cs.quizScores } : {};
     cs.applied ||= {};
     cs.simResponses ||= {};
-    const before = JSON.stringify({ completedParts:cs.completedParts, quizScores:cs.quizScores, simulationKnowledge:cs.simulationKnowledge, simulationScore:cs.simulationScore, finalScore:cs.finalScore, learningComplete:cs.learningComplete });
+
+    const before = JSON.stringify({
+      completedParts:cs.completedParts,
+      quizScores:cs.quizScores,
+      simulationKnowledge:cs.simulationKnowledge,
+      simulationScore:cs.simulationScore,
+      finalScore:cs.finalScore,
+      learningComplete:cs.learningComplete
+    });
 
     const by = Object.fromEntries(rows.map(r => [String(r.item_id || ''), r]));
-    const quizScores = {};
-    const completed = [];
+    const completed = new Set(cs.completedParts);
+
+    // Merge only fields represented by authoritative rows. Missing rows are not
+    // treated as negative evidence because the endpoint can legitimately return a
+    // partial/empty result during first use, migrations, or transient conditions.
     for (let p=1; p<=4; p++) {
       const row = by[`part-${p}`];
       if (!row) continue;
       const score = Number(row.best_score || 0);
-      if (score > 0) quizScores[p] = score;
-      if (Number(row.completed) === 1 && score >= PASS) {
-        completed.push(p);
+      if (score > 0) cs.quizScores[p] = score;
+      else delete cs.quizScores[p];
+      const passed = Number(row.completed) === 1 && score >= PASS;
+      if (passed) {
+        completed.add(p);
         if (!cs.learningComplete.includes(p)) cs.learningComplete.push(p);
+      } else {
+        completed.delete(p);
       }
     }
 
     const knowledge = by['part-5'];
-    const knowledgeScore = knowledge ? Number(knowledge.best_score || 0) : 0;
-    if (knowledge && Number(knowledge.completed) === 1 && knowledgeScore >= PASS && !cs.learningComplete.includes(5)) cs.learningComplete.push(5);
+    if (knowledge) {
+      const knowledgeScore = Number(knowledge.best_score || 0);
+      cs.simulationKnowledge = knowledgeScore || null;
+      if (Number(knowledge.completed) === 1 && knowledgeScore >= PASS && !cs.learningComplete.includes(5)) cs.learningComplete.push(5);
+    }
 
     const sim = by.simulation;
-    const simScore = sim ? Number(sim.best_score || 0) : 0;
-    if (sim && Number(sim.completed) === 1 && simScore >= PASS) {
-      completed.push(5);
-      if (!cs.learningComplete.includes(5)) cs.learningComplete.push(5);
+    if (sim) {
+      const simScore = Number(sim.best_score || 0);
+      cs.simulationScore = simScore || null;
+      if (Number(sim.completed) === 1 && simScore >= PASS) {
+        completed.add(5);
+        if (!cs.learningComplete.includes(5)) cs.learningComplete.push(5);
+      } else {
+        completed.delete(5);
+      }
     }
 
     const final = by.final;
-    cs.quizScores = quizScores;
-    cs.completedParts = completed;
-    cs.simulationKnowledge = knowledgeScore || null;
-    cs.simulationScore = simScore || null;
-    cs.finalScore = final ? Number(final.best_score || 0) || null : null;
-    cs.learningComplete.sort((a,b)=>a-b);
+    if (final) cs.finalScore = Number(final.best_score || 0) || null;
+
+    cs.completedParts = [...completed].sort((a,b)=>a-b);
+    cs.learningComplete = [...new Set(cs.learningComplete)].sort((a,b)=>a-b);
     sanitizeCareer(cs);
 
-    const after = JSON.stringify({ completedParts:cs.completedParts, quizScores:cs.quizScores, simulationKnowledge:cs.simulationKnowledge, simulationScore:cs.simulationScore, finalScore:cs.finalScore, learningComplete:cs.learningComplete });
+    const after = JSON.stringify({
+      completedParts:cs.completedParts,
+      quizScores:cs.quizScores,
+      simulationKnowledge:cs.simulationKnowledge,
+      simulationScore:cs.simulationScore,
+      finalScore:cs.finalScore,
+      learningComplete:cs.learningComplete
+    });
     return before !== after;
   }
 
-  async function reconcileCurrent(forceReload=false) {
+  async function reconcileCurrent(refreshView=false) {
     if (!API || qaMode() || !window.CM_AUTH?.ready || !window.CM_AUTH?.user) return;
     const epoch = ++routeEpoch;
     const [root, pathway] = parts();
@@ -144,10 +181,20 @@
     let changed = false;
     for (const r of results) if (r.status === 'fulfilled') changed = applyOfficial(state, r.value.id, r.value.rows) || changed;
     if (!changed) return;
+
     state.updatedAt = new Date().toISOString();
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
     window.CM_SYNC?.flush?.().catch(() => {});
-    if (forceReload && !document.querySelector('.cm-result')) location.reload();
+
+    // app.js owns an in-memory copy of local progress. Refresh that copy and, when
+    // a visible route needs repainting, rerun the SPA hash render in place. Never
+    // call location.reload(): a state reconciliation must not turn a working SPA
+    // into a network-dependent document navigation.
+    window.CM?.refreshLocalState?.();
+    if (refreshView && !document.querySelector('.cm-result')) {
+      skipNextHashReconcile = true;
+      window.dispatchEvent(new HashChangeEvent('hashchange'));
+    }
   }
 
   function repairAsyncRouteRace() {
@@ -219,9 +266,13 @@
     } catch (_) {}
   }
 
-  function routeTasks(forceReload=false) {
+  function routeTasks(refreshView=false) {
     routeEpoch++;
-    setTimeout(() => reconcileCurrent(forceReload), 80);
+    if (skipNextHashReconcile) {
+      skipNextHashReconcile = false;
+    } else {
+      setTimeout(() => reconcileCurrent(refreshView), 80);
+    }
     setTimeout(correctCredentialDetail, 180);
     setTimeout(scheduleDom, 40);
   }
