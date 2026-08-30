@@ -28,7 +28,7 @@ Capital Mastery is a finance workforce-readiness platform that combines role lea
 ## Phase 1 architecture
 
 ```text
-GitHub Pages frontend
+Cloudflare Pages frontend
         │
         ├── Firebase Authentication
         │
@@ -71,7 +71,18 @@ node tests/enterprise-v2-runtime-smoke.mjs
 node tests/ib-reference-audit.mjs
 ```
 
-The current suites cover the legacy 79%/80% mastery boundary, **189 existing application routes**, and **17 additional Enterprise V2 routes**, plus V2 sequencing, no-delete Firm Layer rules, role-based authorization, readiness/evidence features, accessibility hooks, and credential verification wiring.
+The current suites cover the legacy 79%/80% mastery boundary, **190 public/learner application routes**, and the Enterprise V2 routes, plus V2 sequencing, no-delete Firm Layer rules, role-based authorization, readiness/evidence features, accessibility hooks, and credential verification wiring.
+
+## Production build
+
+Build and audit the frontend-only Cloudflare Pages artifact before deployment:
+
+```bash
+node tools/build-pages.mjs
+node tests/pages-production-bundle-audit.mjs
+```
+
+Deploy `dist-pages/`, never the repository root. The production bundle excludes Worker code, tests, migrations, diagnostics, and internal documentation. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md) for the release order and live verification matrix.
 
 ## Founder
 

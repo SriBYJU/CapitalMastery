@@ -1,6 +1,6 @@
 # Capital Mastery Phase 2 Curriculum Accuracy Audit
 
-**Verification date:** August 29, 2026  
+**Verification date:** August 30, 2026
 **Scope:** 16 finance-career pathways, professional-toolkit surfaces, Applied Work, secure assessments and Role Labs.  
 **Standard:** Training should reflect the real decisions, work products, source discipline and review behavior of the role while avoiding employer-proprietary software, data or internal processes.
 
@@ -41,6 +41,25 @@
 - Venture Capital now uses a market, unit-economics, cap-table and cohort workspace with a partner recommendation workflow.
 - Corporate Development now uses a target, valuation, synergy, diligence and integration deal room with an executive recommendation workflow.
 - Employer/learner progress views now read authoritative server evidence so UI completion cannot disagree with official assessment/credential state.
+- Every non-IB career workbench now ends in a structured manager handoff with separate decision, evidence, risk/uncertainty, and next-action fields. Server grading uses the role's case numbers and decision language rather than a generic writing-length rubric.
+- Every non-IB Role Lab now includes a role-native material case update before the final recommendation. Learners must re-underwrite the affected assumptions, outputs, risk, and control action instead of receiving a decorative "new information" banner.
+- Employer-visible reviewer standards now state what a decision-ready submission must contain without exposing answer keys or exact grading thresholds.
+
+## August 30 role-task re-verification
+
+The change-control and manager-handoff release was checked against current first-party role evidence. The sources support the task families, not employer endorsement or a claim that Capital Mastery reproduces any firm's proprietary process.
+
+| Task family strengthened | Current first-party evidence used | Capital Mastery implementation consequence |
+| --- | --- | --- |
+| Buyout investing | [Blackstone Private Equity](https://www.blackstone.com/our-businesses/private-equity/) describes sector expertise, diligence, operational improvement, and value creation. | PE updates now force a revised downside/IC view when customer concentration and pricing affect the underwritten case. |
+| Venture investing | [Insight Partners Summer Analyst Program](https://info.insightpartners.com/Summer-Analyst-Program.html) separates investment sourcing/diligence from Diligence & Growth Strategy work. | VC work requires sourced market/traction analysis, unit economics, diligence priorities, and an invest/pass recommendation that changes when retention and burn are restated. |
+| Quantitative research | [Citadel Quantitative Research Analyst](https://www.citadel.com/careers/details/quantitative-research-analyst-university-graduate-europe/) emphasizes researching datasets, backtesting models, and implementing strategies in live trading. | Quant work now treats test-set contamination as a material control failure and requires a corrected validation plan before a research conclusion can be accepted. |
+| Markets | [J.P. Morgan Markets Analyst Program](https://www.jpmorganchase.com/careers/explore-opportunities/programs/markets-fulltime-analyst) emphasizes client solutions, execution, market information, and risk. | Sales & Trading work requires an execution decision, liquidity/market-risk explanation, and client update when the market moves. |
+| Planning and analysis | [Amazon FP&A role evidence](https://amazon.jobs/jobs/10511757) centers on forecasts, variance analysis, financial models, planning, and decision support. | FP&A handoffs require a driver bridge, revised forecast, quantified scenario effect, and management action—not a general course response. |
+| Risk | [BlackRock Risk & Quantitative Analysis](https://careers.blackrock.com/students-and-graduates-functions-risk-quantitative-analysis) emphasizes independent risk oversight, modeling, quantitative analysis, and decision support. | Risk work requires stress/counterparty consequences, limit implications, escalation, and a control recommendation after exposure changes. |
+| Wealth management | [Bank of America Private Wealth Investment Management Specialist](https://careers.bankofamerica.com/en-us/job-detail/26015967/private-wealth-investment-management-specialist-multiple-locations) describes portfolio monitoring, asset allocation, risk, client objectives, and recommendations. | Wealth work requires suitability-aware allocation, liquidity and concentration analysis, implementation actions, and a client-ready explanation after constraints change. |
+| Real estate finance | [CBRE Capital Markets Financial Analyst](https://careers.cbre.com/en_US/careers/JobDetail?jobId=290644&source=External+Career+Portal) includes underwriting, financial modeling, cash-flow analysis, property research, and investment materials. | Real Estate Finance work requires NOI/value/debt coverage analysis and a revised bid or financing view after occupancy and rate changes. |
+| Corporate development | [Apple Corporate Development Associate](https://jobs.apple.com/en-us/details/200671785-0836/associate-corporate-development?team=CORSV) covers transaction execution, valuation, diligence, negotiation, and integration. | Corporate Development work requires an executive recommendation that connects valuation, probability-weighted synergies, diligence, negotiation posture, and integration risk. |
 
 ## Reverification rule
 

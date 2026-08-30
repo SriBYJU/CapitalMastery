@@ -46,7 +46,7 @@
     return {
       className: '',
       label: 'Career Certificate',
-      description: 'for demonstrating mastery across the required learning, assessments, practical simulation, and final examination under the Capital Mastery Standard.'
+      description: 'for demonstrating mastery across the required learning, assessments, practical simulation, and Professional Readiness Final under the Capital Mastery Standard.'
     };
   }
 

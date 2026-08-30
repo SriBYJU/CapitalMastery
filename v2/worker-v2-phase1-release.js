@@ -2899,6 +2899,121 @@ const CAREER_WORKBENCHES = {
   }
 };
 
+// Every professional Role Lab includes a material mid-case update. The learner must
+// trace the new fact through the work product, explain decision impact and state a
+// controlled next action before the final manager handoff. These are intentionally
+// role-native changes rather than a generic "the case changed" banner.
+const CAREER_ROLELAB_UPDATES = {
+  'private-equity': {
+    title:'Re-underwrite the customer-concentration update', timestamp:'Diligence update · 4:20 PM', fileName:'04_Customer_Contract_Update.pdf', deliverable:'Updated underwriting / IC change note',
+    message:'Commercial diligence confirms the top customer renewed for only 12 months and received an 8% price concession. Trace the impact through revenue, EBITDA, downside returns and the IC recommendation.',
+    impactGroups:[['customer','contract','renew'],['12 month','12-month'],['8%','price concession'],['revenue','ebitda','margin'],['downside','moic','irr','returns']],
+    actionGroups:[['rerun','update','re-underwrite'],['downside','sensitivity'],['diligence','condition','gate'],['ic','investment committee','recommend']]
+  },
+  'venture-capital': {
+    title:'Reassess the cohort and runway update', timestamp:'Founder follow-up · 2:35 PM', fileName:'05_Beacon_Revised_Cohorts.xlsx', deliverable:'Revised partner-decision note',
+    message:'The company restates Month-12 retention from 66% to 58%, and current monthly burn is 20% above the deck. Reassess retention quality, runway and the invest / pass recommendation.',
+    impactGroups:[['retention','cohort'],['66%','58%','restat'],['burn','20%'],['runway'],['invest','pass','diligence']],
+    actionGroups:[['recalculate','rerun','update'],['cohort','retention'],['cash','runway','financing'],['founder','diligence','partner']]
+  },
+  'equity-research': {
+    title:'Update the earnings view for revised guidance', timestamp:'Management follow-up · 5:05 PM', fileName:'04_Revised_Guidance.xlsx', deliverable:'Revised estimates / flash note',
+    message:'Management lowers the top end of revenue guidance and flags 150 bps of near-term margin pressure. Update affected estimates, valuation and the research-note conclusion.',
+    impactGroups:[['guidance','revenue'],['150 bps','150 basis','margin'],['estimate','forecast'],['valuation','price target'],['thesis','rating','recommend']],
+    actionGroups:[['update','rerun','revise'],['model','estimate'],['price target','valuation'],['risk','catalyst','senior analyst']]
+  },
+  'asset-management': {
+    title:'Rebalance after a policy and liquidity change', timestamp:'Client mandate update · 11:10 AM', fileName:'03_Revised_Investment_Policy.pdf', deliverable:'Revised rebalance ticket / PM note',
+    message:'The client reduces the maximum equity weight to 55% and schedules a $0.75m redemption. Rebuild the trade list while preserving liquidity and policy compliance.',
+    impactGroups:[['55%','equity'],['0.75','redemption','liquidity'],['trade','rebalance'],['policy','mandate'],['cash','portfolio']],
+    actionGroups:[['recalculate','rebalance','update'],['sell','trim','trade'],['cash','liquidity'],['compliance','policy','pm']]
+  },
+  'hedge-funds': {
+    title:'Re-underwrite the delayed catalyst', timestamp:'Catalyst update · 7:45 AM', fileName:'04_Catalyst_and_Borrow_Update.txt', deliverable:'Updated position / risk note',
+    message:'Alpha delays its product launch by two quarters and Beta borrow cost doubles. Reassess catalyst timing, carrying cost, sizing and the add / hold / trim / exit decision.',
+    impactGroups:[['two quarter','2 quarter','delay'],['borrow','cost','double'],['catalyst'],['position','size','carrying'],['add','hold','trim','exit']],
+    actionGroups:[['update','re-underwrite','rerun'],['position','size','exposure'],['risk','stop','thesis'],['pm','monitor','catalyst']]
+  },
+  'sales-trading': {
+    title:'Revise the execution plan after a market shock', timestamp:'Market update · 9:58 AM', fileName:'04_Macro_Flash_and_Depth.csv', deliverable:'Revised execution / client update',
+    message:'Macro data surprises to the upside, the offer gaps wider and displayed liquidity falls by half. Reassess price, execution method, desk limit usage and client communication.',
+    impactGroups:[['macro','surprise'],['offer','price','gap'],['liquidity','half','50%'],['execution','limit','desk risk'],['client','communication']],
+    actionGroups:[['update','reprice','reassess'],['limit','risk','position'],['slice','stage','liquidity','execution'],['client','disclose','confirm']]
+  },
+  'quantitative-finance': {
+    title:'Respond to a research-integrity exception', timestamp:'Model review · 3:15 PM', fileName:'04_Validation_Audit.md', deliverable:'Remediation / research decision note',
+    message:'Audit logs show the test set was viewed during feature selection. Treat the reported out-of-sample result as contaminated and define the clean rerun and governance response.',
+    impactGroups:[['test set','out-of-sample'],['feature selection'],['contaminat','leakage','bias'],['result','backtest'],['governance','research']],
+    actionGroups:[['new test','holdout','fresh sample'],['rerun','retrain'],['document','audit'],['pause','reject','not ready','review']]
+  },
+  'private-credit': {
+    title:'Re-underwrite a borrower downside event', timestamp:'Credit update · 5:40 PM', fileName:'04_Customer_Loss_Update.xlsx', deliverable:'Revised downside / Credit Committee note',
+    message:'The borrower loses a major customer and downside EBITDA falls from $45m to $38m. Recalculate leverage and covenant headroom, then revise structure and the credit recommendation.',
+    impactGroups:[['customer','loss'],['45','38','ebitda'],['leverage'],['covenant','headroom','breach'],['credit','approve','decline']],
+    actionGroups:[['recalculate','rerun','update'],['covenant','structure','condition'],['liquidity','repayment','cash flow'],['credit committee','escalate','recommend']]
+  },
+  'corporate-banking': {
+    title:'Refresh the approval case for higher debt', timestamp:'Borrower update · 1:25 PM', fileName:'03_Revised_Facility_Request.pdf', deliverable:'Revised credit-approval change note',
+    message:'Transaction fees and delayed asset sales increase pro forma debt by $30m. Update leverage, debt capacity, covenant structure and the support / decline recommendation.',
+    impactGroups:[['30','debt'],['leverage'],['capacity'],['covenant','structure'],['support','decline','approval']],
+    actionGroups:[['recalculate','update','rerun'],['condition','covenant','amortization'],['cash flow','asset sale','liquidity'],['credit officer','approval','escalate']]
+  },
+  'corporate-development': {
+    title:'Rebuild the synergy case after diligence', timestamp:'Integration workstream · 6:10 PM', fileName:'04_Integration_Workstream_Update.xlsx', deliverable:'Revised executive deal note',
+    message:'Diligence reduces synergy realization probability from 75% to 50% and raises one-time integration cost from $15m to $28m. Rebuild value and reassess go / no-go.',
+    impactGroups:[['75%','50%','probability'],['15','28','one-time','integration cost'],['synergy','value'],['integration','risk'],['go','no-go','pause']],
+    actionGroups:[['recalculate','rerun','update'],['synergy','owner','workstream'],['integration','plan','cost'],['executive','governance','diligence']]
+  },
+  'fp-and-a': {
+    title:'Reforecast after a new operating signal', timestamp:'Weekly business review · 10:15 AM', fileName:'04_Week3_Operating_Update.xlsx', deliverable:'Revised forecast / CFO commentary',
+    message:'Week-3 volume is another 3% below plan and a committed operating contract cannot be deferred. Update the forecast, variance bridge, cost outlook and management action.',
+    impactGroups:[['3%','volume'],['contract','cannot be deferred','committed'],['forecast','reforecast'],['variance','bridge'],['cost','opex','outlook']],
+    actionGroups:[['update','rerun','reforecast'],['driver','volume','price','mix'],['cost','headcount','spend'],['cfo','management','action']]
+  },
+  'treasury': {
+    title:'Refresh liquidity for a timing disruption', timestamp:'Bank / AR update · 9:40 AM', fileName:'04_Liquidity_Timing_Update.xlsx', deliverable:'Revised liquidity / funding action',
+    message:'A $10m receivable slips four weeks and an additional $3m at Bank C becomes restricted. Update the 13-week low point, policy gap, funding action and hedge timing.',
+    impactGroups:[['10','receivable','four week','4 week'],['3','restricted','bank c'],['13-week','liquidity'],['gap','policy','buffer'],['funding','hedge']],
+    actionGroups:[['update','rerun','refresh'],['revolver','funding','liquidity'],['timing','buffer','policy'],['treasurer','escalate','monitor']]
+  },
+  'wealth-management': {
+    title:'Revise the plan for a new liquidity need', timestamp:'Client discovery update · 4:45 PM', fileName:'03_Client_Followup.pdf', deliverable:'Revised suitability / implementation note',
+    message:'The client adds a $0.4m cash need within 12 months and confirms a low tax basis in employer stock. Reassess liquidity, concentration, allocation and implementation sequencing.',
+    impactGroups:[['0.4','liquidity','12 month'],['tax basis','tax'],['employer stock','concentration'],['allocation'],['suitability','client']],
+    actionGroups:[['update','revise','recalculate'],['reserve','cash','liquidity'],['tax','staged','transition'],['client','confirm','advisor']]
+  },
+  'risk-management': {
+    title:'Escalate a worsening counterparty event', timestamp:'Intraday risk update · 12:05 PM', fileName:'03_Counterparty_Downgrade.csv', deliverable:'Updated breach / escalation note',
+    message:'The counterparty is downgraded and exposure rises from $120m to $135m. Recalculate limit usage and breach, assess stress implications and recommend an immediate control action.',
+    impactGroups:[['downgrade'],['120','135','exposure'],['limit','breach','utilization'],['stress','loss'],['counterparty','risk']],
+    actionGroups:[['recalculate','update','rerun'],['reduce','hedge','collateral'],['escalate','approval','limit'],['monitor','owner','deadline']]
+  },
+  'real-estate-finance': {
+    title:'Re-underwrite occupancy and debt terms', timestamp:'Lender / leasing update · 3:30 PM', fileName:'03_Revised_RentRoll_and_Debt.xlsx', deliverable:'Revised underwriting / IC note',
+    message:'Physical occupancy falls from 95% to 91% and the lender quote increases from 6% to 7%. Update NOI, value, debt service, DSCR and the bid / financing recommendation.',
+    impactGroups:[['95%','91%','occupancy'],['6%','7%','interest','lender'],['noi'],['debt service','dscr'],['value','bid']],
+    actionGroups:[['recalculate','re-underwrite','update'],['rent roll','leasing'],['debt','financing','lender'],['bid','price','ic','diligence']]
+  }
+};
+
+const CAREER_REVIEW_STANDARDS = {
+  'private-equity':['IC decision','Base and downside returns','Diligence issue that can break the thesis','Specific next diligence gate'],
+  'venture-capital':['Invest / pass position','Market, runway, dilution and retention evidence','Largest unresolved venture risk','Next founder or customer diligence step'],
+  'equity-research':['Rating / thesis conclusion','Estimate and valuation evidence','Catalyst and material risk','Required model or research follow-up'],
+  'asset-management':['Hold / rebalance decision','Exposure, attribution and trade evidence','Mandate or concentration risk','Implementation and monitoring action'],
+  'hedge-funds':['Add / hold / trim / exit decision','Upside, downside and catalyst evidence','Sizing, liquidity or thesis-breaker risk','Position and monitoring action'],
+  'sales-trading':['Execution recommendation','Level, spread, liquidity and limit evidence','Market / inventory risk','Client-safe next action without promising certainty'],
+  'quantitative-finance':['Research readiness decision','Net and out-of-sample evidence','Bias, leakage or robustness risk','Controlled validation / implementation step'],
+  'private-credit':['Credit decision and conditions','Leverage, coverage and downside evidence','Repayment / covenant risk','Structure, diligence and monitoring action'],
+  'corporate-banking':['Credit support decision','Current and pro forma capacity evidence','Borrower / facility risk','Covenant, condition and monitoring action'],
+  'corporate-development':['Go / no-go recommendation','Standalone value and risk-adjusted synergy evidence','Integration / execution risk','Next diligence and governance gate'],
+  'fp-and-a':['Forecast conclusion','Actual / budget / forecast evidence','Driver and controllership risk','Management action with owner / timing'],
+  'treasury':['Liquidity / funding decision','Cash, low-point, policy-gap and exposure evidence','Timing, counterparty or forecast risk','Funding / hedge action with trigger'],
+  'wealth-management':['Suitable client recommendation','Goals, liquidity, concentration and allocation evidence','Client / tax / implementation constraint','Clear confirmation and implementation step'],
+  'risk-management':['Risk disposition / escalation','Limit, breach and stress evidence','Model or concentration limitation','Immediate control, owner and escalation step'],
+  'real-estate-finance':['Bid / diligence decision','NOI, value and DSCR evidence','Leasing, cap-rate or financing risk','Underwriting / lender / diligence action']
+};
+
 
 const V2_CAREER_COMPETENCY_IDS = {"private-equity":["cmp_private_equity_underwriting","cmp_private_equity_debt","cmp_private_equity_returns","cmp_private_equity_diligence","cmp_private_equity_judgment","cmp_private_equity_quality"],"venture-capital":["cmp_venture_capital_market","cmp_venture_capital_unit","cmp_venture_capital_cap","cmp_venture_capital_diligence","cmp_venture_capital_judgment","cmp_venture_capital_memo"],"equity-research":["cmp_equity_research_model","cmp_equity_research_earnings","cmp_equity_research_valuation","cmp_equity_research_thesis","cmp_equity_research_sources","cmp_equity_research_note"],"asset-management":["cmp_asset_management_research","cmp_asset_management_portfolio","cmp_asset_management_risk","cmp_asset_management_attribution","cmp_asset_management_rebalance","cmp_asset_management_pm"],"hedge-funds":["cmp_hedge_funds_variant","cmp_hedge_funds_model","cmp_hedge_funds_catalyst","cmp_hedge_funds_risk","cmp_hedge_funds_sizing","cmp_hedge_funds_pm"],"sales-trading":["cmp_sales_trading_market","cmp_sales_trading_execution","cmp_sales_trading_risk","cmp_sales_trading_analysis","cmp_sales_trading_client","cmp_sales_trading_review"],"quantitative-finance":["cmp_quantitative_finance_data","cmp_quantitative_finance_research","cmp_quantitative_finance_backtest","cmp_quantitative_finance_implementation","cmp_quantitative_finance_risk","cmp_quantitative_finance_writeup"],"private-credit":["cmp_private_credit_spread","cmp_private_credit_leverage","cmp_private_credit_structure","cmp_private_credit_downside","cmp_private_credit_judgment","cmp_private_credit_memo"],"corporate-banking":["cmp_corporate_banking_spread","cmp_corporate_banking_credit","cmp_corporate_banking_facility","cmp_corporate_banking_covenant","cmp_corporate_banking_economics","cmp_corporate_banking_approval"],"corporate-development":["cmp_corporate_development_strategy","cmp_corporate_development_valuation","cmp_corporate_development_synergy","cmp_corporate_development_diligence","cmp_corporate_development_integration","cmp_corporate_development_exec"],"fp-and-a":["cmp_fp_and_a_actuals","cmp_fp_and_a_forecast","cmp_fp_and_a_variance","cmp_fp_and_a_scenario","cmp_fp_and_a_kpi","cmp_fp_and_a_commentary"],"treasury":["cmp_treasury_cash","cmp_treasury_liquidity","cmp_treasury_funding","cmp_treasury_market","cmp_treasury_policy","cmp_treasury_update"],"wealth-management":["cmp_wealth_management_discovery","cmp_wealth_management_suitability","cmp_wealth_management_allocation","cmp_wealth_management_portfolio","cmp_wealth_management_implementation","cmp_wealth_management_client"],"risk-management":["cmp_risk_management_exposure","cmp_risk_management_var","cmp_risk_management_stress","cmp_risk_management_concentration","cmp_risk_management_limits","cmp_risk_management_challenge"],"real-estate-finance":["cmp_real_estate_finance_rent","cmp_real_estate_finance_noi","cmp_real_estate_finance_valuation","cmp_real_estate_finance_debt","cmp_real_estate_finance_risk","cmp_real_estate_finance_memo"]};
 
@@ -2954,15 +3069,50 @@ function v2DynamicLab(pathway) {
   for(const t of wb.tasks) {
     const cid=comps[(stageNo-1)%comps.length];
     if(t.type==='numeric') {
-      tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.0',stage_no:stageNo,title:t.prompt,task_type:'numeric_fields',brief_json:JSON.stringify({timestamp:`Stage ${stageNo}`,from:wb.reviewer,message:t.workProduct?.instruction||'Complete the requested work product.',fileName:wb.files?.[Math.min(stageNo-1,(wb.files?.length||1)-1)]?.name||`${wb.project}_Workpaper.xlsx`,deliverable:t.workProduct?.section||'Analysis',fields:[{id:t.id,label:t.prompt,type:'number',suffix:t.unit||''}]}),grading_json:JSON.stringify({rules:[{field:t.id,type:'numeric',expected:Number(t.answer),tolerance:Number(t.tolerance||0),points:100,feedback:t.workProduct?.instruction||'Recheck the workpaper calculation.'}]}),competency_map_json:JSON.stringify({[cid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
+      tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.1',stage_no:stageNo,title:t.prompt,task_type:'numeric_fields',brief_json:JSON.stringify({timestamp:`Stage ${stageNo}`,from:wb.reviewer,message:t.workProduct?.instruction||'Complete the requested work product.',fileName:wb.files?.[Math.min(stageNo-1,(wb.files?.length||1)-1)]?.name||`${wb.project}_Workpaper.xlsx`,deliverable:t.workProduct?.section||'Analysis',fields:[{id:t.id,label:t.prompt,type:'number',suffix:t.unit||''}]}),grading_json:JSON.stringify({rules:[{field:t.id,type:'numeric',expected:Number(t.answer),tolerance:Number(t.tolerance||0),points:100,feedback:t.workProduct?.instruction||'Recheck the workpaper calculation.'}]}),competency_map_json:JSON.stringify({[cid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
     } else {
-      tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.0',stage_no:stageNo,title:t.prompt,task_type:'written_decision',brief_json:JSON.stringify({timestamp:`Stage ${stageNo}`,from:wb.reviewer,message:t.workProduct?.instruction||'Write the requested analysis note.',fileName:wb.files?.[Math.min(stageNo-1,(wb.files?.length||1)-1)]?.name||`${wb.project}_Notes.docx`,deliverable:t.workProduct?.section||'Analysis note',fields:[{id:t.id,label:t.prompt,type:'textarea',maxLength:1800}]}),grading_json:JSON.stringify({rules:[{field:t.id,type:'text_evidence',points:100,min_chars:Math.max(120,Number(t.minWords||18)*5),evidence_groups:(t.keywords||[]).slice(0,6).map(k=>[k]),feedback:'Connect the work product to specific case evidence, risk and decision relevance.'}]}),competency_map_json:JSON.stringify({[cid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
+      tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.1',stage_no:stageNo,title:t.prompt,task_type:'written_decision',brief_json:JSON.stringify({timestamp:`Stage ${stageNo}`,from:wb.reviewer,message:t.workProduct?.instruction||'Write the requested analysis note.',fileName:wb.files?.[Math.min(stageNo-1,(wb.files?.length||1)-1)]?.name||`${wb.project}_Notes.docx`,deliverable:t.workProduct?.section||'Analysis note',fields:[{id:t.id,label:t.prompt,type:'textarea',maxLength:1800}]}),grading_json:JSON.stringify({rules:[{field:t.id,type:'text_evidence',points:100,min_chars:Math.max(120,Number(t.minWords||18)*5),evidence_groups:(t.keywords||[]).slice(0,6).map(k=>[k]),feedback:'Connect the work product to specific case evidence, risk and decision relevance.'}]}),competency_map_json:JSON.stringify({[cid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
     }
     stageNo++;
   }
+  const update=CAREER_ROLELAB_UPDATES[pathway.id];
+  if(update){
+    const updateCid=comps[(stageNo-1)%comps.length];
+    tasks.push({
+      id:`${pathway.code.toLowerCase()}rl-update`,
+      lab_key:labKey,
+      lab_version:'2.1',
+      stage_no:stageNo,
+      title:update.title,
+      task_type:'mixed_fields',
+      brief_json:JSON.stringify({
+        timestamp:update.timestamp,
+        from:wb.reviewer,
+        message:update.message,
+        fileName:update.fileName,
+        deliverable:update.deliverable,
+        changeEvent:true,
+        fields:[
+          {id:'changeImpact',label:'Impact on the work product and decision',type:'textarea',maxLength:2200},
+          {id:'controlAction',label:'Controlled next action / escalation',type:'textarea',maxLength:1600}
+        ]
+      }),
+      grading_json:JSON.stringify({rules:[
+        {field:'changeImpact',type:'text_evidence',points:60,min_chars:180,evidence_groups:update.impactGroups,feedback:'Trace the new fact through the affected calculations, assumptions, risks and decision—not just the narrative.'},
+        {field:'controlAction',type:'text_evidence',points:40,min_chars:120,evidence_groups:update.actionGroups,feedback:'State the concrete rerun, control, owner / escalation path and decision gate.'}
+      ]}),
+      competency_map_json:JSON.stringify({[updateCid]:1}),
+      pass_score:70,
+      max_attempts:3,
+      required:1,
+      status:'active'
+    });
+    stageNo++;
+  }
   const finalCid=comps[(stageNo-1)%comps.length];
-  tasks.push({id:`${pathway.code.toLowerCase()}rl${stageNo}`,lab_key:labKey,lab_version:'2.0',stage_no:stageNo,title:'Send the manager your final recommendation',task_type:'written_decision',brief_json:JSON.stringify({timestamp:'Final review',from:wb.reviewer,message:'Send the decision-ready conclusion using the work you completed in the case.',fileName:`${wb.project.replace(/\s+/g,'_')}_Manager_Update.docx`,deliverable:'Manager recommendation',fields:[{id:'recommendation',label:'Manager recommendation',type:'textarea',maxLength:2400}]}),grading_json:JSON.stringify({rules:[{field:'recommendation',type:'text_evidence',points:100,min_chars:220,evidence_groups:[['recommend','proceed','approve','invest','hold','trim','pass','decline','rebalance'],['risk','downside','constraint','uncertain','assumption'],['because','evidence','analysis','model','forecast','valuation','liquidity','return'],['next','diligence','monitor','review','action','test']],feedback:'State a decision, cite case evidence, identify material risk and name the next action.'}]}),competency_map_json:JSON.stringify({[finalCid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
-  return {definition:{lab_key:labKey,version:'2.0',pathway_id:pathway.id,title:`${wb.project} — ${pathway.title} Professional Role Lab`,role_title:pathway.role,client_name:wb.client,scenario_json:JSON.stringify({project:wb.project,desk:pathway.title,reviewer:wb.reviewer,client:wb.client,deadline:wb.deadline,context:wb.objective,files:wb.files,workflow:tasks.map(x=>x.title),note:'Synthetic training case. No proprietary employer information is used.'}),pass_score:80,status:'active'},tasks};
+  const finalTaskId=`${pathway.code.toLowerCase()}rl${wb.tasks.length+1}`;
+  tasks.push({id:finalTaskId,lab_key:labKey,lab_version:'2.1',stage_no:stageNo,title:'Send the manager your final recommendation',task_type:'written_decision',brief_json:JSON.stringify({timestamp:'Manager handoff',from:wb.reviewer,message:'Send the decision-ready conclusion using the work you completed, including the effect of the mid-case update.',fileName:`${wb.project.replace(/\s+/g,'_')}_Manager_Update.docx`,deliverable:'Manager recommendation',fields:[{id:'recommendation',label:'Manager recommendation',type:'textarea',maxLength:2800}]}),grading_json:JSON.stringify({rules:[{field:'recommendation',type:'text_evidence',points:100,min_chars:260,evidence_groups:[['recommend','proceed','approve','invest','hold','trim','pass','decline','rebalance','bid','support','escalate'],['risk','downside','constraint','uncertain','assumption','breach'],['because','evidence','analysis','model','forecast','valuation','liquidity','return','exposure'],['update','changed','revised','new information'],['next','diligence','monitor','review','action','test','owner']],feedback:'State a decision, cite case evidence, explain the mid-case change, identify material risk and name the next controlled action.'}]}),competency_map_json:JSON.stringify({[finalCid]:1}),pass_score:70,max_attempts:3,required:1,status:'active'});
+  return {definition:{lab_key:labKey,version:'2.1',pathway_id:pathway.id,title:`${wb.project} — ${pathway.title} Professional Role Lab`,role_title:pathway.role,client_name:wb.client,scenario_json:JSON.stringify({project:wb.project,desk:pathway.title,reviewer:wb.reviewer,client:wb.client,deadline:wb.deadline,context:wb.objective,files:wb.files,workflow:tasks.map(x=>x.title),reviewStandard:CAREER_REVIEW_STANDARDS[pathway.id]||[],note:'Synthetic training case. No proprietary employer information is used.'}),pass_score:80,status:'active'},tasks};
 }
 function v2DynamicLabByKey(key) { for(const p of ALL_PATHWAYS){if(p.id!=='investment-banking'&&v2CareerRoleLabKey(p.id)===key)return v2DynamicLab(p);} return null; }
 
@@ -2970,7 +3120,7 @@ function buildCareerWorkbenchSimulation(pathway) {
   const b=CAREER_WORKBENCHES[pathway.id]; if(!b) return null;
   return {
     version:'2.0-workbench', itemType:'simulation', questions:b.tasks, writingPrompt:b.writingPrompt,
-    simulationProfile:{kind:'career-workbench-v2',project:b.project,role:b.role,reviewer:b.reviewer,client:b.client,deadline:b.deadline,objective:b.objective,files:b.files,workflow:[...new Set(b.tasks.map(x=>x.workProduct.section))]}
+    simulationProfile:{kind:'career-workbench-v2',pathwayId:pathway.id,project:b.project,role:b.role,reviewer:b.reviewer,client:b.client,deadline:b.deadline,objective:b.objective,files:b.files,workflow:[...new Set(b.tasks.map(x=>x.workProduct.section))],reviewStandard:CAREER_REVIEW_STANDARDS[pathway.id]||[]}
   };
 }
 
@@ -4025,6 +4175,61 @@ function gradeAssessment(
   };
 }
 
+function careerWorkbenchNumberMention(text, task) {
+  const value=Number(task?.answer);
+  if(!Number.isFinite(value)) return false;
+  const variants=new Set([
+    String(value),
+    value.toFixed(1),
+    value.toFixed(2),
+    value.toFixed(3)
+  ].map(x=>x.replace(/\.0+$/,'').replace(/(\.\d*?)0+$/,'$1')));
+  for(const variant of variants){
+    const escaped=variant.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const pattern=new RegExp(`(^|[^0-9.])${escaped}(?=$|[^0-9.])`);
+    if(pattern.test(text)) return true;
+  }
+  return false;
+}
+
+function gradeCareerWorkbenchWriting(rawWriting, assessment) {
+  const text=cleanString(rawWriting||'',5000).trim();
+  if(!text) return 0;
+  const lower=text.toLowerCase();
+  const words=text.split(/\s+/).filter(Boolean);
+  const pathwayId=assessment.simulationProfile?.pathwayId;
+  const workbench=CAREER_WORKBENCHES[pathwayId];
+  if(!workbench) return 0;
+  let points=0;
+
+  // Concise enough for a reviewer, but developed enough to support a decision.
+  if(words.length>=55) points+=2;
+  if(words.length>=90) points+=2;
+
+  // The response must take a position; a descriptive case summary is not a recommendation.
+  if(/\b(recommend|approve|decline|proceed|continue diligence|invest|pass|hold|add|trim|exit|rebalance|support|escalate|bid|pause|not ready)\b/i.test(text)) points+=5;
+
+  // Reward direct use of calculated case outputs instead of finance-sounding generalities.
+  const numericTasks=(workbench.tasks||[]).filter(t=>t.type==='numeric').slice(0,4);
+  const numericHits=numericTasks.filter(t=>careerWorkbenchNumberMention(lower,t)).length;
+  points+=Math.min(8,numericHits*2);
+
+  // Role-native risk evidence comes from the case's written diligence / exception task.
+  const roleKeywords=[...new Set((workbench.tasks||[]).filter(t=>t.type==='text').flatMap(t=>t.keywords||[]).map(x=>String(x).toLowerCase()))];
+  const riskHits=roleKeywords.filter(k=>lower.includes(k)).length;
+  if(riskHits>=2) points+=3;
+  if(riskHits>=4) points+=2;
+
+  // A manager handoff needs a controlled action, not only a conclusion.
+  if(/\b(next step|next action|diligence|validate|confirm|rerun|recalculate|monitor|escalate|review|implement|test|owner|deadline)\b/i.test(text)) points+=4;
+
+  // Professional judgment acknowledges what could change and how the work stays controlled.
+  if(/\b(assumption|downside|sensitivity|uncertain|constraint|changed|revised|update|breach|limit)\b/i.test(text)) points+=2;
+  if(/\b(because|therefore|based on|driven by|subject to|provided that)\b/i.test(text) && words.length<=300) points+=2;
+
+  return Math.min(30,points);
+}
+
 function gradeWriting(
   rawWriting,
   assessment
@@ -4042,6 +4247,10 @@ function gradeWriting(
 
   const lower =
     text.toLowerCase();
+
+  if (assessment.version === "2.0-workbench" && assessment.simulationProfile?.kind === "career-workbench-v2") {
+    return gradeCareerWorkbenchWriting(text, assessment);
+  }
 
   if (assessment.version === "2.0-workbench" && assessment.simulationProfile?.kind === "ib-deal-workbench-v2") {
     let points = 0;
@@ -5646,4 +5855,3 @@ async function v2EnforceAssessmentRate(env, uid, pathwayId, assessmentKey, assig
   const row=await env.DB.prepare(`SELECT COUNT(*) AS n FROM v2_assessment_attempts WHERE uid=? AND pathway_id=? AND assessment_key=? AND COALESCE(assignment_id,'public')=? AND submitted_at>=datetime('now','-10 minutes')`).bind(uid,pathwayId,assessmentKey,scope).first();
   if(Number(row?.n||0)>=10) throw new HttpError(429,'Too many recent assessment attempts. Please wait before trying again.');
 }
-

@@ -111,7 +111,7 @@
     if (!learned.includes(5)) return `Next is Part 5, the Job Simulation section. Read the briefing and click <b>Mark Learning Complete</b>.${action('Open Part 5',`#/learn/${c.id}/5`)}`;
     if (Number(cs.simulationKnowledge || 0) < PASS) return `Next, pass the Part 5 knowledge check with <b>${PASS}%+</b>.${action('Take Part 5 knowledge check',`#/quiz/${c.id}/5`)}`;
     if (Number(cs.simulationScore || 0) < PASS) return `You’re ready for the <b>official server-graded job simulation</b>.${action('Open official simulation',`#/official-simulation/${c.id}`)}`;
-    if (Number(cs.finalScore || 0) < PASS) return `You passed the simulation. Your next step is the <b>20-question final exam</b>.${action('Take final exam',`#/final/${c.id}`)}`;
+    if (Number(cs.finalScore || 0) < PASS) return `You passed the simulation. Your next step is the <b>Professional Readiness Final</b>.${action('Take readiness final',`#/final/${c.id}`)}`;
     return `You’ve met the recorded pathway requirements. Check your verified credentials.${action('Open Credentials','#/credentials')}`;
   }
 
@@ -174,7 +174,7 @@
     }
 
     if (/(pass score|mastery|how many.*correct|what score|80 percent|80%)/.test(q)) {
-      return `The mastery standard is <b>${PASS}%</b>. That means at least <b>8/10</b> on a 10-question assessment and <b>16/20</b> on the final exam.`;
+      return `The mastery standard is <b>${PASS}%</b> on every required assessment, including the job simulation and Professional Readiness Final.`;
     }
 
     if (/(retake|try again|failed|fail quiz|didn't pass|did not pass)/.test(q)) {
@@ -189,7 +189,7 @@
     if (/(credential id|certificate id|where.* id|find.* id)/.test(q)) return credentialHelp(true);
 
     if (/(three certificates|3 certificates|credential levels|foundations certificate|applied skills|career certificate|how.*certificates work)/.test(q)) {
-      return `<b>Each pathway has 3 credential levels:</b><br>• <b>Foundations:</b> pass Parts 1–2.<br>• <b>Applied Skills:</b> pass Parts 1–4.<br>• <b>Career Certificate:</b> pass Parts 1–5, the official simulation, and the final exam.<br><br>Required assessments use the ${PASS}% standard.${action('View Credentials','#/credentials')}`;
+      return `<b>Each pathway has 3 credential levels:</b><br>• <b>Foundations:</b> pass Parts 1–2.<br>• <b>Applied Skills:</b> pass Parts 1–4.<br>• <b>Career Certificate:</b> pass Parts 1–5, the official simulation, and the Professional Readiness Final.<br><br>Required assessments use the ${PASS}% standard.${action('View Credentials','#/credentials')}`;
     }
 
     if (/(linkedin|add.*credential|share.*credential|post.*certificate)/.test(q)) {
@@ -221,7 +221,7 @@
     }
 
     if (/(final exam|final examination|20 question)/.test(q)) {
-      return `The final exam comes after the official job simulation. It has <b>20 questions</b>, and you need at least <b>16 correct (${PASS}%)</b> to pass.`;
+      return `The <b>Professional Readiness Final</b> comes after the official job simulation and checks knowledge, calculations and workflow judgment. It is a separate ${PASS}% gate; it does not replace the practical work product.`;
     }
 
     if (/(how many careers|career pathways|how many pathways|45|48 credentials|credentials total)/.test(q)) {

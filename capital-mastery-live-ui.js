@@ -243,7 +243,7 @@
         applied:'for successfully completing the applied learning, professional toolkit, and required assessments under the Capital Mastery Standard.',
         role_lab:'for successfully performing the required live-style Role Lab workflow, including analysis, quality control, revision and professional judgment.',
         professional_readiness:'for demonstrating evidence-backed readiness across the baseline diagnostic, required credentials, Role Lab, competency floors and Professional Readiness Final under Capital Mastery Standard 2.0.',
-        career:'for demonstrating mastery across required learning, technical assessments, applied work, a graded job simulation, and the final examination under the Capital Mastery Standard.'
+        career:'for demonstrating mastery across required learning, technical assessments, applied work, a graded job simulation, and the Professional Readiness Final under the Capital Mastery Standard.'
       };
       const description = descriptions[level] || 'for successfully completing the verified Capital Mastery credential requirements.';
       const displayTitle = credential.credential_title.replace(/ Certificate$/, '').replace(/ Career Certificate$/, '');

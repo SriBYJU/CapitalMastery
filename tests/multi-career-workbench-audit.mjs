@@ -8,7 +8,7 @@ ok(worker.includes("kind:'career-workbench-v2'"),'Worker must mark generic caree
 ok(worker.includes("type:'text'")&&worker.includes("type:'numeric'"),'Workbenches must support real numeric and written work products');
 ok(worker.includes('q.type === "text"'),'Secure grader must evaluate written work-product fields');
 ok(live.includes('PROFESSIONAL WORKBENCH · SYNTHETIC CASE'),'Browser must render non-IB simulations as professional workbenches');
-ok(live.includes('This is the job simulation. MCQ knowledge testing remains'),'Workbench must distinguish job simulation from MCQ exams');
+ok(live.includes('The separate final checks knowledge, calculations and workflow judgment'),'Workbench must distinguish the job simulation from the separate readiness final');
 ok(live.includes("data.simulationProfile?.kind === 'career-workbench-v2'"),'Secure route must dispatch to career workbench renderer');
 ok(worker.includes('"quant-finance": "quantitative-finance"')&&live.includes("'quant-finance': 'quantitative-finance'"),'Quant public/backend IDs must be aliased');
 const mapStart=worker.indexOf('const CAREER_WORKBENCHES'); const mapEnd=worker.indexOf('function buildCareerWorkbenchSimulation',mapStart); const map=worker.slice(mapStart,mapEnd);

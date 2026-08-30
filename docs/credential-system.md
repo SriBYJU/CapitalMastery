@@ -15,7 +15,7 @@ Issued only after:
 - every required knowledge assessment ≥80%
 - simulation knowledge check ≥80%
 - practical job simulation ≥80/100
-- 20-question final examination ≥80%
+- Professional Readiness Final ≥80% (knowledge, calculation and workflow judgment)
 
 ## Credential record fields
 
@@ -28,7 +28,7 @@ Issued only after:
 - pathway version
 - status (active / reissued / revoked)
 - skills demonstrated
-- final examination score where applicable
+- Professional Readiness Final score where applicable
 - practical simulation score where applicable
 - public verification token
 
