@@ -1,101 +1,196 @@
-# Capital Mastery V2 — Phase 2 Roadmap
+# Capital Mastery V2 — Phase 2 Execution Roadmap
 
-Phase 2 scales the audited Phase 1 architecture from the Investment Banking reference implementation to the full multi-career, pilot-ready enterprise platform. Existing learner content and all previously issued credentials remain preserved and verifiable.
+Phase 2 scales the audited Phase 1 architecture from the Investment Banking reference implementation to a multi-career, employer-ready finance workforce-readiness platform. Existing learner content and previously issued credentials remain preserved and verifiable.
 
-## 1. Distinct employer onboarding experience
+This document tracks **implementation status**, not production-release status. The authoritative production evidence and blockers are recorded in [`phase2-release-audit.md`](phase2-release-audit.md).
 
-Capital Mastery keeps one secure Firebase Authentication backend, but employer onboarding must feel purpose-built rather than like a learner signing up for a course site.
+## 1. Learner preparation architecture — IMPLEMENTED
 
-**Employer entry:** `For Employers → Get Started / Open Employer Workspace`
+Every career is presented through two preparation choices rather than one undifferentiated course:
 
-Flow:
-1. Sign in or create an account with work email / Google.
-2. Capture full name for account identity.
-3. Capture company / firm name.
-4. Capture employer role (training lead, founder/partner, manager, recruiter/HR, other).
-5. Optional approximate cohort size.
-6. Create or join the organization workspace.
-7. Land directly in the Employer Command Center.
+### Career Skills Program
+A shorter practical route through:
 
-Learner signup remains the existing learner-first flow. An invited employee/intern receives a context-aware invitation screen naming the firm, creates/signs into the same secure account system, accepts the invite and lands directly in Assigned Training.
+1. Foundations
+2. Essentials
+3. Applied Skills
 
-## 2. Admin Demo & Test Lab
+Learners receive teaching, guided practice, independent application and practical work. The shorter route is shorter because it stops before the advanced Role Lab / Professional Readiness sequence—not because it replaces professional work with multiple-choice questions.
 
-The Capital Mastery admin must have an easy, centralized way to test every employer and learner workflow without recruiting real people or creating real-world accounts. This is an admin-only synthetic environment protected server-side by the existing Capital Mastery admin identity.
+The Career Skills Program can produce a printable/shareable program-completion certificate. That completion document is a presentation layer over the verified Foundations, Essentials and Applied Skills milestones and does **not** create a sixth Standard 2.0 credential level.
 
-### One-click demo workspace
-- Generate a synthetic firm with one click.
-- Seed one or more cohorts and assignments.
-- Seed synthetic learner profiles without requiring real Firebase users.
-- Choose preset cohort sizes and readiness distributions.
-- Create realistic names, deadlines, progress states and competency profiles.
-- Display an unmistakable **DEMO / SYNTHETIC DATA** banner.
-- Exclude demo tenants from real customer analytics and official public credentials.
+### Professional Readiness Program
+The full route through:
 
-### Demo presets
-- New cohort — nobody started.
-- Mixed cohort — strong, average and struggling learners.
-- Completed cohort — full readiness reports and credentials.
-- Weak modeling cohort — targeted development signal.
-- Overdue cohort — deadlines and manager-attention state.
-- Revision scenario — learner fails a Role Lab stage, receives comments and improves.
-- Permission scenario — owner/admin/manager/viewer/learner access matrix.
+1. Foundations
+2. Essentials
+3. Applied Skills
+4. Role Lab
+5. Professional Readiness
 
-### Admin test console
-From one admin screen, the founder/admin can:
-- open the app as a demo employer
-- open a synthetic learner view
-- create/reset demo organizations
-- generate cohorts and assignments
-- move synthetic learners between progress states
-- trigger diagnostic, Essentials, Role Lab, revision, final and credential states
-- preview employer and learner readiness reports
-- preview credential evidence and verification states
-- test Firm Layer hide/archive/restore and protected-standard warnings
-- test invites without sending real invitations
-- inspect audit events
-- run permission-denial scenarios
-- reset the entire demo environment to a clean state
+The first three verified milestones carry forward from Career Skills. Learners who upgrade do not repeat already demonstrated work.
 
-Demo mode must never grant the browser unrestricted production mutation. All demo actions are explicit admin-only server operations scoped to demo records.
+Professional Readiness adds deeper technical work, source materials, role-native workbenches, changing information, revisions, professional work products, final evidence coverage and competency floors.
 
-## 3. Full 16-career professional expansion
+## 2. Distinct employer onboarding — IMPLEMENTED
 
-Convert the other 15 careers to the same Phase 1 architecture: career-specific competency maps, diagnostics, Essentials/applied work, realistic Role Labs, grading rubrics, final assessments, readiness thresholds, evidence portfolios and Professional Readiness credentials.
+Capital Mastery uses one secure Firebase Authentication system, but employer onboarding is purpose-built rather than presenting a learner course-signup flow.
 
-Role Labs must model the actual work products and changing-information workflows of each job rather than generic finance quizzes.
+**Employer entry:** `For Employers → Open Free Employer Workspace`
 
-Each career also receives a role-specific **Professional Toolkit** equivalent to the Investment Banking reference implementation: visual, interactive teaching for the software/models/research inputs/work products actually used in that role, not just conceptual reading. Tool instruction must precede any simulation that expects the learner to use that tool.
+Implemented flow:
 
-## 4. Credential and Academy expansion
+1. Sign in or create a secure account.
+2. Confirm full name.
+3. Enter company / firm name.
+4. Select employer role/context.
+5. Optionally select approximate cohort size.
+6. Create the organization workspace.
+7. Land in the Employer Command Center / interactive launch guide.
 
-- Complete the five-level stackable credential model across all careers.
-- Add Finance Core credentials.
-- Add Academy-level credentials.
-- Add the optional Capital Mastery Finance Professional achievement.
-- Maintain curriculum/version evidence on every credential.
+Invited learners use the same identity system but receive employer-assignment context and land in Assigned Training after acceptance.
 
-## 5. Enterprise reporting & customization expansion
+## 3. Admin Demo & Test Lab — IMPLEMENTED
 
-- deeper cohort analytics and coaching recommendations
-- manager review for selected deliverables
-- richer evidence portfolios
-- advanced Firm Layer customization
-- notifications and deadline workflows
-- stronger employer exports and pilot reporting
+Capital Mastery includes an administrator-only synthetic testing environment designed to exercise employer and learner workflows without using real employees or firms.
 
-## 6. Production hardening and pilot package
+Implemented controls include:
 
-- accessibility hardening toward WCAG 2.2 AA
-- expanded Trust Center/security documentation
-- reliability, rate-limit and tenant-isolation regression coverage
-- demo company workspace
-- sample readiness report
+- synthetic demo organizations
+- cohort / assignment presets
+- synthetic learner states
+- permission-matrix scenarios
+- role-aware employer views
+- readiness/report scenarios
+- Role Lab / revision states
+- reset controls
+- explicit synthetic/demo labeling
+- server-side administrator enforcement
+
+Demo actions remain scoped to demo records and do not grant unrestricted browser mutation of production data.
+
+Automated release coverage includes Admin Demo Lab contract, demo-state/permission behavior and general administrator runtime stability.
+
+## 4. Full 16-career professional expansion — IMPLEMENTED
+
+The Phase 2 architecture now covers all 16 finance careers rather than only the Investment Banking reference pathway.
+
+Each career is expected to follow the same core instructional sequence:
+
+**Teach → guided practice → independent practice → professional simulation → evidence**
+
+Role-native work surfaces are used where the role requires them. Examples include:
+
+- Investment Banking — valuation, comps, models, transaction materials and analyst recommendation
+- Private Equity — LBO / debt / returns / investment-committee underwriting
+- Venture Capital — cap tables, cohorts, TAM, unit economics and investment memos
+- Corporate Development — strategic M&A evaluation and integration trade-offs
+- FP&A — budgets, forecasts, variance analysis and management packs
+- Treasury — cash forecasting, funding and hedge decisions
+- Sales & Trading — market data, orders, execution and risk
+- Quantitative Finance — datasets, validation, backtests and model-risk checks
+- Risk Management — exposures, scenarios, controls and escalation
+- Wealth Management — client constraints, allocation, suitability and proposal work
+- Real Estate Finance — underwriting, NOI, debt, DSCR and returns
+
+The browser release gate now sweeps **16 careers × both tracks × four release widths**.
+
+## 5. Credential architecture — IMPLEMENTED
+
+Standard 2.0 keeps a five-level verified career ladder:
+
+- Foundations
+- Essentials
+- Applied Skills
+- Role Lab
+- Professional Readiness
+
+Across 16 careers, this preserves a consistent career-credential architecture rather than creating miscellaneous certificate names for every lesson.
+
+Academy credentials remain a separate credential family. Public verification and employer reporting distinguish completion from evidence-backed readiness.
+
+## 6. Enterprise reporting, roles and Firm Layer — IMPLEMENTED
+
+Implemented employer capabilities include:
+
+- cohorts and role-specific assignments
+- Career Skills vs Professional Readiness assignment distinction
+- employer interactive launch guide
+- readiness and evidence reporting
+- manager-attention signals
+- manager review
+- notifications
+- evidence exports
+- audit history
+- Firm Layer create/edit/version/reorder/hide/archive/restore lifecycle
+- protected Capital Mastery Standard content
+- no employer-facing permanent delete
+
+Server-authoritative role separation:
+
+- **Owner** — workspace, programs, people, reports, reviews, Firm Layer, audit
+- **Training Admin** — program/cohort administration, people, reports, reviews, Firm Layer, audit
+- **Content Manager** — Firm Layer / curriculum administration without learner-performance access
+- **Manager** — learner reporting and reviews without workspace administration
+- **Viewer** — read-only learner reporting
+
+The release browser gate now verifies all five roles, including direct-route boundaries rather than checking navigation labels alone.
+
+## 7. Security, integrity and release hardening — IMPLEMENTED IN SOURCE
+
+Source-level release controls now include:
+
+- explicit request-origin enforcement
+- authenticated authoritative routes
+- server-side tenant/role checks
+- assessment-answer/rationale isolation
+- server-side official grading
+- request body ceiling
+- attempt throttling / abuse limits
+- non-destructive employer content lifecycle
+- CSV spreadsheet-formula injection neutralization
+- notification deduplication/scope/lifecycle checks
+- account-deletion contract and owner protections
+- Trust Center claims tied to implementation evidence
+- production frontend allowlist and security-header bundle audit
+- keyboard/reduced-motion/accessibility release checks
+- 375 / 430 / 768 / ~1440 px browser coverage
+- state/offline/history resilience browser testing
+- admin-only read-only D1 integrity endpoint using `quick_check`, `foreign_key_check` and table counts
+
+The current audited source release passes **59 static regression files plus six Chromium release suites**. See [`phase2-release-audit.md`](phase2-release-audit.md) for exact evidence.
+
+## 8. Employer / pilot package — IMPLEMENTED, FINAL PRODUCTION PROOF PENDING
+
+Repository materials include:
+
 - employer one-pager
-- pilot guide / FAQ
+- pilot guide
 - security overview
-- outreach/demo materials for boutique firms
+- sample readiness report
+- workforce evidence material
+- pilot demo playbook
+- Trust Center and credential-policy surfaces
+- deployment runbook
+- Phase 2 release audit
+
+The public product positions Capital Mastery as a finance-readiness layer that complements—not replaces—orientation, HR onboarding, licensing or regulated firm training.
+
+## 9. Remaining Phase 2 closure work — LIVE / EXTERNAL
+
+The remaining work is no longer broad feature construction. It is production promotion and final black-box evidence:
+
+1. Promote the audited Worker while preserving existing Cloudflare secrets/bindings/settings.
+2. Confirm `/admin/integrity` exists in production and run it with an authenticated Capital Mastery administrator.
+3. Require D1 `quick_check = ok`, zero foreign-key violations and record table counts.
+4. Deploy the exact audited `dist-pages/` artifact to the canonical Cloudflare Pages project.
+5. Confirm current frontend generation and production security headers.
+6. Re-run the complete live Chromium matrix against `capitalmastery.pages.dev`.
+7. Verify `capitalmastery.pages.dev` is an authorized Firebase Authentication domain.
+8. Run final signed-out, signed-in learner, signed-in employer, role/tenant, Firm Layer, manager-review, notification/export and Admin Demo Lab production smokes.
+9. Delete disposable QA data/accounts and recheck integrity.
+10. Only after every blocker is closed, perform final release sign-off and then submit the Cloudflare URL to Search Console.
 
 ## Phase 2 release gate
 
-Phase 2 is not complete until the full Phase 2 audit passes, every finding is fixed, and the final deployed black-box audit exercises learner, assigned employee, employer, second-tenant isolation and Capital Mastery admin/demo workflows on the production application.
+Phase 2 is **not complete** merely because source/CI is green. Completion requires the audited Worker and Pages builds to be the live canonical production generation and the final authenticated black-box audit to pass without unresolved blockers.
