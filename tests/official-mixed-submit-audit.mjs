@@ -6,5 +6,5 @@ ok(e2e.includes('const numeric = fieldset.querySelector(\'input[type="number"]\'
 ok(e2e.includes("if (numeric) return !String(numeric.value || '').trim()"),'numeric questions must require a value rather than a radio selection');
 ok(e2e.includes("form.querySelectorAll('input[name]').forEach(input =>"),'draft persistence must include numeric inputs');
 ok(e2e.includes("else input.value = saved.answers[input.name]"),'numeric draft values must restore');
-ok(index.includes('capital-mastery-e2e.js?v=20260829-mixedsubmit1'),'mixed-submit helper fix must be cache-busted');
+ok(index.includes('capital-mastery-e2e.js?v=20260830-stability3'),'mixed-submit helper fix must be cache-busted to the current stability generation');
 console.log('OFFICIAL MIXED ASSESSMENT SUBMIT ISOLATION PASS');
