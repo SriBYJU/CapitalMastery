@@ -5,40 +5,51 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/github-pages-live-readonly-audit.yml'
+      - '*.js'
+      - '*.css'
+      - '*.html'
+      - '*.webmanifest'
+      - '*.txt'
+      - '*.xml'
       - '_config.yml'
+      - 'assets/**'
+      - 'tests/**'
       - 'tools/build-pages.mjs'
-      - 'capital-mastery-live.js'
-      - 'capital-mastery-live-ui.js'
-      - 'app.js'
-      - 'admin-route-guard.js'
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: github-pages-live-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   live-fallback:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       FALLBACK: https://sribyju.github.io/CapitalMastery
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for current protected/completion-aware generation
+      - name: Wait for current protected/completion/identity-aware generation
         run: |
           set -euo pipefail
           ready=false
           for i in {1..60}; do
             curl -fsS "${FALLBACK}/capital-mastery-live.js?sha=${GITHUB_SHA}" -o /tmp/cm-live.js || true
             curl -fsS "${FALLBACK}/app.js?sha=${GITHUB_SHA}" -o /tmp/cm-app.js || true
-            if grep -q 'PROGRAM COMPLETIONS' /tmp/cm-live.js 2>/dev/null && grep -q "root==='admin-preview'&&a==='simulation'" /tmp/cm-app.js 2>/dev/null; then
+            curl -fsS "${FALLBACK}/certificate-name.js?sha=${GITHUB_SHA}" -o /tmp/cm-name.js || true
+            if grep -q 'PROGRAM COMPLETIONS' /tmp/cm-live.js 2>/dev/null \
+              && grep -q "root==='admin-preview'&&a==='simulation'" /tmp/cm-app.js 2>/dev/null \
+              && grep -q 'Credential identity is authoritative on the protected user-root document' /tmp/cm-name.js 2>/dev/null; then
               ready=true
               break
             fi
             sleep 5
           done
-          [ "$ready" = true ] || { echo 'GitHub Pages did not converge to the protected/completion-aware generation'; exit 1; }
+          [ "$ready" = true ] || { echo 'GitHub Pages did not converge to the protected/completion/identity-aware generation'; exit 1; }
           echo 'GitHub Pages current-generation markers: PASS'
 
       - name: Wait for internal backend and QA artifacts to become private
@@ -88,6 +99,7 @@ jobs:
           grep -q 'admin-route-guard.js' /tmp/cm-index
           grep -q 'capital-mastery-live.js' /tmp/cm-index
           grep -q 'public-certificate-verify.js' /tmp/cm-index
+          grep -q 'certificate-name.js' /tmp/cm-index
           curl -fsS "${FALLBACK}/assets/logo-mark.svg" >/dev/null
           echo 'GitHub Pages public shell/assets: PASS'
 
@@ -99,9 +111,14 @@ jobs:
       - name: Live public browser matrix
         run: |
           set -euo pipefail
+          CM_AUDIT_URL="${FALLBACK}/" node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/failure-seeking-browser-audit.mjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/admin-simulation-route-stability-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/program-completion-public-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/employer-public-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/employer-role-matrix-browser-audit.cjs
+          echo 'GitHub Pages ten-suite live browser matrix: PASS'
