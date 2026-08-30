@@ -48,6 +48,7 @@ jobs:
           node --check tests/failure-seeking-browser-audit.mjs
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
+          node --check tests/admin-simulation-route-stability-browser-audit.cjs
           node --check tests/learner-guide-mobile-browser-audit.cjs
           node --check tests/all-career-browser-sweep.cjs
           node --check tests/employer-public-browser-audit.cjs
@@ -58,6 +59,7 @@ jobs:
         run: |
           node tests/failure-seeking-round2-audit.mjs
           node tests/admin-runtime-stability-audit.mjs
+          node tests/admin-simulation-route-ownership-audit.mjs
           node tests/admin-route-boundary-audit.mjs
           node tests/training-track-architecture-audit.mjs
           node tests/career-skills-track-audit.mjs
@@ -107,6 +109,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-simulation-route-stability-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
