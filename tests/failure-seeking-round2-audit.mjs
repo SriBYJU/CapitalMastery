@@ -5,16 +5,30 @@ const live=fs.readFileSync('capital-mastery-live-ui.js','utf8');
 const tracks=fs.readFileSync('training-tracks.js','utf8');
 const madeline=fs.readFileSync('madeline.js','utf8');
 const certName=fs.readFileSync('certificate-name.js','utf8');
+const app=fs.readFileSync('app.js','utf8');
+const e2e=fs.readFileSync('capital-mastery-e2e.js','utf8');
+const ux=fs.readFileSync('ux-stability.js','utf8');
+const continuity=fs.readFileSync('course-continuity.js','utf8');
+const runtime=fs.readFileSync('runtime-audit-fixes.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const workbookAudit=fs.readFileSync('tests/interactive-guidance-workbook-audit.mjs','utf8');
 const notificationAudit=fs.readFileSync('tests/notification-discovery-audit.mjs','utf8');
 
 // Admin QA must be both server-admin gated and isolated from authoritative UI.
-ok(admin.includes("if (!isAdmin())") && admin.includes('QA control blocked: administrator verification required'), 'Non-admin callers must not be able to run QA score/progress controls');
+ok(admin.includes("['qaProgress', 'qaScores', 'resetState']"), 'All state-mutating QA controls, including reset, must be wrapped');
+ok(admin.includes("if (!isAdmin())") && admin.includes('QA control blocked: administrator verification required'), 'Non-admin callers must not be able to run QA score/progress/reset controls');
 ok(admin.includes('const originalToggle = window.CM.toggleQa'), 'QA mode toggle must also be wrapped by the admin guard');
 ok(live.includes("localStorage.getItem(QA_KEY) === 'true'"), 'Live credential UI must understand isolated Admin QA mode');
 ok(live.includes("['credential','certificate','achievement'].includes(root)"), 'Authoritative credential renderer must yield to verified Admin QA previews');
 ok(live.includes("window.CM_AUTH?.isAdmin === true"), 'QA preview yield must require verified admin state');
+
+// A raw localStorage flag must never be enough to activate QA bypasses.
+for(const [name,source] of Object.entries({app,e2e,ux,continuity,runtime})) {
+  ok(source.includes('window.CM_AUTH?.isAdmin === true') && source.includes("localStorage.getItem(QA_KEY) === 'true'"), `${name} QA mode must require verified administrator state`);
+}
+ok(!e2e.includes("function qaMode() {\n    return localStorage.getItem(QA_KEY) === 'true';"), 'E2E layer must not trust localStorage alone for QA bypass');
+ok(!ux.includes("function qaMode() {\n    return localStorage.getItem(QA_KEY) === 'true';"), 'UX layer must not trust localStorage alone for QA bypass');
+ok(!continuity.includes("function qaMode() {\n    return localStorage.getItem(QA_KEY) === 'true';"), 'Course continuity must not trust localStorage alone for QA bypass');
 
 // Career Skills must use authoritative simulation without a legacy redirect hop,
 // and Professional Readiness must not deep-link the shorter capstone.
@@ -35,6 +49,10 @@ for(const asset of [
   'app.js?v=20260830-stability3',
   'training-tracks.js?v=20260830-stability3',
   'capital-mastery-live-ui.js?v=20260830-stability3',
+  'capital-mastery-e2e.js?v=20260830-stability3',
+  'ux-stability.js?v=20260830-stability3',
+  'course-continuity.js?v=20260830-stability3',
+  'runtime-audit-fixes.js?v=20260830-stability3',
   'madeline.js?v=20260830-stability3',
   'admin-qa-simulation-fix.js?v=20260830-stability3'
 ]) ok(index.includes(asset), `Missing current cache-bust for ${asset}`);
