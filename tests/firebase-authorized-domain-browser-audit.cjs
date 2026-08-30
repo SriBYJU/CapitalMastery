@@ -18,8 +18,14 @@ function assert(condition, message) {
       const button = document.createElement('button');
       button.id = 'cm-firebase-domain-probe';
       button.textContent = 'probe';
-      button.style.position = 'fixed';
-      button.style.zIndex = '2147483647';
+      Object.assign(button.style, {
+        position: 'fixed',
+        top: '8px',
+        left: '8px',
+        width: '96px',
+        height: '40px',
+        zIndex: '2147483647'
+      });
       document.body.appendChild(button);
       window.__CM_FIREBASE_DOMAIN_PROBE = { state: 'idle', code: '', message: '' };
       button.addEventListener('click', async () => {
@@ -45,7 +51,7 @@ function assert(condition, message) {
     });
 
     const popupPromise = page.waitForEvent('popup', { timeout: 15000 }).catch(() => null);
-    await page.click('#cm-firebase-domain-probe');
+    await page.locator('#cm-firebase-domain-probe').click({ timeout: 10000 });
     const popup = await popupPromise;
     if (popup) {
       await popup.close().catch(() => {});
