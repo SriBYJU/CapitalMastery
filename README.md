@@ -2,30 +2,54 @@
 
 **Learn it. Practice it. Prove it.**
 
-Capital Mastery is a finance workforce-readiness platform that combines role learning, applied work, realistic simulations, competency measurement, and verifiable credential evidence. The original learner product remains intact while Capital Mastery 2.0 adds an employer layer for cohorts, assignments, Firm Layer customization, readiness reporting, and enterprise-grade evidence.
+Capital Mastery is a free finance workforce-readiness platform built around a simple question: **can a learner perform role-specific finance work at a defensible standard, not merely finish content?**
+
+The platform combines structured teaching, immediate practice, professional work products, realistic role simulations, competency evidence, verifiable credentials, and an employer layer for pre-Day-1 readiness programs.
 
 ## Product snapshot
 
-- **16 finance career pathways** in the preserved public learner catalog
-- Existing **Foundations, Applied Skills, and Career** credentials remain supported and verifiable
-- **80% mastery standard** for official assessed work
-- Firebase Authentication for learner and employer sign-in
-- Cloudflare Worker + D1 as the authoritative assessment, evidence, credential, and enterprise backend
-- Employer organizations, cohorts, invitations, assignments, roles, audit history, and readiness reports
-- Firm Layer customization with **Hide / Archive / Restore — no permanent employer delete**
-- Evidence-backed competency profiles and readiness snapshots
-- Investment Banking Phase 1 reference pathway with:
-  - baseline diagnostic
-  - Essentials Mini Case
-  - Applied Skills recognition
-  - seven-stage **Project Northstar** Role Lab
-  - Professional Readiness Final
-  - five-level V2 credential ladder
-- Public privacy-safe credential verification
+- **16 finance career pathways** spanning deals, investing, markets, corporate finance, clients/risk, and real assets
+- Two preparation tracks on each career pathway:
+  - **Career Skills Program** — a shorter practical route through Foundations, Essentials and Applied Skills
+  - **Professional Readiness Program** — the full route through Foundations, Essentials, Applied Skills, Role Lab and Professional Readiness
+- Career Skills work carries forward into Professional Readiness; learners do not repeat the first three verified milestones
+- A five-level **Capital Mastery Standard 2.0** evidence ladder for each career
+- Practice immediately after newly taught concepts rather than assessment-only progression
+- Mixed assessment formats: calculations, tables, source review, judgment, written work, spreadsheet-style work and professional simulations—not MCQ-only pathways
+- Role-native workbenches for modeling, underwriting, research, planning, markets, risk, client and real-estate workflows
+- Firebase Authentication for learner and employer identity
+- Cloudflare Worker + D1 as the authoritative assessment, evidence, credential and enterprise backend
+- Employer organizations, cohorts, invitations, assignments, server-enforced roles, audit history and readiness reports
+- Firm Layer customization with versioning and **Hide / Archive / Restore — no permanent employer delete**
+- Manager review, attention signals, competency evidence and readiness snapshots
+- Privacy-conscious public credential verification
 - LinkedIn sharing and downloadable certificate workflows
-- Responsive UI, keyboard focus states, and reduced-motion support
+- Responsive layouts, keyboard focus states, reduced-motion support and release browser testing
+- Free for learners and employers; no subscription, seat fee or trial gate
 
-## Phase 1 architecture
+## Training architecture
+
+```text
+                         CAPITAL MASTERY
+                                │
+               ┌────────────────┴────────────────┐
+               │                                 │
+       Career Skills Program          Professional Readiness Program
+               │                                 │
+        Foundations ✓                         Foundations ✓
+        Essentials ✓                          Essentials ✓
+        Applied Skills ✓                      Applied Skills ✓
+               │                                 │
+       practical completion                     Role Lab ✓
+                                                 │
+                                          revision / evidence
+                                                 │
+                                      Professional Readiness ✓
+```
+
+The Career Skills Program can produce a printable/shareable program-completion certificate, but that document does **not** create a sixth Standard 2.0 credential level. The verified career milestones remain Foundations, Essentials, Applied Skills, Role Lab and Professional Readiness.
+
+## System architecture
 
 ```text
 Cloudflare Pages frontend
@@ -35,24 +59,58 @@ Cloudflare Pages frontend
         └── Cloudflare Worker
                 │
                 └── D1 authoritative database
-                    ├── enterprise tenants / roles
-                    ├── cohorts / assignments / invites
-                    ├── diagnostics / assessments
-                    ├── Role Lab submissions
+                    ├── enterprise tenants / server roles
+                    ├── cohorts / assignments / invitations
+                    ├── diagnostics / secure assessments
+                    ├── Role Lab submissions / revisions
                     ├── competency evidence / readiness
                     ├── credentials / evidence portfolio
+                    ├── Firm Layer versions
+                    ├── notifications / manager reviews
                     └── audit events
 ```
 
-Firebase/Firestore may synchronize non-authoritative learner state, but official assessment results, readiness evidence, and credential issuance are determined server-side by the Worker and D1.
+Firebase/Firestore may synchronize non-authoritative learner state, but official assessment results, readiness evidence, enterprise access and credential issuance are determined server-side by the Worker and D1.
 
-See [`docs/architecture.md`](docs/architecture.md), [`docs/enterprise-security.md`](docs/enterprise-security.md), [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md), and [`docs/phase2-roadmap.md`](docs/phase2-roadmap.md).
+## Employer model
 
-Phase 2 pilot materials: [`docs/employer-one-pager.md`](docs/employer-one-pager.md), [`docs/phase2-pilot-guide.md`](docs/phase2-pilot-guide.md), [`docs/phase2-security-overview.md`](docs/phase2-security-overview.md), [`docs/sample-readiness-report.md`](docs/sample-readiness-report.md), [`docs/workforce-evidence.md`](docs/workforce-evidence.md), and [`docs/pilot-demo-playbook.md`](docs/pilot-demo-playbook.md).
+Capital Mastery is designed as a **finance-readiness layer**, not a replacement for HR onboarding. Employers can:
+
+1. choose a finance career and preparation track;
+2. create cohorts and assign programs;
+3. inspect the protected Capital Mastery Standard before launch;
+4. add firm-specific terminology, resources and cases through the Firm Layer;
+5. monitor completion, readiness, competency evidence and coaching signals separately;
+6. review learner work where their role permits;
+7. export readiness evidence and inspect material audit history.
+
+Workspace permissions are separated across Owner, Training Admin, Content Manager, Manager and Viewer roles, with authoritative organization checks enforced by the Worker.
+
+## Documentation
+
+Architecture and security:
+
+- [`docs/architecture.md`](docs/architecture.md)
+- [`docs/enterprise-security.md`](docs/enterprise-security.md)
+- [`docs/phase2-security-overview.md`](docs/phase2-security-overview.md)
+- [`docs/deployment-runbook.md`](docs/deployment-runbook.md)
+
+Release evidence:
+
+- [`docs/phase1-release-audit.md`](docs/phase1-release-audit.md)
+- [`docs/phase2-release-audit.md`](docs/phase2-release-audit.md)
+
+Employer / pilot materials:
+
+- [`docs/employer-one-pager.md`](docs/employer-one-pager.md)
+- [`docs/phase2-pilot-guide.md`](docs/phase2-pilot-guide.md)
+- [`docs/sample-readiness-report.md`](docs/sample-readiness-report.md)
+- [`docs/workforce-evidence.md`](docs/workforce-evidence.md)
+- [`docs/pilot-demo-playbook.md`](docs/pilot-demo-playbook.md)
 
 ## Run locally
 
-This is a static frontend. Serve the repository root with any local static server, for example:
+This is a static frontend. Serve the repository root with a local static server, for example:
 
 ```bash
 python3 -m http.server 8000
@@ -60,18 +118,24 @@ python3 -m http.server 8000
 
 Then open `http://localhost:8000`.
 
-## Automated QA
+## Release QA
 
-```bash
-node tests/static-audit.mjs
-node tests/logic-audit.mjs
-node tests/runtime-smoke.mjs
-node tests/enterprise-v2-audit.mjs
-node tests/enterprise-v2-runtime-smoke.mjs
-node tests/ib-reference-audit.mjs
-```
+Phase 2 uses separate source, browser and live-production gates rather than treating one smoke test as release proof.
 
-The current suites cover the legacy 79%/80% mastery boundary, **190 public/learner application routes**, and the Enterprise V2 routes, plus V2 sequencing, no-delete Firm Layer rules, role-based authorization, readiness/evidence features, accessibility hooks, and credential verification wiring.
+Key automated gates include:
+
+- Worker and frontend syntax validation
+- all dependency-free regression audits
+- D1 integrity-route contract
+- production Pages allowlist / security-header bundle audit
+- state-resilience Chromium testing
+- failure-seeking browser torture testing
+- learner-guide mobile testing
+- **16 careers × both tracks × 4 release widths**
+- employer public walkthrough / calculator testing
+- **Owner / Training Admin / Content Manager / Manager / Viewer** browser role-matrix testing
+
+The exact current evidence, artifact identifiers and unresolved live blockers are recorded in [`docs/phase2-release-audit.md`](docs/phase2-release-audit.md). Do not infer production completion from a green source build alone.
 
 ## Production build
 
@@ -82,10 +146,16 @@ node tools/build-pages.mjs
 node tests/pages-production-bundle-audit.mjs
 ```
 
-Deploy `dist-pages/`, never the repository root. The production bundle excludes Worker code, tests, migrations, diagnostics, and internal documentation. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md) for the release order and live verification matrix.
+Deploy `dist-pages/`, never the repository root. The production bundle excludes Worker code, tests, migrations, diagnostics and internal documentation.
+
+The Worker and Pages surfaces are deployed separately. When both change, promote the reviewed Worker while preserving existing Cloudflare bindings/secrets, validate D1/auth/origin boundaries, then deploy the exact audited Pages artifact and rerun the live browser matrix. See [`docs/deployment-runbook.md`](docs/deployment-runbook.md).
+
+## Independence and claims
+
+Capital Mastery is an independent educational and workforce-readiness platform. References to financial institutions, professional organizations, employers and public agencies identify research sources or simulated professional contexts only and do not imply affiliation, endorsement or sponsorship.
+
+Capital Mastery does not claim professional licensure, accreditation, regulatory-training status, or third-party security certification unless explicitly documented.
 
 ## Founder
 
 **Shriyan Avadhanula — Founder, Capital Mastery**
-
-Capital Mastery is an independent educational platform. References to financial institutions, professional organizations, employers, and public agencies identify research sources or simulated professional contexts only and do not imply affiliation, endorsement, or sponsorship.
