@@ -42,6 +42,8 @@ jobs:
           node --check runtime-audit-fixes.js
           node --check tests/failure-seeking-browser-audit.mjs
           node --check tests/learner-guide-mobile-browser-audit.cjs
+          node --check tests/all-career-browser-sweep.cjs
+          node --check tests/employer-public-browser-audit.cjs
 
       - name: Failure-seeking static audits
         run: |
@@ -89,3 +91,5 @@ jobs:
           done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
