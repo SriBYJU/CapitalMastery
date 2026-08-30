@@ -13,6 +13,7 @@ const runtime=fs.readFileSync('runtime-audit-fixes.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const workbookAudit=fs.readFileSync('tests/interactive-guidance-workbook-audit.mjs','utf8');
 const notificationAudit=fs.readFileSync('tests/notification-discovery-audit.mjs','utf8');
+const mixedSubmitAudit=fs.readFileSync('tests/official-mixed-submit-audit.mjs','utf8');
 
 // Admin QA must be both server-admin gated and isolated from authoritative UI.
 ok(admin.includes("['qaProgress', 'qaScores', 'resetState']"), 'All state-mutating QA controls, including reset, must be wrapped');
@@ -61,5 +62,6 @@ ok(!index.includes('training-tracks.js?v=20260830-tracks2'), 'Old training-track
 ok(!index.includes('admin-qa-simulation-fix.js?v=20260828-adminsim2'), 'Old Admin QA cache key must not remain');
 ok(workbookAudit.includes('app.js?v=20260830-stability3'), 'Older workbook regression audit must follow the current app cache generation');
 ok(notificationAudit.includes('app.js?v=20260830-stability3'), 'Notification regression audit must follow the current app cache generation');
+ok(mixedSubmitAudit.includes('capital-mastery-e2e.js?v=20260830-stability3'), 'Mixed-submit regression audit must follow the current E2E cache generation');
 
 console.log('FAILURE-SEEKING ROUND 2 STATIC AUDIT PASS');
