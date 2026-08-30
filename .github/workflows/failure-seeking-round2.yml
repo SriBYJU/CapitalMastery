@@ -7,9 +7,7 @@ on:
       - 'tools/failure-seeking-hardening-round2.mjs'
       - 'tools/fix-learner-guide-mobile-overflow.mjs'
       - 'tools/instrument-browser-overflow-diagnostics.mjs'
-      - 'tests/failure-seeking-round2-audit.mjs'
-      - 'tests/failure-seeking-browser-audit.mjs'
-      - 'tests/interactive-guidance-workbook-audit.mjs'
+      - 'tests/**'
       - '.github/workflows/failure-seeking-round2.yml'
   workflow_dispatch:
 
