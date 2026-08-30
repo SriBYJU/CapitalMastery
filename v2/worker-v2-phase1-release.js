@@ -1495,7 +1495,7 @@ export default {
             const pathway = getPathway(body.pathwayId);
             const name = cleanString(body.name, 120);
             if (name.length < 2) throw new HttpError(400, "Cohort name is required");
-            const level = enterpriseEnum(body.programLevel || "professional", ["foundations", "essentials", "professional"], "program level");
+            const level = enterpriseEnum(body.programLevel || "professional", ["foundations", "essentials", "career_skills", "professional"], "program level");
             const deadline = optionalIsoDate(body.deadlineAt);
             const id = `coh_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
             await env.DB.batch([
@@ -1550,9 +1550,10 @@ export default {
             if (!cohort) throw new HttpError(404, "Cohort not found");
             const pathway = getPathway(body.pathwayId || cohort.pathway_id);
             if (cohort.pathway_id !== pathway.id) throw new HttpError(409, "Assignment pathway must match cohort pathway");
-            const track = enterpriseEnum(body.track || "professional", ["foundations", "professional"], "track");
-            const target = enterpriseEnum(body.credentialTarget || (track === "professional" ? "professional_readiness" : "essentials"), ["foundations", "essentials", "applied", "role_lab", "professional_readiness"], "credential target");
+            const track = enterpriseEnum(body.track || "professional", ["foundations", "career_skills", "professional"], "track");
+            const target = enterpriseEnum(body.credentialTarget || (track === "professional" ? "professional_readiness" : "essentials"), ["foundations", "essentials", "applied", "career", "role_lab", "professional_readiness"], "credential target");
             if (track === "foundations" && !["foundations", "essentials"].includes(target)) throw new HttpError(400, "Foundations track cannot target a professional credential");
+            if (track === "career_skills" && target !== "career") throw new HttpError(400, "Career Skills assignments must target the Career Certificate");
             const dueAt = optionalIsoDate(body.dueAt);
             const id = `asn_${crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`;
             await env.DB.batch([
@@ -1685,7 +1686,8 @@ export default {
           credentialLadder: [
             { id: "foundations", title: "Foundations Certificate", track: "foundations", level: "beginner" },
             { id: "essentials", title: "Essentials Certificate", track: "foundations", level: "beginner" },
-            { id: "applied", title: "Applied Skills Certificate", track: "professional", level: "advanced" },
+            { id: "applied", title: "Applied Skills Certificate", track: "career_skills", level: "applied" },
+            { id: "career", title: "Career Skills Certificate", track: "career_skills", level: "applied" },
             { id: "role_lab", title: "Role Lab Certificate", track: "professional", level: "advanced" },
             { id: "professional_readiness", title: "Professional Readiness Certificate", track: "professional", level: "advanced" }
           ],
@@ -4605,8 +4607,7 @@ function requirementsForLevel(level) {
       "part-3",
       "part-4",
       "part-5",
-      "simulation",
-      "final"
+      "simulation"
     ];
   }
 
