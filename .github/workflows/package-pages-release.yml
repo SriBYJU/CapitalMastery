@@ -1,0 +1,44 @@
+name: Package audited Pages release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - '*.js'
+      - '*.css'
+      - 'assets/**'
+      - 'tools/build-pages.mjs'
+      - 'tests/pages-production-bundle-audit.mjs'
+      - '.github/workflows/package-pages-release.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: package-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and audit exact Cloudflare Pages directory
+        run: |
+          set -euo pipefail
+          node --check enterprise-v2.js
+          node tests/csv-export-security-audit.mjs
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Upload exact audited release candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: capitalmastery-pages-${{ github.sha }}
+          path: dist-pages/
+          if-no-files-found: error
+          retention-days: 14
