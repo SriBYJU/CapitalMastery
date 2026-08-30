@@ -2,11 +2,13 @@
 -- Expand the original enterprise cohort/assignment CHECK constraints for the
 -- Career Skills program while preserving existing rows and foreign-key targets.
 --
--- SQLite cannot alter CHECK constraints in place. Rebuild the two parent tables
--- with foreign-key enforcement temporarily disabled, copy every existing row,
--- then restore the canonical table names and indexes.
+-- SQLite cannot alter CHECK constraints in place. Rebuild the two parent tables,
+-- copy every existing row, then restore the canonical table names and indexes.
+-- Cloudflare D1 runs migrations inside implicit transactions, so PRAGMA foreign_keys
+-- cannot be disabled there. D1 explicitly requires defer_foreign_keys for schema
+-- rebuilds that temporarily violate parent/child references.
 
-PRAGMA foreign_keys = OFF;
+PRAGMA defer_foreign_keys = ON;
 
 CREATE TABLE cohorts_phase2 (
   id TEXT PRIMARY KEY,
@@ -57,4 +59,4 @@ DROP TABLE program_assignments;
 ALTER TABLE program_assignments_phase2 RENAME TO program_assignments;
 CREATE INDEX IF NOT EXISTS idx_assignments_org_cohort ON program_assignments(org_id, cohort_id, status);
 
-PRAGMA foreign_keys = ON;
+PRAGMA defer_foreign_keys = OFF;
