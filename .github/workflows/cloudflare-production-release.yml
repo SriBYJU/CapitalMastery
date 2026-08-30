@@ -39,12 +39,15 @@ jobs:
       - name: Re-run release source gate
         run: |
           set -euo pipefail
+          node --check admin-route-guard.js
           node --check app.js
           node --check training-tracks.js
           node --check capital-mastery-live.js
           node --check enterprise-v2.js
           node --check v2/worker-v2-phase1-release.js
           node --check tests/adversarial-chaos-browser-audit.cjs
+          node --check tests/admin-route-zero-exposure-browser-audit.cjs
+          node tests/admin-route-boundary-audit.mjs
           node tests/d1-integrity-endpoint-audit.mjs
           node tests/release-security-abuse-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
@@ -119,12 +122,13 @@ jobs:
             echo '--- headers ---'
             cat /tmp/cm-headers || true
             echo '--- index markers ---'
-            grep -E 'training-tracks|learner-guide|runtime-audit' /tmp/cm-index || true
+            grep -E 'training-tracks|learner-guide|runtime-audit|admin-route-guard' /tmp/cm-index || true
             exit 1
           }
           grep -q 'training-tracks.js' /tmp/cm-index
           grep -q 'learner-guide.js' /tmp/cm-index
           grep -q 'enterprise-v2.js' /tmp/cm-index
+          grep -q 'admin-route-guard.js' /tmp/cm-index
           echo 'Canonical generation and production headers: PASS'
 
       - name: Install Chromium release-test dependency
@@ -138,6 +142,7 @@ jobs:
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/adversarial-chaos-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/learner-guide-mobile-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
@@ -156,7 +161,7 @@ jobs:
           - protected /admin/integrity route exists
           - exact production Pages allowlist deployed
           - canonical generation/security headers passed
-          - seven canonical Chromium suites passed, including adversarial chaos/race testing
+          - eight canonical Chromium suites passed, including adversarial chaos/race and zero-transient-exposure admin testing
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts
