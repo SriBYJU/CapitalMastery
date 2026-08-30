@@ -25,6 +25,7 @@ jobs:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CANONICAL_URL: https://capitalmastery.pages.dev
+      FALLBACK_URL: https://sribyju.github.io/CapitalMastery
       WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
     steps:
       - uses: actions/checkout@v4
@@ -45,9 +46,13 @@ jobs:
           node --check capital-mastery-live.js
           node --check capital-mastery-live-ui.js
           node --check public-certificate-verify.js
+          node --check certificate-name.js
+          node --check firebase-sync.js
           node --check enterprise-v2.js
           node --check v2/worker-v2-phase1-release.js
           node --check tools/prepare-production-d1.mjs
+          node --check tests/firebase-authorized-domain-browser-audit.cjs
+          node --check tests/live-firebase-auth-browser-audit.cjs
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
           node --check tests/admin-simulation-route-stability-browser-audit.cjs
@@ -57,6 +62,7 @@ jobs:
           node tests/release-security-abuse-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
           node tests/program-completion-public-verification-audit.mjs
+          node tests/credential-name-root-persistence-audit.mjs
           for test_file in tests/*.mjs; do
             if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then
               continue
@@ -100,6 +106,13 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
+
+      - name: Require live Firebase readiness before any D1 mutation
+        run: |
+          set -euo pipefail
+          CM_AUDIT_URL="${FALLBACK_URL}/" node tests/live-firebase-auth-browser-audit.cjs
+          CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
+          echo 'Firebase email/password persistence + canonical Google authorized-domain gates: PASS'
 
       - name: Prepare and verify production D1 schema before Worker
         run: |
@@ -193,6 +206,8 @@ jobs:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
           - exact dist-pages artifact survived ten hostile Chromium suites before any production mutation
+          - live Firebase email/password credential-name persistence passed before any D1 mutation
+          - canonical Google Firebase authorized-domain probe passed before any D1 mutation
           - production D1 schema was inspected and only missing Career Skills migrations 016/017 were conditionally applied
           - D1 row-count preservation, quick_check and foreign_key_check passed before Worker deployment
           - Worker deployed only after D1 compatibility was proven
@@ -204,7 +219,6 @@ jobs:
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts
-          - Firebase Authorized Domains verification for capitalmastery.pages.dev
           - authenticated learner/employer/admin/second-tenant production smokes
           - disposable QA cleanup and post-cleanup integrity verification
           EOF
