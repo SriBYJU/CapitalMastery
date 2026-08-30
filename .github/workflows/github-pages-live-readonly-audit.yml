@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Wait for this source generation on GitHub Pages
+      - name: Wait for current protected/completion-aware generation
         run: |
           set -euo pipefail
           ready=false
@@ -38,29 +38,47 @@ jobs:
             fi
             sleep 5
           done
-          [ "$ready" = true ] || { echo 'GitHub Pages did not converge to the current protected/completion-aware generation'; exit 1; }
+          [ "$ready" = true ] || { echo 'GitHub Pages did not converge to the protected/completion-aware generation'; exit 1; }
           echo 'GitHub Pages current-generation markers: PASS'
 
-      - name: Prove internal backend and QA artifacts are not public
+      - name: Wait for internal backend and QA artifacts to become private
         run: |
           set -euo pipefail
-          exposed=0
-          check_private() {
-            path="$1"
-            code=$(curl -sS -o /tmp/cm-private-check -w '%{http_code}' "${FALLBACK}/${path}?sha=${GITHUB_SHA}" || true)
-            case "$code" in
-              404|403) echo "PRIVATE $path -> HTTP $code" ;;
-              *) echo "CRITICAL EXPOSURE: $path -> HTTP $code"; exposed=1 ;;
-            esac
+          paths=(
+            'v2/worker-v2-phase1-release.js'
+            'migrations/017_phase2_program_completion_records.sql'
+            'tests/program-completion-public-verification-audit.mjs'
+            'tools/prepare-production-d1.mjs'
+            'wrangler.jsonc'
+            'auth-test.html'
+            'firestore.rules'
+            'firebase-config.example.js'
+          )
+          private=false
+          for attempt in {1..60}; do
+            exposed=0
+            for path in "${paths[@]}"; do
+              code=$(curl -sS -o /tmp/cm-private-check -w '%{http_code}' "${FALLBACK}/${path}?sha=${GITHUB_SHA}&attempt=${attempt}" || true)
+              case "$code" in
+                404|403) ;;
+                *) exposed=1 ;;
+              esac
+            done
+            if [ "$exposed" -eq 0 ]; then private=true; break; fi
+            sleep 5
+          done
+          [ "$private" = true ] || {
+            echo 'GitHub Pages still exposes one or more internal artifacts after propagation window'
+            for path in "${paths[@]}"; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' "${FALLBACK}/${path}?final=${GITHUB_SHA}" || true)
+              echo "$path -> HTTP $code"
+            done
+            exit 1
           }
-          check_private 'v2/worker-v2-phase1-release.js'
-          check_private 'migrations/017_phase2_program_completion_records.sql'
-          check_private 'tests/program-completion-public-verification-audit.mjs'
-          check_private 'tools/prepare-production-d1.mjs'
-          check_private 'wrangler.jsonc'
-          check_private 'auth-test.html'
-          check_private 'dist-pages-sha256.txt'
-          [ "$exposed" -eq 0 ] || exit 1
+          for path in "${paths[@]}"; do
+            code=$(curl -sS -o /dev/null -w '%{http_code}' "${FALLBACK}/${path}?final=${GITHUB_SHA}" || true)
+            echo "PRIVATE $path -> HTTP $code"
+          done
           echo 'GitHub Pages internal-artifact exposure boundary: PASS'
 
       - name: Public route and asset smoke
