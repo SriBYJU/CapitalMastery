@@ -13,8 +13,10 @@ ok(live.includes('VIRTUAL DATA ROOM'),'Official simulation must expose a data ro
 ok(live.includes('Northstar_Orion_Valuation_v03.xlsx'),'Official simulation must expose workbook-style work product');
 ok(live.includes('OUTLOOK / COMPOSE'),'Final recommendation must render as an Associate email');
 ok(!live.includes("data.simulationProfile?.kind === 'ib-deal-workbench-v2') {\n        return;"),'Workbench branch must actually render');
-ok(app.includes("if(c.id==='investment-banking' && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }"),'Normal IB legacy simulation traffic must redirect to the secure workbench, with only verified Admin QA preview exempted');
-ok(app.includes("function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.isAdmin === true"),'The IB preview exception must depend on backend-verified Admin QA mode, not a raw localStorage flag');
+ok(app.includes("if(c.id==='investment-banking' && !adminPreview && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }"),'Normal IB legacy simulation traffic must redirect to the secure workbench');
+ok(app.includes('const adminPreview = forceAdminPreview && qaMode();'),'Only an explicit protected Admin preview invocation may bypass the secure IB redirect');
+ok(app.includes("root==='admin-preview'&&a==='simulation'")&&app.includes('simulationPage(c,true)'),'Admin IB preview must live in the protected Admin namespace and explicitly invoke the local preview renderer');
+ok(app.includes("function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.backendVerified === true && window.CM_AUTH?.isAdmin === true"),'The IB preview exception must depend on backend-verified Admin QA mode, not a raw localStorage flag');
 const pub=worker.slice(worker.indexOf('function publicQuestion'),worker.indexOf('function otherValues'));
 ok(!/answer:/.test(pub),'public question payload must not expose correct answers');
 console.log('IB OFFICIAL ANALYST WORKBENCH AUDIT PASS');
