@@ -23,7 +23,7 @@ permissions:
 jobs:
   live-production-audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       LIVE_URL: https://capitalmastery.pages.dev
       WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
@@ -139,6 +139,7 @@ jobs:
           for test in \
             tests/state-resilience-browser-audit.cjs \
             tests/failure-seeking-browser-audit.mjs \
+            tests/adversarial-chaos-browser-audit.cjs \
             tests/learner-guide-mobile-browser-audit.cjs \
             tests/all-career-browser-sweep.cjs \
             tests/employer-public-browser-audit.cjs \
