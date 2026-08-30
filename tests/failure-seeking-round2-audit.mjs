@@ -48,12 +48,13 @@ ok(certName.includes('setTimeout(() => openLearningGate(hash), 0)'), 'Account re
 // The interactive guide may contain wide spreadsheet work, but the page itself
 // must stay viewport-contained while the workbook becomes the horizontal scroller.
 ok(guideCss.includes('Failure-seeking mobile containment'),'Learner Guide mobile overflow hardening marker missing');
-ok(guideCss.includes('.cm-learner-guide-shell,.cm-learner-guide-panel,.cm-guide-workbook')&&guideCss.includes('min-width:0;max-width:100%'),'Learner Guide grid items must be allowed to shrink on narrow viewports');
+ok(guideCss.includes('.cm-learner-guide-nav,.cm-learner-guide-panels')&&guideCss.includes('min-width:0;max-width:100%'),'Learner Guide nav/panel grid items must be allowed to shrink on narrow viewports');
+ok(guideCss.includes('.cm-learner-guide-shell{grid-template-columns:minmax(0,1fr)}')&&guideCss.includes('.cm-learner-guide-nav{grid-template-columns:minmax(0,1fr)}'),'Learner Guide responsive grid tracks must use minmax(0,1fr) to prevent min-content expansion');
 ok(guideCss.includes('overflow-x:auto')&&guideCss.includes('overscroll-behavior-inline:contain'),'Wide guide workbooks must scroll internally instead of widening the document');
 
 // New releases must not allow old cached versions of recently changed scripts/styles to mix.
 for(const asset of [
-  'learner-guide.css?v=20260830-stability3',
+  'learner-guide.css?v=20260830-stability4',
   'certificate-name.js?v=20260830-stability3',
   'app.js?v=20260830-stability3',
   'training-tracks.js?v=20260830-stability3',
@@ -68,7 +69,7 @@ for(const asset of [
 
 ok(!index.includes('training-tracks.js?v=20260830-tracks2'), 'Old training-track cache key must not remain');
 ok(!index.includes('admin-qa-simulation-fix.js?v=20260828-adminsim2'), 'Old Admin QA cache key must not remain');
-ok(workbookAudit.includes('learner-guide.css?v=20260830-stability3')&&workbookAudit.includes('app.js?v=20260830-stability3'), 'Workbook regression audit must follow current guide/app stability generations');
+ok(workbookAudit.includes('learner-guide.css?v=20260830-stability4')&&workbookAudit.includes('app.js?v=20260830-stability3'), 'Workbook regression audit must follow current guide/app stability generations');
 ok(notificationAudit.includes('app.js?v=20260830-stability3'), 'Notification regression audit must follow the current app cache generation');
 ok(mixedSubmitAudit.includes('capital-mastery-e2e.js?v=20260830-stability3'), 'Mixed-submit regression audit must follow the current E2E cache generation');
 
