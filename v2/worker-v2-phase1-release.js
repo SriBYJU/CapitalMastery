@@ -5198,33 +5198,71 @@ const ENTERPRISE_REQUIRED_STANDARD_CONTENT = new Set([
 function managerReviewPublic(x){return {id:x.id,orgId:x.org_id,assignmentId:x.assignment_id,learnerUid:x.learner_uid,pathwayId:x.pathway_id,artifactType:x.artifact_type,artifactRef:x.artifact_ref,reviewStatus:x.review_status,rating:x.rating==null?null:Number(x.rating),comment:x.comment,createdByUid:x.created_by_uid,createdAt:x.created_at,updatedAt:x.updated_at};}
 async function upsertEnterpriseNotification(env,{recipientUid,orgId,assignmentId=null,category,severity='info',title,body,actionHash=null,dedupeKey}){
   const id=`note_${(await sha256Hex(`${recipientUid}|${dedupeKey}`)).slice(0,24)}`;
-  await env.DB.prepare(`INSERT INTO enterprise_notifications (id,recipient_uid,org_id,assignment_id,category,severity,title,body,action_hash,dedupe_key,status) VALUES (?,?,?,?,?,?,?,?,?,?,'unread') ON CONFLICT(recipient_uid,dedupe_key) DO UPDATE SET severity=excluded.severity,title=excluded.title,body=excluded.body,action_hash=excluded.action_hash,updated_at=CURRENT_TIMESTAMP`).bind(id,recipientUid,orgId,assignmentId,category,severity,title,body,actionHash,dedupeKey).run(); return id;
+  await env.DB.prepare(`INSERT INTO enterprise_notifications (id,recipient_uid,org_id,assignment_id,category,severity,title,body,action_hash,dedupe_key,status) VALUES (?,?,?,?,?,?,?,?,?,?,'unread') ON CONFLICT(recipient_uid,dedupe_key) DO UPDATE SET severity=excluded.severity,title=excluded.title,body=excluded.body,action_hash=excluded.action_hash,status=CASE WHEN enterprise_notifications.status='archived' THEN 'unread' ELSE enterprise_notifications.status END,updated_at=CURRENT_TIMESTAMP`).bind(id,recipientUid,orgId,assignmentId,category,severity,title,body,actionHash,dedupeKey).run(); return id;
 }
 async function refreshEnterpriseNotifications(env,user){
   const activeKeys=[];
+  const activeSet=new Set();
+  const remember=key=>{ if(key){ activeKeys.push(key); activeSet.add(key); } };
+  const completionCredential=async(uid,a)=>{
+    if(a.credential_target==='career'){
+      return env.DB.prepare(`SELECT credential_id FROM credentials WHERE uid=? AND pathway_id=? AND credential_level='career' AND status='active' ORDER BY issued_at DESC LIMIT 1`).bind(uid,a.pathway_id).first();
+    }
+    return env.DB.prepare(`SELECT credential_id FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' AND status='active' ORDER BY issued_at DESC LIMIT 1`).bind(uid,a.id).first();
+  };
   const memberships=(await env.DB.prepare(`SELECT org_id,role FROM organization_members WHERE uid=? AND status='active'`).bind(user.sub).all()).results||[];
   for(const m of memberships){
     if(ENTERPRISE_EMPLOYER_ROLES.includes(m.role)){
-      const assignments=(await env.DB.prepare(`SELECT a.id,a.cohort_id,a.pathway_id,a.due_at,c.name AS cohort_name FROM program_assignments a JOIN cohorts c ON c.id=a.cohort_id WHERE a.org_id=? AND a.status='published'`).bind(m.org_id).all()).results||[];
+      const assignments=(await env.DB.prepare(`SELECT a.id,a.cohort_id,a.pathway_id,a.track,a.credential_target,a.due_at,c.name AS cohort_name FROM program_assignments a JOIN cohorts c ON c.id=a.cohort_id WHERE a.org_id=? AND a.status='published'`).bind(m.org_id).all()).results||[];
       for(const a of assignments){
+        const professional=a.track==='professional';
+        const programLabel=professional?'Professional Readiness':'Career Skills';
         const learners=(await env.DB.prepare(`SELECT cm.uid,MAX(i.email_normalized) AS email,MAX(cr.holder_name) AS holder_name FROM cohort_members cm LEFT JOIN organization_invites i ON i.org_id=cm.org_id AND i.cohort_id=cm.cohort_id AND i.accepted_by_uid=cm.uid LEFT JOIN credentials cr ON cr.uid=cm.uid WHERE cm.cohort_id=? AND cm.org_id=? AND cm.status='active' GROUP BY cm.uid`).bind(a.cohort_id,m.org_id).all()).results||[];
         for(const l of learners){
-          const name=l.holder_name||l.email||'Learner'; const cred=await env.DB.prepare(`SELECT credential_id FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' AND status='active' LIMIT 1`).bind(l.uid,a.id).first(); const lab=await env.DB.prepare(`SELECT score,revision_count,status FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(l.uid,a.id).first(); const readiness=await env.DB.prepare(`SELECT overall_score,evidence_coverage FROM readiness_snapshots WHERE uid=? AND assignment_id=? ORDER BY created_at DESC LIMIT 1`).bind(l.uid,a.id).first();
+          const name=l.holder_name||l.email||'Learner';
+          const cred=await completionCredential(l.uid,a);
+          const lab=professional?await env.DB.prepare(`SELECT score,revision_count,status FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(l.uid,a.id).first():null;
+          const readiness=professional?await env.DB.prepare(`SELECT overall_score,evidence_coverage FROM readiness_snapshots WHERE uid=? AND assignment_id=? ORDER BY created_at DESC LIMIT 1`).bind(l.uid,a.id).first():null;
           const due=a.due_at?Date.parse(a.due_at):null, days=due?Math.ceil((due-Date.now())/86400000):null;
           let note=null,key=null;
-          if(due&&due<Date.now()&&!cred){key=`employer:overdue:${a.id}:${l.uid}`;note={category:'overdue',severity:'urgent',title:`Overdue · ${name}`,body:`${a.cohort_name} is past due and Professional Readiness is not complete.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
-          else if(Number(lab?.revision_count||0)>0&&lab?.status!=='passed'){key=`employer:revision:${a.id}:${l.uid}`;note={category:'revision',severity:'attention',title:`Revision cycle · ${name}`,body:`${Number(lab.revision_count)} Role Lab revision cycle${Number(lab.revision_count)===1?'':'s'} recorded. Review the recurring work-product weakness.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
-          else if(readiness&&Number(readiness.evidence_coverage||0)>=.7&&Number(readiness.overall_score)<75){key=`employer:readiness:${a.id}:${l.uid}`;note={category:'readiness',severity:'attention',title:`Readiness gap · ${name}`,body:`Readiness is ${Number(readiness.overall_score)} with ${Math.round(Number(readiness.evidence_coverage)*100)}% evidence coverage.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
-          else if(days!=null&&days>=0&&days<=3&&!cred){key=`employer:deadline:${a.id}:${l.uid}`;note={category:'deadline',severity:'info',title:`Due soon · ${name}`,body:`${a.cohort_name} is due in ${days} day${days===1?'':'s'}.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
-          if(note){activeKeys.push(key);await upsertEnterpriseNotification(env,{recipientUid:user.sub,orgId:m.org_id,assignmentId:a.id,dedupeKey:key,...note});}
+          if(due&&due<Date.now()&&!cred){key=`employer:overdue:${a.id}:${l.uid}`;note={category:'overdue',severity:'urgent',title:`Overdue · ${name}`,body:`${a.cohort_name} is past due and ${programLabel} is not complete.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          else if(professional&&Number(lab?.revision_count||0)>0&&lab?.status!=='passed'){key=`employer:revision:${a.id}:${l.uid}`;note={category:'revision',severity:'attention',title:`Revision cycle · ${name}`,body:`${Number(lab.revision_count)} Role Lab revision cycle${Number(lab.revision_count)===1?'':'s'} recorded. Review the recurring work-product weakness.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          else if(professional&&readiness&&Number(readiness.evidence_coverage||0)>=.7&&Number(readiness.overall_score)<75){key=`employer:readiness:${a.id}:${l.uid}`;note={category:'readiness',severity:'attention',title:`Readiness gap · ${name}`,body:`Readiness is ${Number(readiness.overall_score)} with ${Math.round(Number(readiness.evidence_coverage)*100)}% evidence coverage.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          else if(days!=null&&days>=0&&days<=3&&!cred){key=`employer:deadline:${a.id}:${l.uid}`;note={category:'deadline',severity:'info',title:`Due soon · ${name}`,body:`${a.cohort_name} is due in ${days} day${days===1?'':'s'} · ${programLabel}.`,actionHash:`#/employer/${m.org_id}/reports?assignment=${a.id}`};}
+          if(note){remember(key);await upsertEnterpriseNotification(env,{recipientUid:user.sub,orgId:m.org_id,assignmentId:a.id,dedupeKey:key,...note});}
         }
       }
     }
   }
-  // Learner-side assigned deadlines/revisions.
-  const learnerAssignments=(await env.DB.prepare(`SELECT a.id,a.org_id,a.pathway_id,a.due_at,c.name AS cohort_name FROM cohort_members cm JOIN program_assignments a ON a.cohort_id=cm.cohort_id AND a.org_id=cm.org_id JOIN cohorts c ON c.id=a.cohort_id WHERE cm.uid=? AND cm.status='active' AND a.status='published'`).bind(user.sub).all()).results||[];
-  for(const a of learnerAssignments){const cred=await env.DB.prepare(`SELECT credential_id FROM credentials WHERE uid=? AND assignment_id=? AND credential_level='professional_readiness' AND status='active' LIMIT 1`).bind(user.sub,a.id).first();const lab=await env.DB.prepare(`SELECT revision_count,status FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(user.sub,a.id).first();const due=a.due_at?Date.parse(a.due_at):null,days=due?Math.ceil((due-Date.now())/86400000):null;let note=null,key=null;if(due&&due<Date.now()&&!cred){key=`learner:overdue:${a.id}`;note={category:'overdue',severity:'urgent',title:`Assigned training is overdue`,body:`${a.cohort_name} is past due. Open the assigned program to continue.`,actionHash:`#/assigned/${a.id}`};}else if(lab&&Number(lab.revision_count||0)>0&&lab.status!=='passed'){key=`learner:revision:${a.id}`;note={category:'revision',severity:'attention',title:'Role Lab revision required',body:'Manager-style feedback is waiting in your Role Lab. Revise the current work product before continuing.',actionHash:`#/role-lab/${a.pathway_id}?assignment=${a.id}`};}else if(days!=null&&days>=0&&days<=3&&!cred){key=`learner:deadline:${a.id}`;note={category:'deadline',severity:'info',title:'Assigned training due soon',body:`${a.cohort_name} is due in ${days} day${days===1?'':'s'}.`,actionHash:`#/assigned/${a.id}`};}if(note){activeKeys.push(key);await upsertEnterpriseNotification(env,{recipientUid:user.sub,orgId:a.org_id,assignmentId:a.id,dedupeKey:key,...note});}}
-  return {activeGenerated:activeKeys.length};
+
+  // Learner-side assigned deadlines/revisions. Career Skills never receives
+  // Role Lab or Professional Readiness-gap alerts because those are not its gates.
+  const learnerAssignments=(await env.DB.prepare(`SELECT a.id,a.org_id,a.pathway_id,a.track,a.credential_target,a.due_at,c.name AS cohort_name FROM cohort_members cm JOIN program_assignments a ON a.cohort_id=cm.cohort_id AND a.org_id=cm.org_id JOIN cohorts c ON c.id=a.cohort_id WHERE cm.uid=? AND cm.status='active' AND a.status='published'`).bind(user.sub).all()).results||[];
+  for(const a of learnerAssignments){
+    const professional=a.track==='professional';
+    const cred=await completionCredential(user.sub,a);
+    const lab=professional?await env.DB.prepare(`SELECT revision_count,status FROM role_lab_runs WHERE uid=? AND assignment_id=? ORDER BY started_at DESC LIMIT 1`).bind(user.sub,a.id).first():null;
+    const due=a.due_at?Date.parse(a.due_at):null,days=due?Math.ceil((due-Date.now())/86400000):null;
+    let note=null,key=null;
+    if(due&&due<Date.now()&&!cred){key=`learner:overdue:${a.id}`;note={category:'overdue',severity:'urgent',title:'Assigned training is overdue',body:`${a.cohort_name} is past due. Open the assigned ${professional?'Professional Readiness':'Career Skills'} program to continue.`,actionHash:`#/assigned/${a.id}`};}
+    else if(professional&&lab&&Number(lab.revision_count||0)>0&&lab.status!=='passed'){key=`learner:revision:${a.id}`;note={category:'revision',severity:'attention',title:'Role Lab revision required',body:'Manager-style feedback is waiting in your Role Lab. Revise the current work product before continuing.',actionHash:`#/role-lab/${a.pathway_id}?assignment=${a.id}`};}
+    else if(days!=null&&days>=0&&days<=3&&!cred){key=`learner:deadline:${a.id}`;note={category:'deadline',severity:'info',title:'Assigned training due soon',body:`${a.cohort_name} is due in ${days} day${days===1?'':'s'}.`,actionHash:`#/assigned/${a.id}`};}
+    if(note){remember(key);await upsertEnterpriseNotification(env,{recipientUid:user.sub,orgId:a.org_id,assignmentId:a.id,dedupeKey:key,...note});}
+  }
+
+  // Generated state alerts are stateful, not permanent inbox messages. Once the
+  // condition clears, archive the old alert so a resolved deadline/revision does
+  // not remain active. If it becomes true again, the upsert above re-opens it.
+  const existing=(await env.DB.prepare(`SELECT id,dedupe_key FROM enterprise_notifications WHERE recipient_uid=? AND status!='archived' AND category IN ('overdue','revision','readiness','deadline')`).bind(user.sub).all()).results||[];
+  let archivedResolved=0;
+  for(const row of existing){
+    const key=String(row.dedupe_key||'');
+    if((key.startsWith('employer:')||key.startsWith('learner:'))&&!activeSet.has(key)){
+      const r=await env.DB.prepare(`UPDATE enterprise_notifications SET status='archived',updated_at=CURRENT_TIMESTAMP WHERE id=? AND recipient_uid=?`).bind(row.id,user.sub).run();
+      archivedResolved+=Number(r.meta?.changes||0);
+    }
+  }
+  return {activeGenerated:activeKeys.length,archivedResolved};
 }
 
 const ENTERPRISE_EMPLOYER_ROLES = ["owner", "training_admin", "content_manager", "manager", "viewer"];

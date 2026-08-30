@@ -29,24 +29,42 @@
 
   function levelInfo(level) {
     const key = String(level || '').toLowerCase();
-    if (key === 'foundations') {
-      return {
+    const levels = {
+      foundations: {
         className: 'simple',
-        label: 'Foundations Certificate',
-        description: 'for successfully completing the required career foundations and technical learning requirements under the Capital Mastery Standard.'
-      };
-    }
-    if (key === 'applied') {
-      return {
+        label: 'Foundations Credential',
+        description: 'for demonstrating the required career foundations, role context and technical core under the Capital Mastery Standard.'
+      },
+      essentials: {
+        className: 'simple',
+        label: 'Essentials Credential',
+        description: 'for applying the taught foundations in the required secure mini case and meeting the Capital Mastery mastery standard.'
+      },
+      applied: {
         className: 'applied',
-        label: 'Applied Skills Certificate',
-        description: 'for successfully completing the required applied learning, professional toolkit, and assessment requirements under the Capital Mastery Standard.'
-      };
-    }
-    return {
+        label: 'Applied Skills Credential',
+        description: 'for completing the required professional toolkit, guided practice and independent applied work under the Capital Mastery Standard.'
+      },
+      career: {
+        className: 'career-skills',
+        label: 'Career Skills Certificate',
+        description: 'for completing the shorter practical Career Skills program, including Foundations, Essentials, Applied Skills and the required role-specific capstone simulation.'
+      },
+      role_lab: {
+        className: 'applied',
+        label: 'Role Lab Credential',
+        description: 'for completing the advanced role-specific professional simulation, required work products and review/revision cycle under the Capital Mastery Standard 2.0.'
+      },
+      professional_readiness: {
+        className: 'professional-readiness',
+        label: 'Professional Readiness Credential',
+        description: 'for demonstrating the full required technical, applied, Role Lab and professional-final evidence for the career under the Capital Mastery Standard 2.0.'
+      }
+    };
+    return levels[key] || {
       className: '',
-      label: 'Career Certificate',
-      description: 'for demonstrating mastery across the required learning, assessments, practical simulation, and Professional Readiness Final under the Capital Mastery Standard.'
+      label: 'Capital Mastery Credential',
+      description: 'for completing the evidence requirements associated with this verified Capital Mastery credential.'
     };
   }
 
@@ -56,7 +74,10 @@
 
   function certificateHtml(c, valid) {
     const info = levelInfo(c.level);
-    const isCareer = String(c.level || '').toLowerCase() === 'career';
+    const levelKey = String(c.level || '').toLowerCase();
+    const isCareer = levelKey === 'career';
+    const isProfessional = levelKey === 'professional_readiness';
+    const isFlagship = isCareer || isProfessional;
     const statusText = valid ? 'Verified Active Credential' : `Credential ${String(c.status || 'not active')}`;
     const verify = currentVerifyUrl();
 
@@ -77,14 +98,14 @@
             <span class="corner tr"></span>
             <span class="corner bl"></span>
             <span class="corner br"></span>
-            ${isCareer ? '<img class="cert-seal" src="assets/seal.svg" alt="Capital Mastery seal">' : ''}
+            ${isFlagship ? '<img class="cert-seal" src="assets/seal.svg" alt="Capital Mastery seal">' : ''}
             <div class="cert-inner">
               <div class="cert-brand"><img src="assets/logo-mark.svg" alt="">CAPITAL MASTERY</div>
               <div class="cert-type">${esc(info.label)}</div>
-              <div class="cert-awarded">This certificate is ${isCareer ? 'proudly ' : ''}awarded to</div>
+              <div class="cert-awarded">This certificate is ${isFlagship ? 'proudly ' : ''}awarded to</div>
               <div class="cert-name">${esc(c.holderName)}</div>
               <div class="cert-for">for successfully completing the requirements of</div>
-              <div class="cert-title">${esc(c.title.replace(/ Certificate$/i, '').replace(/ Career Certificate$/i, ''))}</div>
+              <div class="cert-title">${esc(String(c.title||'').replace(/ Career Skills Certificate$/i,'').replace(/ Professional Readiness Credential$/i,'').replace(/ Role Lab Credential$/i,'').replace(/ (Foundations|Essentials|Applied Skills) (Credential|Certificate)$/i,'').replace(/ Certificate$/i,''))}</div>
               <div class="cert-description">${esc(info.description)}</div>
               <div class="cert-bottom">
                 <div class="cert-meta"><span>ISSUED</span><strong>${esc(formatDate(c.issuedAt))}</strong></div>
