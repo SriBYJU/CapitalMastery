@@ -85,9 +85,13 @@ async function gotoHash(page, hash, settle = 220) {
   try {
     await context.addInitScript(({uid}) => {
       localStorage.setItem(`cmCredentialNameOnboardedV3:${uid}`, 'true');
-      // Invalid persisted values are intentional. The UI must normalize/fail safe.
-      localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking', 'garbage-track-value');
-      localStorage.setItem('capitalMasteryTrainingTrackV1:private-equity', '{not-json-or-track}');
+      // Seed corruption once per tab. addInitScript runs again on reload, so
+      // re-seeding here would destroy the valid value we are trying to verify.
+      if (sessionStorage.getItem('cmChaosCorruptTrackSeededV1') !== 'true') {
+        localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking', 'garbage-track-value');
+        localStorage.setItem('capitalMasteryTrainingTrackV1:private-equity', '{not-json-or-track}');
+        sessionStorage.setItem('cmChaosCorruptTrackSeededV1', 'true');
+      }
     }, { uid:UID });
 
     await context.route(/\/firebase-auth\.js(?:\?.*)?$/, route => route.fulfill({
