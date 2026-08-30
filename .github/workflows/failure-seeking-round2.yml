@@ -8,6 +8,7 @@ on:
       - '*.css'
       - 'index.html'
       - '_config.yml'
+      - 'firestore.rules'
       - 'assets/**'
       - 'v2/**'
       - 'tests/**'
@@ -37,6 +38,7 @@ jobs:
           node --check brand-asset-resilience.js
           node --check state-resilience.js
           node --check certificate-name.js
+          node --check firebase-sync.js
           node --check admin-route-guard.js
           node --check admin-qa-simulation-fix.js
           node --check capital-mastery-live.js
@@ -55,6 +57,7 @@ jobs:
           node --check runtime-audit-fixes.js
           node --check tests/deployable-encoding-audit.mjs
           node --check tests/github-pages-publish-boundary-audit.mjs
+          node --check tests/credential-name-root-persistence-audit.mjs
           node --check tests/failure-seeking-browser-audit.mjs
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
@@ -78,6 +81,7 @@ jobs:
           node tests/two-track-notification-reporting-audit.mjs
           node tests/public-credential-hierarchy-audit.mjs
           node tests/program-completion-public-verification-audit.mjs
+          node tests/credential-name-root-persistence-audit.mjs
           node tests/production-d1-release-order-audit.mjs
           node tests/deployable-encoding-audit.mjs
           node tests/github-pages-publish-boundary-audit.mjs
