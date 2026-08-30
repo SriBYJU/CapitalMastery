@@ -21,7 +21,8 @@ must(enterprise.includes('CM_TRAINING_TRACKS.setTrack'), 'Assigned program must 
 
 must(worker.includes("a.credential_target==='career'"), 'Employer completion must resolve the Career Skills program-completion target');
 must(worker.includes("program_completion_records WHERE uid=? AND org_id=? AND assignment_id=? AND pathway_id=? AND program_code='career_skills' AND status='active'"), 'Employer Career Skills completion must require exact assignment-scoped program-completion evidence');
-must(worker.includes("credential_level='career' AND status='active'"), 'Portable Career Skills certificate compatibility must remain available outside assignment-scoped employer completion');
+must(worker.includes("credential_id NOT LIKE 'DEMO-%'"), 'Public legacy credential verification must continue to exclude demo credentials while accepting real legacy rows');
+must(worker.includes("standardVersion:credential.standard_version||'1.0-legacy'"), 'Legacy Career certificates must retain public verification compatibility through the generic credential verifier');
 must(worker.includes('track:a.track'), 'Employer readiness report must expose assignment track');
 must(worker.includes('Career Skills Program Completion Certificate'), 'Worker must expose Career Skills program completion separately');
 must(worker.includes('programCompletions:'), 'Worker catalog must separate program completion from credentialLadder');
