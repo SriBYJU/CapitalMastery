@@ -1,0 +1,70 @@
+name: Add D1 integrity endpoint
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-d1-integrity-endpoint.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add admin-only read-only D1 integrity route
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('v2/worker-v2-phase1-release.js')
+          text=p.read_text()
+          if 'url.pathname === "/admin/integrity"' in text:
+              print('D1 integrity endpoint already present')
+          else:
+              marker='      const parts = url.pathname.split("/").filter(Boolean);'
+              if text.count(marker)!=1:
+                  raise SystemExit(f'Expected one route-parts marker, found {text.count(marker)}; refusing rewrite')
+              route='''      // --------------------------------------------------\n      // ADMIN D1 INTEGRITY (read-only)\n      // --------------------------------------------------\n      if (request.method === "GET" && url.pathname === "/admin/integrity") {\n        await requireAdmin(request, env);\n        const [quick, foreignKeys, tableRows] = await Promise.all([\n          env.DB.prepare(`PRAGMA quick_check`).all(),\n          env.DB.prepare(`PRAGMA foreign_key_check`).all(),\n          env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all()\n        ]);\n        const tableCounts = {};\n        for (const row of tableRows.results || []) {\n          const name = String(row.name || '');\n          if (!/^[A-Za-z0-9_]+$/.test(name)) continue;\n          const countRow = await env.DB.prepare(`SELECT COUNT(*) AS count FROM "${name}"`).first();\n          tableCounts[name] = Number(countRow?.count || 0);\n        }\n        return json({\n          ok: true,\n          checkedAt: new Date().toISOString(),\n          quickCheck: quick.results || [],\n          foreignKeyViolations: foreignKeys.results || [],\n          tableCounts\n        }, 200, env);\n      }\n\n'''
+              p.write_text(text.replace(marker,route+marker,1))
+          PY
+          node --check v2/worker-v2-phase1-release.js
+
+      - name: Add integrity contract regression
+        run: |
+          cat > tests/d1-integrity-endpoint-audit.mjs <<'EOF'
+          import fs from 'node:fs';
+          const w=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
+          const ok=(v,m)=>{if(!v)throw new Error(m)};
+          const s=w.indexOf('url.pathname === "/admin/integrity"');
+          const e=w.indexOf('const parts = url.pathname.split',s);
+          const route=w.slice(s,e);
+          ok(s>=0&&e>s,'Admin D1 integrity route missing');
+          ok(route.includes('request.method === "GET"'),'Integrity route must be GET/read-only');
+          ok(route.includes('await requireAdmin(request, env)'),'Integrity route must require verified admin access');
+          ok(route.includes('PRAGMA quick_check'),'Integrity route must execute SQLite quick_check');
+          ok(route.includes('PRAGMA foreign_key_check'),'Integrity route must execute SQLite foreign_key_check');
+          ok(route.includes("SELECT name FROM sqlite_master WHERE type='table'"),'Integrity route must enumerate actual D1 tables');
+          ok(route.includes('/^[A-Za-z0-9_]+$/.test(name)'),'Dynamic table count identifiers must be strictly sanitized');
+          ok(route.includes('SELECT COUNT(*) AS count'),'Integrity response must report table counts');
+          ok(!route.includes('SELECT * FROM'),'Integrity route must not expose arbitrary table rows');
+          ok(!route.includes('INSERT ')&&!route.includes('UPDATE ')&&!route.includes('DELETE '),'Integrity route must not mutate D1');
+          console.log('D1 INTEGRITY ENDPOINT AUDIT PASS: admin-only read-only quick_check, foreign_key_check and table counts verified');
+          EOF
+          node tests/d1-integrity-endpoint-audit.mjs
+
+      - name: Commit integrity endpoint
+        run: |
+          if git diff --quiet; then
+            echo 'No integrity changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add v2/worker-v2-phase1-release.js tests/d1-integrity-endpoint-audit.mjs
+          git commit -m 'Add admin-only D1 integrity check'
+          git push
