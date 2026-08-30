@@ -21,7 +21,10 @@ must(worker.includes('required Professional Readiness credentials'), 'Academy el
 
 must(enterprise.includes("credentialTarget:track==='professional'?'professional_readiness':'career'"), 'Employer assignment targets must keep Career Skills and Professional Readiness distinct');
 must(enterprise.includes("if(track==='career_skills')"), 'Employer progress must evaluate Career Skills on its own gates');
-must(enterprise.includes("levels.has('career')"), 'Career Skills completion must recognize the Career Skills credential');
+must(enterprise.includes("const scopedCompletion=report.programCompletion?.status==='active'"), 'Assigned Career Skills completion must use exact assignment-scoped program-completion evidence');
+must(enterprise.includes("levels.has('foundations'),levels.has('essentials'),levels.has('applied'),scopedCompletion"), 'Career Skills completion must require the three shared verified credentials plus scoped capstone completion');
 must(enterprise.includes("levels.has('professional_readiness')"), 'Professional Readiness completion must remain tied to the flagship credential');
+must(worker.includes("program_code='career_skills'"), 'Worker must preserve Career Skills as a separate program-completion record');
+must(worker.includes('requiredVerifiedCredentials:3'), 'Career Skills completion evidence must record three verified Standard credentials, not four');
 
 console.log('track-upgrade-no-repeat-audit: PASS');
