@@ -69,7 +69,7 @@ ok(!reconcileBody.includes('location.reload();'),'Progress reconciliation must n
 
 // If a brand SVG revalidation fails during a valid offline SPA render, the user
 // should get an inline fallback mark rather than a broken-image icon.
-ok(index.includes('brand-asset-resilience.js?v=20260830-stability1'),'Offline brand fallback must be loaded by the production shell');
+ok(/<script\s+src=["']brand-asset-resilience\.js\?v=[^"']+["']><\/script>/.test(index),'Offline brand fallback must be loaded by the production shell with a cache-busted production asset URL');
 ok(brand.includes("document.addEventListener('error'")&&brand.includes('true);'),'Brand fallback must listen during capture so image failures cannot bypass it');
 ok(brand.includes('data:image/svg+xml')&&brand.includes("image.dataset.cmAssetFallback = 'true'"),'Brand fallback must replace the failed asset with a self-contained inline mark and mark the replacement');
 ok(/assets\\\/logo-mark\\\.svg|assets\/logo-mark\\\.svg/.test(brand),'Brand fallback must be limited to the Capital Mastery logo asset');
