@@ -19,10 +19,13 @@ must(enterprise.includes("track==='career_skills'"), 'Employer surfaces must und
 must(enterprise.includes('Career Skills assignment'), 'Employer reporting must explain the shorter scope');
 must(enterprise.includes('CM_TRAINING_TRACKS.setTrack'), 'Assigned program must synchronize the learner UI program level');
 
-must(worker.includes("a.credential_target==='career'"), 'Employer completion must resolve the Career Skills credential target');
-must(worker.includes("credential_level='career' AND status='active'"), 'Career Skills completion must recognize a verified portable Career credential');
+must(worker.includes("a.credential_target==='career'"), 'Employer completion must resolve the Career Skills program-completion target');
+must(worker.includes("program_completion_records WHERE uid=? AND org_id=? AND assignment_id=? AND pathway_id=? AND program_code='career_skills' AND status='active'"), 'Employer Career Skills completion must require exact assignment-scoped program-completion evidence');
+must(worker.includes("credential_level='career' AND status='active'"), 'Portable Career Skills certificate compatibility must remain available outside assignment-scoped employer completion');
 must(worker.includes('track:a.track'), 'Employer readiness report must expose assignment track');
 must(worker.includes('Career Skills Program Completion Certificate'), 'Worker must expose Career Skills program completion separately');
 must(worker.includes('programCompletions:'), 'Worker catalog must separate program completion from credentialLadder');
+must(worker.includes("recordType:'program_completion'"), 'Assignment-scoped Career Skills proof must identify itself as a program-completion record, not a Standard credential');
+must(worker.includes('requiredVerifiedCredentials:3'), 'Career Skills program completion must record exactly three required verified Standard credentials');
 
 console.log('two-track-consistency-audit: PASS');
