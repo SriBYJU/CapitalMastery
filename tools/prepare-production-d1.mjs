@@ -4,6 +4,8 @@ import fs from 'node:fs';
 const DB='capital-mastery-prod';
 const WRANGLER=['--yes','wrangler@4','d1','execute',DB,'--remote'];
 const requiredEnv=['CLOUDFLARE_API_TOKEN','CLOUDFLARE_ACCOUNT_ID'];
+const MIGRATION_016='migrations/016_phase2_career_skills_track_constraints.sql';
+const MIGRATION_017='migrations/017_phase2_program_completion_records.sql';
 for(const name of requiredEnv){
   if(!String(process.env[name]||'').trim()) throw new Error(`Missing ${name}; refusing production D1 mutation`);
 }
@@ -30,6 +32,13 @@ function file(path,label){
 function norm(value){return String(value||'').replace(/\s+/g,' ').toLowerCase();}
 function assert(condition,message){if(!condition)throw new Error(message);}
 
+function requireD1SafeMigration016(){
+  if(!fs.existsSync(MIGRATION_016)) throw new Error(`Migration file missing: ${MIGRATION_016}`);
+  const source=norm(fs.readFileSync(MIGRATION_016,'utf8'));
+  assert(source.includes('pragma defer_foreign_keys = on'),'Migration 016 must use D1-compatible defer_foreign_keys before parent-table rebuilds');
+  assert(source.includes('pragma defer_foreign_keys = off'),'Migration 016 must restore deferred checking before completing');
+  assert(!source.includes('pragma foreign_keys = off'),'Migration 016 must not attempt to disable foreign_keys inside D1 implicit transactions');
+}
 function schemaRows(){
   return sql("SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('cohorts','program_assignments','program_completion_records') ORDER BY name;",'Read production table schemas');
 }
@@ -41,6 +50,19 @@ function requireColumns(name,required){
   const got=new Set(tableColumns(name));
   const missing=required.filter(x=>!got.has(x));
   assert(!missing.length,`${name} is an unknown/partial schema; missing columns: ${missing.join(', ')}`);
+}
+function explicitSchemaObjects(table){
+  return sql(`SELECT type,name,sql FROM sqlite_master WHERE tbl_name='${table}' AND type IN ('index','trigger') AND sql IS NOT NULL ORDER BY type,name;`,`Read ${table} indexes/triggers`);
+}
+function requireKnownRebuildObjects(){
+  const expected=new Map([
+    ['cohorts',new Set(['idx_cohorts_org_status'])],
+    ['program_assignments',new Set(['idx_assignments_org_cohort'])]
+  ]);
+  for(const [table,allowed] of expected){
+    const unexpected=explicitSchemaObjects(table).filter(row=>!allowed.has(String(row.name))).map(row=>`${row.type}:${row.name}`);
+    assert(!unexpected.length,`${table} has production indexes/triggers not recreated by migration 016 (${unexpected.join(', ')}); refusing automatic rebuild`);
+  }
 }
 function snapshotCounts(){
   const tables=sql("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",'List production tables').map(r=>r.name);
@@ -59,6 +81,7 @@ function assertUnchanged(before,after,names){
   }
 }
 
+requireD1SafeMigration016();
 console.log('D1 production schema inspection: START');
 const beforeCounts=snapshotCounts();
 let schemas=byName(schemaRows());
@@ -75,8 +98,9 @@ assert(cohortCareer===assignmentCareer,'Partial Career Skills constraint migrati
 
 let applied016=false;
 if(!cohortCareer){
+  requireKnownRebuildObjects();
   console.log('Migration 016 required: production CHECK constraints do not yet allow Career Skills.');
-  file('migrations/016_phase2_career_skills_track_constraints.sql','Apply migration 016');
+  file(MIGRATION_016,'Apply migration 016');
   applied016=true;
   schemas=byName(schemaRows());
   const c=norm(schemas.get('cohorts')?.sql), a=norm(schemas.get('program_assignments')?.sql);
@@ -90,7 +114,7 @@ let applied017=false;
 const completion=schemas.get('program_completion_records');
 if(!completion){
   console.log('Migration 017 required: program_completion_records is absent.');
-  file('migrations/017_phase2_program_completion_records.sql','Apply migration 017');
+  file(MIGRATION_017,'Apply migration 017');
   applied017=true;
 }else{
   console.log('program_completion_records already exists; validating instead of reapplying migration 017.');
@@ -106,7 +130,10 @@ for(const idx of ['idx_program_completion_uid_assignment','idx_program_completio
 }
 
 const afterCounts=snapshotCounts();
-assertUnchanged(beforeCounts,afterCounts,['organizations','organization_members','cohorts','cohort_members','program_assignments','firm_content','credentials','official_progress']);
+assertUnchanged(beforeCounts,afterCounts,['organizations','organization_members','cohorts','cohort_members','program_assignments','firm_content','credentials','official_progress','program_completion_records']);
+if(beforeCounts.program_completion_records===undefined){
+  assert(afterCounts.program_completion_records===0,'New program_completion_records table must be empty immediately after migration 017');
+}
 const quick=sql('PRAGMA quick_check;','Run D1 quick_check');
 const quickValue=String(quick[0]?.quick_check??Object.values(quick[0]||{})[0]??'');
 assert(quickValue.toLowerCase()==='ok',`PRAGMA quick_check failed: ${quickValue}`);
