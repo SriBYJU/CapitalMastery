@@ -11,6 +11,7 @@ const e2e=fs.readFileSync('capital-mastery-e2e.js','utf8');
 const ux=fs.readFileSync('ux-stability.js','utf8');
 const continuity=fs.readFileSync('course-continuity.js','utf8');
 const runtime=fs.readFileSync('runtime-audit-fixes.js','utf8');
+const brand=fs.readFileSync('brand-asset-resilience.js','utf8');
 const index=fs.readFileSync('index.html','utf8');
 const workbookAudit=fs.readFileSync('tests/interactive-guidance-workbook-audit.mjs','utf8');
 const notificationAudit=fs.readFileSync('tests/notification-discovery-audit.mjs','utf8');
@@ -63,6 +64,13 @@ ok(runtime.includes('skipNextHashReconcile = true')&&runtime.includes("window.di
 const reconcileBody=runtime.slice(runtime.indexOf('async function reconcileCurrent'),runtime.indexOf('function repairAsyncRouteRace'));
 ok(!reconcileBody.includes('location.reload();'),'Progress reconciliation must never hard reload the document');
 
+// If a brand SVG revalidation fails during a valid offline SPA render, the user
+// should get an inline fallback mark rather than a broken-image icon.
+ok(index.includes('brand-asset-resilience.js?v=20260830-stability1'),'Offline brand fallback must be loaded by the production shell');
+ok(brand.includes("document.addEventListener('error'")&&brand.includes('true);'),'Brand fallback must listen during capture so image failures cannot bypass it');
+ok(brand.includes('data:image/svg+xml')&&brand.includes("image.dataset.cmAssetFallback = 'true'"),'Brand fallback must replace the failed asset with a self-contained inline mark and mark the replacement');
+ok(/assets\\\/logo-mark\\\.svg|assets\/logo-mark\\\.svg/.test(brand),'Brand fallback must be limited to the Capital Mastery logo asset');
+
 // The interactive guide may contain wide spreadsheet work, but the page itself
 // must stay viewport-contained while the workbook becomes the horizontal scroller.
 ok(trainingCss.includes('Failure-seeking mobile containment'),'Learner Guide mobile overflow hardening marker missing from loaded CSS');
@@ -72,6 +80,7 @@ ok(trainingCss.includes('overflow-x:auto')&&trainingCss.includes('overscroll-beh
 
 // New releases must not allow old cached versions of recently changed scripts/styles to mix.
 for(const asset of [
+  'brand-asset-resilience.js?v=20260830-stability1',
   'learner-guide.css?v=20260830-stability4',
   'training-tracks.css?v=20260830-stability4',
   'certificate-name.js?v=20260830-stability3',
