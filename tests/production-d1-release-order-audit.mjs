@@ -4,12 +4,18 @@ const tool=fs.readFileSync('tools/prepare-production-d1.mjs','utf8');
 const migration016=fs.readFileSync('migrations/016_phase2_career_skills_track_constraints.sql','utf8');
 const must=(v,m)=>{if(!v)throw new Error(m);};
 
+const artifactAttackStep=release.indexOf('- name: Attack exact Pages artifact before deployment');
+const firebaseStep=release.indexOf('- name: Require live Firebase readiness before any D1 mutation');
 const d1Step=release.indexOf('- name: Prepare and verify production D1 schema before Worker');
 const workerStep=release.indexOf('- name: Deploy Worker only after D1 compatibility gate');
 const pagesStep=release.indexOf('- name: Deploy exact Pages bundle');
-must(d1Step>=0,'Production release must include an explicit D1 compatibility step');
+must(artifactAttackStep>=0,'Production release must attack the exact Pages artifact before production mutation');
+must(firebaseStep>artifactAttackStep,'Live Firebase readiness must be checked only after source/artifact browser preflight passes');
+must(d1Step>firebaseStep,'Firebase email/password and canonical Google readiness must pass before any production D1 mutation');
 must(workerStep>d1Step,'D1 compatibility/migration must finish before Worker deployment');
 must(pagesStep>workerStep,'Pages must deploy only after the compatible Worker is live');
+must(release.includes('CM_AUDIT_URL="${FALLBACK_URL}/" node tests/live-firebase-auth-browser-audit.cjs'),'Production release must prove real Firebase email/password + durable credential-name persistence before D1 mutation');
+must(release.includes('CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must prove the canonical host is an authorized Firebase Google-sign-in domain before D1 mutation');
 must(release.includes('node tools/prepare-production-d1.mjs'),'Production release must execute the schema-aware D1 preparation tool');
 must(release.includes('tests/admin-simulation-route-stability-browser-audit.cjs'),'Canonical release matrix must include the delayed-auth Admin simulation race');
 must(release.includes('tests/program-completion-public-browser-audit.cjs'),'Canonical release matrix must include Program Completion verification');
@@ -40,4 +46,4 @@ must(/PRAGMA\s+defer_foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 
 must(!/PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 must never rely on foreign_keys=OFF inside D1 implicit transactions');
 must(tool.includes("Migration 016 must not attempt to disable foreign_keys inside D1 implicit transactions"),'Production preflight must reject regression to the unsafe D1 pragma');
 
-console.log('PRODUCTION D1 RELEASE ORDER AUDIT PASS: source/browser -> D1-safe schema-aware 016/017 -> integrity -> Worker -> Pages ordering is fail-closed');
+console.log('PRODUCTION D1 RELEASE ORDER AUDIT PASS: source/artifact -> live Firebase readiness -> D1-safe 016/017 -> integrity -> Worker -> Pages ordering is fail-closed');
