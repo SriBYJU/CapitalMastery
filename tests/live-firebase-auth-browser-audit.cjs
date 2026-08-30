@@ -18,6 +18,10 @@ function assert(condition, message) {
   const context = await browser.newContext();
   const page = await context.newPage();
   const api = await request.newContext();
+  const pageErrors = [];
+  const consoleErrors = [];
+  page.on('pageerror', error => pageErrors.push(String(error?.message || error)));
+  page.on('console', msg => { if (msg.type() === 'error') consoleErrors.push(msg.text()); });
 
   async function cleanupIdentity() {
     if (!apiKey) return;
@@ -38,6 +42,28 @@ function assert(condition, message) {
     }
   }
 
+  async function requireCreateForm() {
+    try {
+      await page.locator('#cm-create-form input[name="name"]').waitFor({ state:'visible', timeout:5000 });
+    } catch (error) {
+      const snapshot = await page.evaluate(() => {
+        const main = document.querySelector('main#main');
+        return {
+          hash: location.hash,
+          authReady: window.CM_AUTH?.ready,
+          authUser: window.CM_AUTH?.user ? { uid:window.CM_AUTH.user.uid, email:window.CM_AUTH.user.email } : null,
+          backendVerified: window.CM_AUTH?.backendVerified,
+          mainAuthView: main?.dataset?.cmAuthView || '',
+          mainText: (main?.innerText || '').slice(0,1600),
+          mainHtml: (main?.innerHTML || '').slice(0,2600),
+          createForms: document.querySelectorAll('#cm-create-form').length,
+          signinForms: document.querySelectorAll('#cm-signin-form').length
+        };
+      });
+      throw new Error(`Firebase account renderer did not own #/login after auth ready. SNAPSHOT=${JSON.stringify(snapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
+    }
+  }
+
   try {
     // Keep this audit Firebase-real but D1-neutral. Worker auth verification is covered separately.
     await page.route('**/auth-check', async route => {
@@ -52,6 +78,7 @@ function assert(condition, message) {
     await page.waitForFunction(() => window.CM_AUTH?.ready === true, null, { timeout: 30000 });
     apiKey = await page.evaluate(() => window.CAPITAL_MASTERY_FIREBASE_CONFIG?.apiKey || '');
     assert(apiKey, 'Live page did not expose expected Firebase web config');
+    await requireCreateForm();
 
     await page.locator('#cm-create-form input[name="name"]').fill(fullName);
     await page.locator('#cm-create-form input[name="email"]').fill(email);
@@ -74,6 +101,7 @@ function assert(condition, message) {
 
     await page.locator('[data-cm-auth-action="signout"]').click();
     await page.waitForFunction(() => window.CM_AUTH?.user === null, null, { timeout: 15000 });
+    await requireCreateForm();
     await page.locator('#cm-signin-form input[name="email"]').fill(email);
     await page.locator('#cm-signin-form input[name="password"]').fill(password);
     await page.locator('#cm-signin-form button[type="submit"]').click();
