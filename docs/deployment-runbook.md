@@ -7,23 +7,62 @@ Capital Mastery uses two separately deployed surfaces:
 
 Keeping those deploys separate is a security boundary. Never deploy the repository root to Pages: it contains Worker implementation, tests, migrations, and operational documentation that are not browser assets.
 
-## Preflight
+## Required deployment access
 
-The authoritative release gates are the GitHub Actions workflows:
+GitHub Actions production promotion requires these repository secrets:
+
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+
+The token must have only the permissions required to deploy the existing `capital-mastery-api` Worker and `capitalmastery` Pages project. Do not commit Cloudflare credentials, Firebase administrator tokens, or the protected Worker `ADMIN_UID` value to the repository.
+
+The Worker deployment inherits its production configuration from `wrangler.jsonc`, including:
+
+- Worker name `capital-mastery-api`
+- D1 binding `DB` → `capital-mastery-prod`
+- Firebase project `capital-mastery26`
+- production/GitHub Pages origin allowlist
+- `keep_vars: true`
+- observability configuration
+- required protected secret `ADMIN_UID`
+
+A normal Worker deploy must preserve the existing `ADMIN_UID` secret. Never replace production secrets with placeholders during release.
+
+## Authoritative automated gates
+
+The permanent release workflows are:
 
 - `Failure-seeking audit round 2` — Worker/frontend syntax, security and product regressions, production bundle audit, then the real Chromium browser matrix.
 - `Phase 2 current-source audit` — Worker/frontend syntax, D1 integrity-route contract, every static `.mjs` audit, and production bundle verification.
 - `Package audited Pages release` — rebuilds `dist-pages/`, reruns the production-bundle audit, and uploads the exact audited Pages directory as a release artifact.
+- `Package audited Worker release` — packages the reviewed Worker source after Worker/security/credential-boundary checks.
+- `Cloudflare deploy readiness` — non-deploying preflight that proves the Pages artifact builds and checks whether Cloudflare Actions credentials are present without printing them.
+- `Cloudflare production release` — guarded manual production promotion. It requires the workflow input `RELEASE`, reruns source/bundle gates, deploys Worker first, verifies public/security boundaries, deploys Pages second, verifies canonical generation/security headers, and runs all six Chromium suites against `capitalmastery.pages.dev`.
+- `Live production readonly audit` — non-mutating production diagnostic.
 
-Do not continue if either source audit is red. Browser-only Playwright audits are intentionally run by the failure-seeking browser stage after Playwright is installed; do not execute them as ordinary dependency-free static tests.
+Do not continue if the source/adversarial gates are red. Browser-only Playwright audits are intentionally run after Playwright/Chromium installation; do not treat them as ordinary dependency-free static tests.
 
-For a local static preflight:
+## Current Phase 2 deployment blocker
+
+The August 30, 2026 deployment-preflight run `33294066702` rebuilt and audited the 53-file Pages candidate successfully, then reported:
+
+- `CLOUDFLARE_API_TOKEN_PRESENT=false`
+- `CLOUDFLARE_ACCOUNT_ID_PRESENT=false`
+- `CLOUDFLARE_DEPLOY_READY=false`
+
+Therefore canonical production promotion cannot run from GitHub Actions until both secrets are configured (or an equivalent authorized Cloudflare deployment connection is provided). This is a deployment-access blocker, not a source-build failure.
+
+See `docs/phase2-release-audit.md` for the exact current artifact IDs, digests, release-gate SHA and live blockers.
+
+## Local source preflight
 
 ```bash
 node --check capital-mastery-live.js
 node --check enterprise-v2.js
 node --check v2/worker-v2-phase1-release.js
 node tests/d1-integrity-endpoint-audit.mjs
+node tests/release-security-abuse-audit.mjs
+node tests/career-skills-five-level-boundary-audit.mjs
 for test_file in tests/*.mjs; do
   if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then continue; fi
   node "$test_file"
@@ -37,35 +76,98 @@ node tools/build-pages.mjs
 node tests/pages-production-bundle-audit.mjs
 ```
 
-The build recreates `dist-pages/` from the explicit frontend allowlist. It adds production security headers and intentionally excludes the Worker, tests, migrations, Firebase diagnostics, and repository documentation.
+The build recreates `dist-pages/` from the explicit frontend allowlist. It adds production security headers and intentionally excludes Worker code, tests, migrations, Firebase diagnostics, repository documentation, `auth-test.html`, Wrangler configuration, and other backend/internal artifacts.
 
-For a release candidate, prefer the artifact produced by `Package audited Pages release`. Its artifact name contains the exact commit SHA so the bytes uploaded to Cloudflare can be traced back to the audited source. Do not add files to `dist-pages/` after its bundle audit.
+For a release candidate, prefer the artifact produced by `Package audited Pages release`. Its artifact name contains the exact commit SHA so the bytes uploaded to Cloudflare can be traced back to audited source. Do not add files to `dist-pages/` after its bundle audit.
 
-## Deploy order
+## Preferred production promotion
 
-When a release changes both API behavior and the UI, deploy in this order:
+Once both Cloudflare Actions secrets exist:
 
-1. Deploy the Worker from the reviewed commit.
+1. Confirm `docs/phase2-release-audit.md` has no new source blocker.
+2. In GitHub Actions, run **Cloudflare production release**.
+3. Enter exactly `RELEASE` in the confirmation field.
+4. If a protected GitHub `production` environment requires approval, approve only after confirming the intended commit SHA.
+5. Do not separately upload the repository root or run another Worker deployment during the workflow.
+
+The workflow performs this order:
+
+1. Verify Cloudflare credential presence.
+2. Re-run Worker/frontend syntax, security, credential-boundary and static regression gates.
+3. Rebuild and audit `dist-pages/`.
+4. Deploy the Worker with `wrangler.jsonc`.
+5. Require Worker `/health = 200` from the canonical Origin.
+6. Require a deliberately unapproved Origin to return `403`.
+7. Require unauthenticated `/auth-check` to return `401`.
+8. Require `/admin/integrity` to exist and remain protected (`401`/`403`, never `404` unauthenticated).
+9. Deploy exactly `dist-pages/` to Pages project `capitalmastery`.
+10. Require current generation markers plus `X-Frame-Options: DENY` and `Permissions-Policy` on the canonical host.
+11. Run all six Chromium release suites against `https://capitalmastery.pages.dev`.
+
+The UI is designed to remain backward-compatible with the previous Worker during rollout. The Worker must accept the previous UI until the Pages deployment is verified.
+
+## Manual deployment order
+
+If GitHub Actions cannot be used but an authorized Cloudflare environment is available, preserve the same order and gates:
+
+1. Deploy the reviewed Worker source using the checked-in `wrangler.jsonc`.
 2. Run `/health` from the approved production origin and confirm D1 reachability.
 3. Verify an unapproved origin is rejected and unauthenticated protected routes remain blocked.
-4. With an authenticated Capital Mastery administrator, call the read-only `GET /admin/integrity` endpoint. Require `PRAGMA quick_check` to report `ok`, `foreignKeyViolations` to be empty, and record the returned per-table counts. This route exposes counts only and must never be treated as a generic SQL console.
-5. Deploy the exact audited `dist-pages/` release artifact to the `capitalmastery` Pages project.
-6. Verify the canonical Pages response contains the expected generation and production security headers.
-7. Run the browser matrix below against the canonical Pages URL.
+4. Verify unauthenticated `GET /admin/integrity` is protected and no longer returns `404`.
+5. With an authenticated Capital Mastery administrator, call read-only `GET /admin/integrity`. Require `quick_check = ok`, no foreign-key violations, and record table counts.
+6. Build/audit `dist-pages/` or use the exact audited Pages artifact.
+7. Deploy only `dist-pages/` to the `capitalmastery` Pages project.
+8. Verify canonical generation markers and production security headers.
+9. Run the canonical browser matrix.
 
-The UI must remain backward-compatible with the previous Worker during rollout. The Worker must accept the previous UI until the Pages deployment is verified.
+Never guess Cloudflare account IDs, tokens, project names, Worker bindings, secrets, or Firebase configuration.
 
 ## Live verification matrix
 
 | Surface | Required proof |
 |---|---|
 | Public | Home, Careers, Employers, public credential verification, and representative career pages render without application errors. |
-| Learner | Assigned program opens; official assessment submits; Role Lab resumes; material updates change the required work; credential state matches D1. |
-| Employer | Organization setup, cohort, assignment, invite, learner evidence, manager review, readiness export, alerts, and activity log work with correct scope. |
+| Learner | Assigned program opens; official assessment submits; Career Skills completion behaves as program completion; Professional Readiness preserves five verified levels; Role Lab resumes; material updates change required work; credential state matches D1. |
+| Employer | Organization setup, cohort, track assignment, invite, learner evidence, manager review, readiness export, alerts, and activity log work with correct scope. |
 | Firm Layer | Add, edit, reorder, hide, archive, restore, history, version publish, deep links, and parent navigation work; no permanent employer delete is exposed. |
 | Security | Unauthenticated API requests fail safely; an unapproved Origin is rejected; cross-organization access is denied; backend/test paths are absent from Pages; no answer key appears in browser responses; CSV exports neutralize spreadsheet-formula prefixes. |
-| Database | `/health` reaches D1; admin integrity returns a clean `quick_check`, zero foreign-key violations, and recorded table counts. |
+| Database | `/health` reaches D1; authenticated admin integrity returns `quick_check = ok`, zero foreign-key violations, and recorded table counts. |
 | Responsive/accessibility | 375, 430, 768 and ~1440 px browser passes; keyboard operation, focus visibility, reduced motion, mobile navigation, and primary workbench forms remain usable. |
+
+## Firebase closure check
+
+Before Phase 2 closure, Firebase Authentication → Settings → Authorized domains must include:
+
+`capitalmastery.pages.dev`
+
+This must be observed directly. Do not infer it solely because email/password auth works; Google OAuth on the canonical host is the important configuration check.
+
+## Authenticated post-deploy closure
+
+The automated Cloudflare production workflow deliberately does **not** claim the authenticated release is complete. After automated canonical checks pass, perform:
+
+- signed-in learner assessment/progress smoke;
+- Career Skills practical-capstone/program-certificate smoke;
+- Professional Readiness five-level/Role Lab/final smoke;
+- credential issuance and public verification consistency;
+- signed-in employer workspace and five-role boundary spot checks;
+- Firm Layer create/edit/version/reorder/hide/archive/restore spot check;
+- manager review, report, CSV, evidence JSON and notification spot check;
+- second-company tenant-isolation spot check;
+- Admin Demo/Test Lab spot check;
+- authenticated `/admin/integrity` execution;
+- disposable QA account/data cleanup;
+- post-cleanup integrity verification.
+
+## Rollback rules
+
+If the Worker deploy fails its boundary checks, stop before Pages promotion. Restore the previous known-good Worker deployment through Cloudflare or redeploy the previous reviewed Worker source before continuing.
+
+If the Worker is healthy but Pages verification fails, keep/revert Pages to the previous known-good deployment. Do not make unreviewed frontend edits directly in Cloudflare to “fix” production.
+
+If canonical browser tests fail after both promotions, treat production as blocked. Preserve logs/evidence, roll back the failing surface when needed, fix source in GitHub, rerun source/adversarial gates, package a new candidate, and promote again.
+
+Never resolve a release failure by disabling origin checks, weakening authentication/RBAC, exposing answer keys, bypassing D1 authority, or removing production security headers.
 
 ## Release evidence
 
@@ -77,10 +179,11 @@ Record all of the following before calling the release complete:
 - D1 integrity result and table counts;
 - Pages artifact name/digest and Cloudflare deployment identifier/time;
 - live response-header/generation result;
+- six canonical Chromium results;
 - signed-out public smoke;
 - signed-in learner smoke;
-- signed-in employer/role smoke;
-- disposable QA account cleanup result;
+- signed-in employer/admin/second-tenant smoke;
+- disposable QA account/data cleanup result;
 - Firebase Authentication authorized-domain verification;
 - every unresolved blocker.
 
