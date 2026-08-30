@@ -76,7 +76,7 @@ jobs:
           echo "LIVE_HEADERS_OK=$ok" >> "$GITHUB_ENV"
           echo "LIVE_SECURITY_HEADERS=$([ "$ok" -eq 1 ] && echo PASS || echo FAIL)"
 
-      - name: Inspect Worker CORS and auth boundary
+      - name: Inspect Worker D1, CORS, origin and auth boundaries
         run: |
           set -u
           ok=1
@@ -96,6 +96,17 @@ jobs:
             echo 'WORKER_PREFLIGHT_HEADERS_MISSING'
             ok=0
           fi
+
+          health_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-health-body.txt -w '%{http_code}' \
+            "$WORKER_URL/health" -H 'Origin: https://capitalmastery.pages.dev' || echo 000)
+          echo "WORKER_HEALTH_STATUS=$health_status"
+          if [ "$health_status" != '200' ]; then echo 'WORKER_OR_D1_HEALTH_FAILED'; cat /tmp/worker-health-body.txt 2>/dev/null || true; ok=0; fi
+
+          bad_origin_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-bad-origin-body.txt -w '%{http_code}' \
+            "$WORKER_URL/health" -H 'Origin: https://not-approved.example.invalid' || echo 000)
+          echo "WORKER_BAD_ORIGIN_STATUS=$bad_origin_status"
+          if [ "$bad_origin_status" != '403' ]; then echo 'WORKER_ORIGIN_ALLOWLIST_FAILED'; cat /tmp/worker-bad-origin-body.txt 2>/dev/null || true; ok=0; fi
+
           unauth_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-unauth-body.txt -w '%{http_code}' \
             -X POST "$WORKER_URL/auth-check" \
             -H 'Origin: https://capitalmastery.pages.dev' \
