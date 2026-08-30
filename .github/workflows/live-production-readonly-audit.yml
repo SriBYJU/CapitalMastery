@@ -83,22 +83,26 @@ jobs:
           preflight_status=$(curl -sS --retry 3 --retry-all-errors -D /tmp/worker-preflight-headers.txt -o /tmp/worker-preflight-body.txt \
             -w '%{http_code}' -X OPTIONS "$WORKER_URL/auth-check" \
             -H 'Origin: https://capitalmastery.pages.dev' \
-            -H 'Access-Control-Request-Method: GET' \
+            -H 'Access-Control-Request-Method: POST' \
             -H 'Access-Control-Request-Headers: authorization,content-type' || echo 000)
           echo "WORKER_PREFLIGHT_STATUS=$preflight_status"
           case "$preflight_status" in 200|204) ;; *) echo 'WORKER_PREFLIGHT_BAD_STATUS'; ok=0;; esac
           if [ -f /tmp/worker-preflight-headers.txt ]; then
             tr -d '\r' < /tmp/worker-preflight-headers.txt | tr '[:upper:]' '[:lower:]' > /tmp/worker-preflight-lower.txt
             grep -E '^access-control-' /tmp/worker-preflight-lower.txt || true
-            if ! grep -Eq '^access-control-allow-origin:[[:space:]]*https://capitalmastery\.pages\.dev$' /tmp/worker-preflight-lower.txt; then echo 'WORKER_CORS_ORIGIN_MISMATCH'; ok=0; fi
+            if ! grep -Eq '^access-control-allow-origin:[[:space:]]*\*$' /tmp/worker-preflight-lower.txt; then echo 'WORKER_CORS_RESPONSE_CONTRACT_MISMATCH'; ok=0; fi
+            if ! grep -Eq '^access-control-allow-methods:.*post' /tmp/worker-preflight-lower.txt; then echo 'WORKER_POST_NOT_ALLOWED_BY_PREFLIGHT'; ok=0; fi
           else
             echo 'WORKER_PREFLIGHT_HEADERS_MISSING'
             ok=0
           fi
-          unauth_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-unauth-body.txt -w '%{http_code}' "$WORKER_URL/auth-check" \
-            -H 'Origin: https://capitalmastery.pages.dev' || echo 000)
-          echo "WORKER_UNAUTH_STATUS=$unauth_status"
-          case "$unauth_status" in 401|403) ;; *) echo 'WORKER_AUTH_BOUNDARY_BAD_STATUS'; ok=0;; esac
+          unauth_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-unauth-body.txt -w '%{http_code}' \
+            -X POST "$WORKER_URL/auth-check" \
+            -H 'Origin: https://capitalmastery.pages.dev' \
+            -H 'Content-Type: application/json' \
+            --data '{}' || echo 000)
+          echo "WORKER_UNAUTH_POST_STATUS=$unauth_status"
+          case "$unauth_status" in 401|403) ;; *) echo 'WORKER_AUTH_BOUNDARY_BAD_STATUS'; cat /tmp/worker-unauth-body.txt 2>/dev/null || true; ok=0;; esac
           echo "WORKER_OK=$ok" >> "$GITHUB_ENV"
           echo "WORKER_PUBLIC_BOUNDARY=$([ "$ok" -eq 1 ] && echo PASS || echo FAIL)"
 
