@@ -82,7 +82,10 @@ async function waitForMain(page){
         credentialsArray:Array.isArray(s.credentials),
         preferencesObject:!!s.preferences&&typeof s.preferences==='object'&&!Array.isArray(s.preferences),
         createdValid:!Number.isNaN(Date.parse(s.createdAt)),
-        updatedRemoved:!('updatedAt' in s)
+        // The pre-boot guard removes a malformed updatedAt. Later legitimate state
+        // writes may create a fresh ISO timestamp, so the durable contract is that
+        // the corrupt value never survives: absent OR valid is correct.
+        updatedRepaired:!('updatedAt' in s)||(!Number.isNaN(Date.parse(s.updatedAt))&&s.updatedAt!=='also-not-a-date')
       });
       return {current:shape(current),saved:shape(saved)};
     },{stateKey:STATE_KEY,userKey:USER_KEY});
@@ -118,7 +121,7 @@ async function waitForMain(page){
     assert((await page.textContent('#app')).includes('Private Equity'),'Online recovery replaced the current career with stale content');
 
     assert([...new Set(severe)].length===0,`State-resilience browser audit captured failures: ${[...new Set(severe)].join(' | ')}`);
-    console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed v1 snapshots, Back/Forward, offline navigation and online recovery');
+    console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed v1 snapshots, repaired timestamps, Back/Forward, offline navigation and online recovery');
   } finally {
     await context.close();
     await browser.close();
