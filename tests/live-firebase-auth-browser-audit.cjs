@@ -80,6 +80,32 @@ function assert(condition, message) {
     }
   }
 
+  async function requireNamePersistence() {
+    await page.waitForFunction(() => {
+      const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
+      return window.CM_CERT_NAME?.confirmed?.() === true || (!!error && !error.hidden && !!error.textContent.trim());
+    }, null, { timeout:15000 });
+    const snapshot = await page.evaluate(() => {
+      let localState = null;
+      try { localState = JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1') || 'null'); } catch (_) {}
+      const error = document.querySelector('#cm-full-name-onboarding .cm-full-name-message.bad');
+      return {
+        confirmed: window.CM_CERT_NAME?.confirmed?.() === true,
+        displayName: window.CM_AUTH?.user?.displayName || '',
+        syncReady: window.CM_SYNC?.ready,
+        syncStatus: window.CM_SYNC?.status || '',
+        syncError: window.CM_SYNC?.error || '',
+        modalError: error && !error.hidden ? error.textContent.trim() : '',
+        localProfile: localState?.profile || null,
+        modalPresent: !!document.getElementById('cm-full-name-onboarding')
+      };
+    });
+    if (!snapshot.confirmed) {
+      throw new Error(`Credential-name persistence failed after Firebase displayName update. SNAPSHOT=${JSON.stringify(snapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))}`);
+    }
+    return snapshot;
+  }
+
   try {
     // Keep this audit Firebase-real but D1-neutral. Worker auth verification is covered separately.
     await page.route('**/auth-check', async route => {
@@ -111,7 +137,7 @@ function assert(condition, message) {
     await page.locator('#cm-full-name-input').fill(fullName);
     await page.locator('#cm-full-name-form button[type="submit"]').click();
     await page.waitForFunction(expected => window.CM_AUTH?.user?.displayName === expected, fullName, { timeout:30000 });
-    await page.waitForFunction(() => window.CM_CERT_NAME?.confirmed?.() === true, null, { timeout:30000 });
+    await requireNamePersistence();
     await page.locator('#cm-full-name-onboarding').waitFor({ state:'detached', timeout:30000 });
     lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
 
