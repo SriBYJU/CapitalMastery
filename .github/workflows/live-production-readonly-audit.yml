@@ -114,6 +114,16 @@ jobs:
             --data '{}' || echo 000)
           echo "WORKER_UNAUTH_POST_STATUS=$unauth_status"
           case "$unauth_status" in 401|403) ;; *) echo 'WORKER_AUTH_BOUNDARY_BAD_STATUS'; cat /tmp/worker-unauth-body.txt 2>/dev/null || true; ok=0;; esac
+
+          integrity_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-integrity-unauth-body.txt -w '%{http_code}' \
+            "$WORKER_URL/admin/integrity" -H 'Origin: https://capitalmastery.pages.dev' || echo 000)
+          echo "WORKER_INTEGRITY_UNAUTH_STATUS=$integrity_status"
+          case "$integrity_status" in
+            401|403) echo 'WORKER_D1_INTEGRITY_ROUTE_PRESENT_AND_PROTECTED' ;;
+            404) echo 'WORKER_GENERATION_STALE: /admin/integrity not deployed'; ok=0 ;;
+            *) echo 'WORKER_D1_INTEGRITY_ROUTE_BAD_STATUS'; cat /tmp/worker-integrity-unauth-body.txt 2>/dev/null || true; ok=0 ;;
+          esac
+
           echo "WORKER_OK=$ok" >> "$GITHUB_ENV"
           echo "WORKER_PUBLIC_BOUNDARY=$([ "$ok" -eq 1 ] && echo PASS || echo FAIL)"
 
@@ -131,7 +141,8 @@ jobs:
             tests/failure-seeking-browser-audit.mjs \
             tests/learner-guide-mobile-browser-audit.cjs \
             tests/all-career-browser-sweep.cjs \
-            tests/employer-public-browser-audit.cjs; do
+            tests/employer-public-browser-audit.cjs \
+            tests/employer-role-matrix-browser-audit.cjs; do
             echo "=== LIVE $test ==="
             if ! CM_AUDIT_URL="$LIVE_URL" node "$test"; then
               echo "LIVE_BROWSER_TEST_FAILED: $test"
