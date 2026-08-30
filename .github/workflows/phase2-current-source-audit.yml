@@ -25,6 +25,13 @@ jobs:
           node --check v2/worker-v2-phase1-release.js
       - name: D1 integrity route contract
         run: node tests/d1-integrity-endpoint-audit.mjs
+      - name: Validate Cloudflare Worker package without deploying
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/capital-mastery-worker-dryrun
+          npx --yes wrangler@4 deploy --config wrangler.jsonc --dry-run --outdir /tmp/capital-mastery-worker-dryrun
+          test -d /tmp/capital-mastery-worker-dryrun
+          echo 'WRANGLER_WORKER_DRY_RUN=PASS'
       - name: Build production Pages artifact
         run: node tools/build-pages.mjs
       - name: Run every static automated audit
