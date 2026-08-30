@@ -27,6 +27,7 @@ jobs:
 
       - name: Syntax validation
         run: |
+          node --check certificate-name.js
           node --check admin-qa-simulation-fix.js
           node --check capital-mastery-live-ui.js
           node --check training-tracks.js
@@ -89,6 +90,6 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js index.html
-          git commit -m 'Harden Admin QA, simulation routing, and client stability'
+          git add certificate-name.js admin-qa-simulation-fix.js capital-mastery-live-ui.js training-tracks.js madeline.js index.html
+          git commit -m 'Harden Admin QA, account gating, and client stability'
           git push origin HEAD:main
