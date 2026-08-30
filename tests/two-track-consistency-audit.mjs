@@ -7,7 +7,7 @@ const css=fs.readFileSync('training-tracks.css','utf8');
 const must=(c,m)=>{if(!c)throw new Error(m);};
 
 must(tracks.includes('Five verified credentials. Full role-readiness evidence.'), 'Professional self-directed sequence missing');
-must(tracks.includes('Four verified credentials. Shorter, still practical.'), 'Career Skills self-directed sequence missing');
+must(tracks.includes('Three verified credentials + one completion certificate. Shorter, still practical.'), 'Career Skills sequence must distinguish verified credentials from completion');
 must(tracks.includes('#/role-lab/'), 'Professional self-directed Role Lab route missing');
 must(tracks.includes('#/diagnostic/'), 'Professional baseline diagnostic route missing');
 must(tracks.includes('Career Skills capstone is part of the shorter program') || tracks.includes('shorter Career Skills capstone'), 'Professional route guard must keep the shorter capstone out of the flagship path');
@@ -22,6 +22,7 @@ must(enterprise.includes('CM_TRAINING_TRACKS.setTrack'), 'Assigned program must 
 must(worker.includes("a.credential_target==='career'"), 'Employer completion must resolve the Career Skills credential target');
 must(worker.includes("credential_level='career' AND status='active'"), 'Career Skills completion must recognize a verified portable Career credential');
 must(worker.includes('track:a.track'), 'Employer readiness report must expose assignment track');
-must(worker.includes('Career Skills Certificate'), 'Worker credential title must identify Career Skills');
+must(worker.includes('Career Skills Program Completion Certificate'), 'Worker must expose Career Skills program completion separately');
+must(worker.includes('programCompletions:'), 'Worker catalog must separate program completion from credentialLadder');
 
 console.log('two-track-consistency-audit: PASS');

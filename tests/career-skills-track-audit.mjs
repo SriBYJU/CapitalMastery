@@ -10,7 +10,8 @@ must(worker.includes('["foundations", "career_skills", "professional"]'), 'Worke
 must(worker.includes('["foundations", "essentials", "career_skills", "professional"]'), 'Worker cohort enum must support Career Skills');
 must(worker.includes('"career", "role_lab", "professional_readiness"'), 'Worker credential target enum must support Career Certificate');
 must(worker.includes('Career Skills assignments must target the Career Certificate'), 'Worker must enforce Career Skills credential target');
-must(worker.includes('{ id: "career", title: "Career Skills Certificate", track: "career_skills"'), 'Enterprise catalog must expose Career Skills Certificate');
+must(worker.includes('programCompletions:'), 'Enterprise catalog must separate program completion from the verified credential ladder');
+must(worker.includes('{ id: "career", title: "Career Skills Program Completion Certificate", track: "career_skills"'), 'Enterprise catalog must expose Career Skills program completion separately');
 
 const careerRequirement=worker.match(/if \(level === "career"\) \{\s*return \[([\s\S]*?)\];\s*\}/)?.[1]||'';
 must(careerRequirement.includes('"simulation"'), 'Career Certificate must require the practical simulation');

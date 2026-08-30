@@ -16,7 +16,8 @@ must(enterprise.includes("professional?(x.roleLab?.score??''):'Not required'"), 
 must(enterprise.includes("professional?(x.final?.score??''):'Not required'"), 'Career Skills CSV must mark Professional Final not required');
 must(enterprise.includes("capital-mastery-career-skills-report.csv"), 'Career Skills CSV filename missing');
 must(enterprise.includes('programScope:{'), 'Evidence JSON must describe program scope');
-must(enterprise.includes("completionCredential:professional?'professional_readiness':'career'"), 'Evidence JSON must identify the correct completion credential');
+must(enterprise.includes("completionRecord:professional?'professional_readiness':'career'"), 'Evidence JSON must identify the authoritative completion record separately');
+must(enterprise.includes('verifiedCredentialCount:professional?5:3'), 'Evidence JSON must state verified credential count by program');
 must(enterprise.includes('capital-mastery-career-skills-evidence.json'), 'Career Skills evidence JSON filename missing');
 
 must(enterprise.includes("learnerAttention(x,reportTrack)"), 'Employer readiness report coaching must use assignment track');

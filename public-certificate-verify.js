@@ -47,8 +47,8 @@
       },
       career: {
         className: 'career-skills',
-        label: 'Career Skills Certificate',
-        description: 'for completing the shorter practical Career Skills program, including Foundations, Essentials, Applied Skills and the required role-specific capstone simulation.'
+        label: 'Career Skills Program Completion Certificate',
+        description: 'for completing the shorter practical Career Skills program after the three verified Standard 2.0 milestones and the required role-specific capstone simulation. This completion certificate is not a sixth Standard 2.0 credential.'
       },
       role_lab: {
         className: 'applied',
@@ -75,9 +75,9 @@
   function certificateHtml(c, valid) {
     const info = levelInfo(c.level);
     const levelKey = String(c.level || '').toLowerCase();
-    const isCareer = levelKey === 'career';
+    const isProgramCompletion = levelKey === 'career';
     const isProfessional = levelKey === 'professional_readiness';
-    const isFlagship = isCareer || isProfessional;
+    const isFlagship = isProfessional;
     const statusText = valid ? 'Verified Active Credential' : `Credential ${String(c.status || 'not active')}`;
     const verify = currentVerifyUrl();
 
@@ -98,11 +98,11 @@
             <span class="corner tr"></span>
             <span class="corner bl"></span>
             <span class="corner br"></span>
-            ${isFlagship ? '<img class="cert-seal" src="assets/seal.svg" alt="Capital Mastery seal">' : ''}
+            ${(isFlagship || isProgramCompletion) ? '<img class="cert-seal" src="assets/seal.svg" alt="Capital Mastery seal">' : ''}
             <div class="cert-inner">
               <div class="cert-brand"><img src="assets/logo-mark.svg" alt="">CAPITAL MASTERY</div>
               <div class="cert-type">${esc(info.label)}</div>
-              <div class="cert-awarded">This certificate is ${isFlagship ? 'proudly ' : ''}awarded to</div>
+              <div class="cert-awarded">This certificate is ${(isFlagship || isProgramCompletion) ? 'proudly ' : ''}awarded to</div>
               <div class="cert-name">${esc(c.holderName)}</div>
               <div class="cert-for">for successfully completing the requirements of</div>
               <div class="cert-title">${esc(String(c.title||'').replace(/ Career Skills Certificate$/i,'').replace(/ Professional Readiness Credential$/i,'').replace(/ Role Lab Credential$/i,'').replace(/ (Foundations|Essentials|Applied Skills) (Credential|Certificate)$/i,'').replace(/ Certificate$/i,''))}</div>

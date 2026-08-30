@@ -11,15 +11,15 @@
       name: 'Career Skills Program',
       kicker: 'SHORTER · PRACTICAL · CREDENTIALED',
       awardCount: 4,
-      verifiedCredentialCount: 4,
+      verifiedCredentialCount: 3,
       summary: 'Learn the role, practice the major technical and professional skills, complete applied work and finish a compact realistic job simulation.',
       milestones: [
         'Foundations credential',
         'Essentials credential',
         'Applied Skills credential',
-        'Career Skills Certificate'
+        'Career Skills Program Completion Certificate'
       ],
-      evidenceModel: '4 verified credentials · Career Skills ends at the practical capstone'
+      evidenceModel: '3 verified Standard 2.0 credentials + 1 program-completion certificate'
     },
     [PROFESSIONAL]: {
       name: 'Professional Readiness Program',
@@ -93,7 +93,7 @@
         <h3>${esc(t.name)}</h3>
         <p>${esc(t.summary)}</p>
         <div class="cm-track-meta">
-          <span>${t.verifiedCredentialCount} credentials</span>
+          <span>${professional?`${t.verifiedCredentialCount} verified credentials`:`${t.verifiedCredentialCount} verified credentials + completion certificate`}</span>
           <span>${professional?'Full Role Lab + final':'Shorter capstone simulation'}</span>
           <span>${professional?'Highest career credential':'Upgrade anytime'}</span>
         </div>
@@ -117,10 +117,10 @@
     return `<div class="cm-track-status" data-cm-track-status data-cm-track-status-id="${track}">
       <div>
         <strong>${esc(t.name)}</strong>
-        <span class="cm-track-badge">${t.verifiedCredentialCount} credentials</span>
+        <span class="cm-track-badge">${professional?`${t.verifiedCredentialCount} verified credentials`:`${t.verifiedCredentialCount} verified + completion certificate`}</span>
         <p>${professional
           ? 'Complete the full pathway, Role Lab and Professional Readiness Final.'
-          : 'Complete the core pathway and practical capstone to earn the Career Skills Certificate. Switch to Professional Readiness later without repeating completed stages.'}</p>
+          : 'Complete the core pathway and practical capstone to earn the Career Skills Program Completion Certificate. Your three verified milestones carry into Professional Readiness, so upgrading does not repeat completed stages.'}</p>
       </div>
       <button type="button" class="btn btn-soft btn-sm" data-cm-switch-track="${professional?CAREER_SKILLS:PROFESSIONAL}">${professional?'View shorter option':'Upgrade to Professional Readiness'}</button>
     </div>`;
@@ -214,9 +214,9 @@
       ['01','Foundations','Learn the role + technical core and earn Foundations',`#/learn/${id}/1`],
       ['02','Essentials','Apply the core concepts in the secure mini case',`#/v2-assessment/${essentials}`],
       ['03','Applied Skills','Complete Toolkit + Applied Work',`#/learn/${id}/3`],
-      ['04','Career Skills Capstone','Complete the realistic server-graded job simulation and earn Career Skills',`#/official-simulation/${id}`]
+      ['04','Career Skills Capstone','Complete the realistic server-graded job simulation and earn the program-completion certificate',`#/official-simulation/${id}`]
     ];
-    return `<section class="cm-track-sequence" data-cm-track-sequence data-cm-track-id="${trackId}"><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Four verified credentials. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
+    return `<section class="cm-track-sequence" data-cm-track-sequence data-cm-track-id="${trackId}"><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Three verified credentials + one completion certificate. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
   }
 
   function shapeCareerPath(root, careerId, trackId) {
@@ -309,7 +309,7 @@
 
   function decorateCareerDirectory() {
     document.querySelectorAll('.career-card .cred-count').forEach(el => {
-      const copy='Career Skills: 4 credentials · Professional Readiness: 5 credentials';
+      const copy='Career Skills: 3 verified + completion certificate · Professional Readiness: 5 verified credentials';
       if(el.textContent!==copy) el.textContent=copy;
       if(!el.classList.contains('cm-track-count')) el.classList.add('cm-track-count');
     });
@@ -320,10 +320,10 @@
     return `<section class="section cm-track-public-overview" data-cm-track-public-overview><div class="container">
       <div class="section-head"><div><div class="eyebrow">TWO PROGRAM LEVELS · EVERY CAREER</div><h2>Choose the depth that matches the goal.</h2></div><p>Both routes teach before they test and require real application. Professional Readiness goes further into full role simulation, review and readiness evidence.</p></div>
       <div class="cm-track-public-grid">
-        <article class="card"><div class="cm-track-public-top"><span>CAREER SKILLS</span><b>4 verified credentials</b></div><h3>Shorter. Practical. Still real work.</h3><p>Foundations → Essentials → Applied Skills → Career Skills Capstone. Built for meaningful role preparation without requiring the full advanced onboarding-style sequence.</p><ul><li>Role-native learning and guided practice</li><li>Applied work, not MCQ-only completion</li><li>Realistic practical capstone</li><li>Upgrade later without repeating earned stages</li></ul><a class="btn btn-outline" href="#/careers">${employer?'Preview Career Skills':'Explore Career Skills'} →</a></article>
+        <article class="card"><div class="cm-track-public-top"><span>CAREER SKILLS</span><b>3 verified + completion certificate</b></div><h3>Shorter. Practical. Still real work.</h3><p>Foundations → Essentials → Applied Skills → Career Skills Capstone. Built for meaningful role preparation without requiring the full advanced onboarding-style sequence.</p><ul><li>Role-native learning and guided practice</li><li>Applied work, not MCQ-only completion</li><li>Realistic practical capstone</li><li>Upgrade later without repeating earned stages</li></ul><a class="btn btn-outline" href="#/careers">${employer?'Preview Career Skills':'Explore Career Skills'} →</a></article>
         <article class="card cm-track-public-flagship"><div class="cm-track-public-top"><span>PROFESSIONAL READINESS</span><b>5 verified credentials</b></div><h3>Full job-readiness preparation.</h3><p>Foundations → Essentials → Applied Skills → Role Lab → Professional Readiness, with the baseline, advanced simulation, revision cycle and Professional Final supporting the flagship evidence standard.</p><ul><li>Full role-specific professional workflow</li><li>Manager-style review and revisions</li><li>Professional Final + evidence coverage</li><li>Flagship Professional Readiness credential</li></ul><a class="btn btn-primary" href="#/careers">${employer?'Preview Professional Readiness':'Explore Professional Readiness'} →</a></article>
       </div>
-      <div class="cm-track-public-note"><strong>Shared foundation:</strong> Foundations, Essentials and Applied Skills carry forward when a learner moves from Career Skills into Professional Readiness. The shorter credential never substitutes for the advanced Role Lab or Professional Readiness credential.</div>
+      <div class="cm-track-public-note"><strong>Shared foundation:</strong> Foundations, Essentials and Applied Skills carry forward when a learner moves from Career Skills into Professional Readiness. The Career Skills completion certificate is not a sixth Standard 2.0 credential and never substitutes for the advanced Role Lab or Professional Readiness credential.</div>
       ${employer?'<p class="cm-track-employer-use"><strong>Employer use:</strong> assign Career Skills for shorter practical preparation or Professional Readiness for internship, new-hire and pre-Day-1 role readiness. Reporting and completion rules stay separate automatically.</p>':''}
     </div></section>`;
   }
@@ -359,7 +359,7 @@
       <p><strong>Career Skills</strong> is the shorter practical route with four verified credentials: Foundations, Essentials, Applied Skills and the Career Skills Certificate. <strong>Professional Readiness</strong> is the advanced five-credential Standard 2.0 route with the full Role Lab and flagship readiness credential. Work earned in the shorter route carries forward.</p>
       <div class="cm-track-mini">
         <div><strong>Career Skills</strong>Shorter practical route</div>
-        <div><strong>4 credentials</strong>Ends with Career Skills Certificate</div>
+        <div><strong>3 verified + completion certificate</strong>Ends with Career Skills Certificate</div>
         <div><strong>Professional Readiness</strong>Full job-readiness route</div>
         <div><strong>5 credentials</strong>Includes Role Lab + flagship credential</div>
       </div>

@@ -13,14 +13,14 @@ must(index.includes('training-tracks.js'), 'index.html must load training-tracks
 must(js.includes("const CAREER_SKILLS = 'career-skills'"), 'Career Skills track missing');
 must(js.includes("const PROFESSIONAL = 'professional-readiness'"), 'Professional Readiness track missing');
 must(js.includes('awardCount: 4'), 'Career Skills must present four learner-facing credentials');
-must(js.includes('verifiedCredentialCount: 4'), 'Career Skills must expose four verified credentials');
+must(js.includes('verifiedCredentialCount: 3'), 'Career Skills must expose exactly three verified Standard 2.0 credentials');
 must(js.includes('awardCount: 5'), 'Professional Readiness must present five career credentials');
 must(js.includes('verifiedCredentialCount: 5'), 'Professional Readiness must preserve five verified career credentials');
-must(js.includes("'Career Skills Certificate'"), 'Career Skills capstone credential missing');
-must(js.includes('4 verified credentials · Career Skills ends at the practical capstone'), 'Career Skills credential semantics missing');
+must(js.includes("'Career Skills Program Completion Certificate'"), 'Career Skills program-completion certificate missing');
+must(js.includes('3 verified Standard 2.0 credentials + 1 program-completion certificate'), 'Career Skills credential/completion distinction missing');
 must(js.includes('5 Standard 2.0 career credentials'), 'Professional Readiness Standard 2.0 semantics missing');
 must(js.includes('upgrading never means repeating earned stages'), 'Track stacking/no-repeat rule missing');
-must(js.includes('Career Skills: 4 credentials · Professional Readiness: 5 credentials'), 'Career directory count correction missing');
+must(js.includes('Career Skills: 3 verified + completion certificate · Professional Readiness: 5 verified credentials'), 'Career directory credential/completion distinction missing');
 must(js.includes('Professional Readiness only'), 'Advanced final gate must be visibly scoped');
 must(js.includes('Career Skills capstone'), 'Career Skills simulation capstone label missing');
 must(js.includes('Role Lab credential'), 'Professional Readiness Role Lab credential missing');

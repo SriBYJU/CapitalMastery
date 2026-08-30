@@ -37,7 +37,7 @@ ok(!continuity.includes("function qaMode() {\n    return localStorage.getItem(QA
 // Career Skills must use authoritative simulation without a legacy redirect hop,
 // and Professional Readiness must not deep-link the shorter capstone.
 ok(tracks.includes("'official-simulation'"), 'Training-track route parser must know the authoritative Career Skills simulation route');
-ok(tracks.includes('Complete the realistic server-graded job simulation and earn Career Skills'), 'Career Skills capstone must be explicitly authoritative/server graded');
+ok(tracks.includes('Complete the realistic server-graded job simulation and earn the program-completion certificate'), 'Career Skills capstone must remain explicitly authoritative/server graded while using program-completion semantics');
 ok(tracks.includes('`#/official-simulation/${id}`'), 'Career Skills sequence must link directly to authoritative simulation');
 ok(tracks.includes("(route==='simulation'||route==='official-simulation')"), 'Professional Readiness must guard both legacy and authoritative Career Skills simulation deep links');
 ok(madeline.includes("#/official-simulation/${c.id}"), 'Madeline must direct Career Skills to the authoritative capstone');

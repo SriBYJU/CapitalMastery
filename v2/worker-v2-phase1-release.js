@@ -1710,12 +1710,14 @@ export default {
           ok: true,
           version: "2.0",
           credentialLadder: [
-            { id: "foundations", title: "Foundations Certificate", track: "foundations", level: "beginner" },
-            { id: "essentials", title: "Essentials Certificate", track: "foundations", level: "beginner" },
-            { id: "applied", title: "Applied Skills Certificate", track: "career_skills", level: "applied" },
-            { id: "career", title: "Career Skills Certificate", track: "career_skills", level: "applied" },
-            { id: "role_lab", title: "Role Lab Certificate", track: "professional", level: "advanced" },
-            { id: "professional_readiness", title: "Professional Readiness Certificate", track: "professional", level: "advanced" }
+            { id: "foundations", title: "Foundations Credential", track: "career_skills", level: "foundational" },
+            { id: "essentials", title: "Essentials Credential", track: "career_skills", level: "foundational" },
+            { id: "applied", title: "Applied Skills Credential", track: "career_skills", level: "applied" },
+            { id: "role_lab", title: "Role Lab Credential", track: "professional", level: "advanced" },
+            { id: "professional_readiness", title: "Professional Readiness Credential", track: "professional", level: "advanced" }
+          ],
+          programCompletions: [
+            { id: "career", title: "Career Skills Program Completion Certificate", track: "career_skills", verifiedCredentialLevel: false, requires: "practical_capstone" }
           ],
           pathways: ALL_PATHWAYS.map(p => ({ id: p.id, code: p.code, title: p.title, role: p.role, group: p.group, purpose: p.purpose, focus: p.focus, simulation: p.simulation }))
         }, 200, env);
