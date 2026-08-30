@@ -10,6 +10,7 @@ on:
       - 'assets/**'
       - 'tools/build-pages.mjs'
       - 'tests/pages-production-bundle-audit.mjs'
+      - 'tests/career-skills-five-level-boundary-audit.mjs'
       - '.github/workflows/package-pages-release.yml'
   workflow_dispatch:
 
@@ -32,13 +33,20 @@ jobs:
           set -euo pipefail
           node --check enterprise-v2.js
           node tests/csv-export-security-audit.mjs
+          node tests/career-skills-five-level-boundary-audit.mjs
           node tools/build-pages.mjs
           node tests/pages-production-bundle-audit.mjs
+          find dist-pages -type f -print0 | sort -z | xargs -0 sha256sum > pages-release-sha256.txt
+          test -s pages-release-sha256.txt
+          echo "PAGES_RELEASE_FILE_COUNT=$(find dist-pages -type f | wc -l)"
+          sha256sum pages-release-sha256.txt
 
       - name: Upload exact audited release candidate
         uses: actions/upload-artifact@v4
         with:
           name: capitalmastery-pages-${{ github.sha }}
-          path: dist-pages/
+          path: |
+            dist-pages/
+            pages-release-sha256.txt
           if-no-files-found: error
           retention-days: 14
