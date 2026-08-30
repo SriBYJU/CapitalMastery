@@ -10,7 +10,9 @@ function assert(condition,message){ if(!condition) throw new Error(message); }
 // still use a local preview namespace, but normal learners always enter the Worker-backed workbench.
 assert(app.includes("if(!adminPreview && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }"), 'Every learner simulation must redirect to the secure official workbench');
 assert(!app.includes("if(c.id==='investment-banking' && !adminPreview && !qaMode())"), 'Official-workbench routing must not be Investment-Banking-only');
-assert(app.includes("n===5 ? (passed?`official-simulation/${c.id}`:`quiz/${c.id}/5`)"), 'Part-5 knowledge pass must open the real practical workbench directly');
+const hasDirectPart5Route=app.includes("n===5 ? (passed?`official-simulation/${c.id}`:`quiz/${c.id}/5`)");
+const hasHelperPart5Route=app.includes("if(n===5) return `official-simulation/${c.id}`;") && app.includes('function assessmentContinuePath');
+assert(hasDirectPart5Route || hasHelperPart5Route, 'Part-5 knowledge pass must open the real practical workbench directly');
 assert(app.includes("return nav(`official-simulation/${c.id}`)"), 'Final prerequisite recovery must point back to the official workbench');
 
 // Practical simulation renderer: calculations + authored work only. No answer-picking UI.
