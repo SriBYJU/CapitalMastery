@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/harden-track-notifications-reporting.mjs'
+      - 'tools/fix-track-attention-regression.mjs'
       - '.github/workflows/harden-track-notifications-reporting.yml'
   workflow_dispatch:
 
@@ -19,7 +20,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Apply program-aware notification and reporting hardening
-        run: node tools/harden-track-notifications-reporting.mjs
+        run: |
+          node tools/harden-track-notifications-reporting.mjs
+          node tools/fix-track-attention-regression.mjs
       - name: Syntax checks
         run: |
           node --check enterprise-v2.js
@@ -31,6 +34,7 @@ jobs:
           node tests/assigned-program-status-audit.mjs
           node tests/notification-discovery-audit.mjs
           node tests/employer-operations-audit.mjs
+          node tests/employer-firm-ready-audit.mjs
       - name: Full regression suite
         run: |
           set -e
