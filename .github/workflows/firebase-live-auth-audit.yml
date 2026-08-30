@@ -40,6 +40,7 @@ jobs:
           CM_CANONICAL_URL=https://capitalmastery.pages.dev/ node tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Disposable real Firebase email/password lifecycle on live fallback
+        if: always()
         run: |
           set -euo pipefail
           CM_AUDIT_URL=https://sribyju.github.io/CapitalMastery/ node tests/live-firebase-auth-browser-audit.cjs
