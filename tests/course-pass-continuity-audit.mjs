@@ -20,5 +20,11 @@ for(const marker of [
   'CM_COURSE_CONTINUITY'
 ]) assert(continuity.includes(marker),`Course continuity missing ${marker}`);
 assert(live.includes('window.CM_LIVE_ROUTE = route;'),'Secure assessment router must expose an explicit continuity-owned rerender bridge');
+for(const marker of [
+  "params.set('retake','1')",
+  "params.set('attempt',String(nonce))",
+  "#/final/${pathwayId}?retake=1&attempt=${nonce}",
+  "#/quiz/${pathwayId}/${n}?retake=1&attempt=${nonce}"
+]) assert(live.includes(marker),`Secure assessment retry URL contract missing ${marker}`);
 assert(!continuity.includes('You may retake it, or continue without redoing the quiz.</p></div><a'),'Old banner-only prior-pass behavior must not remain authoritative');
-console.log('COURSE PASS CONTINUITY AUDIT PASS: lesson review preserves prior passes, next bypasses completed quizzes, server progress hydrates cross-device state, and retakes use direct secure-router ownership');
+console.log('COURSE PASS CONTINUITY AUDIT PASS: lesson review preserves prior passes, Next bypasses completed quizzes, server progress hydrates cross-device state, and every secure retry owns an explicit unique retake route');
