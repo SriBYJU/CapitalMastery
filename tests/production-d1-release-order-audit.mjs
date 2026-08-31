@@ -11,11 +11,12 @@ const workerStep=release.indexOf('- name: Deploy Worker only after D1 compatibil
 const pagesStep=release.indexOf('- name: Deploy exact Pages bundle');
 must(artifactAttackStep>=0,'Production release must attack the exact Pages artifact before production mutation');
 must(firebaseStep>artifactAttackStep,'Live Firebase readiness must be checked only after source/artifact browser preflight passes');
-must(d1Step>firebaseStep,'Firebase email/password and canonical Google readiness must pass before any production D1 mutation');
+must(d1Step>firebaseStep,'Firebase email/password and canonical provider safety must pass before any production D1 mutation');
 must(workerStep>d1Step,'D1 compatibility/migration must finish before Worker deployment');
 must(pagesStep>workerStep,'Pages must deploy only after the compatible Worker is live');
 must(release.includes('CM_AUDIT_URL="${FALLBACK_URL}/" node tests/live-firebase-auth-browser-audit.cjs'),'Production release must prove real Firebase email/password + durable credential-name persistence before D1 mutation');
-must(release.includes('CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must prove the canonical host is an authorized Firebase Google-sign-in domain before D1 mutation');
+must(release.includes('CM_CANONICAL_URL=http://127.0.0.1:4173/ node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must prove the exact Pages artifact has a safe Firebase provider surface before D1 mutation');
+must(release.includes('CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must re-prove Firebase provider safety on canonical Pages after deployment');
 must(release.includes('node tools/prepare-production-d1.mjs'),'Production release must execute the schema-aware D1 preparation tool');
 must(release.includes('tests/admin-simulation-route-stability-browser-audit.cjs'),'Canonical release matrix must include the delayed-auth Admin simulation race');
 must(release.includes('tests/program-completion-public-browser-audit.cjs'),'Canonical release matrix must include Program Completion verification');

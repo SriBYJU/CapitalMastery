@@ -19,14 +19,14 @@ permissions:
   contents: read
 
 jobs:
-  canonical-google-domain:
-    name: canonical-google-domain
+  canonical-provider-safety:
+    name: canonical-provider-safety
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate Google-domain probe syntax
+      - name: Validate provider-safety probe syntax
         run: node --check tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Install Chromium
@@ -34,7 +34,7 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Probe canonical Google authorized-domain configuration
+      - name: Probe canonical provider configuration and fail-safe UI
         run: |
           set -euo pipefail
           CM_CANONICAL_URL=https://capitalmastery.pages.dev/ node tests/firebase-authorized-domain-browser-audit.cjs

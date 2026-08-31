@@ -11,12 +11,14 @@
   let workerIdentity = null;
   let message = '';
   let messageType = '';
+  let googleAvailable = false;
 
   const CM_AUTH = window.CM_AUTH = {
     ready: false,
     user: null,
     isAdmin: false,
     backendVerified: false,
+    googleAvailable: false,
     async googleSignIn() { throw new Error('Authentication is still loading.'); },
     async emailSignIn() { throw new Error('Authentication is still loading.'); },
     async emailCreate() { throw new Error('Authentication is still loading.'); },
@@ -57,6 +59,21 @@
     }
   }
 
+  async function resolveGoogleAvailability() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    try {
+      const response = await fetch(`https://identitytoolkit.googleapis.com/v1/projects?key=${encodeURIComponent(CONFIG.apiKey)}`, { signal:controller.signal });
+      const data = await response.json().catch(() => ({}));
+      const domains = Array.isArray(data.authorizedDomains) ? data.authorizedDomains.map(value => String(value).toLowerCase()) : [];
+      return response.ok && domains.includes(location.hostname.toLowerCase());
+    } catch (_) {
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   async function boot() {
     if (!CONFIG) {
       console.error('Capital Mastery Firebase config is missing.');
@@ -69,8 +86,11 @@
       authApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-auth.js`);
       const firebaseApp = appApi.getApps().length ? appApi.getApp() : appApi.initializeApp(CONFIG);
       auth = authApi.getAuth(firebaseApp);
+      googleAvailable = await resolveGoogleAvailability();
+      CM_AUTH.googleAvailable = googleAvailable;
 
       CM_AUTH.googleSignIn = async () => {
+        if (!googleAvailable) throw new Error('Google sign-in is not available on this domain. Use secure email sign-in instead.');
         setMessage('Opening Google sign-in…');
         const provider = new authApi.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
@@ -209,6 +229,10 @@
       </div></div></section>`;
     }
 
+    const googleEntry = googleAvailable
+      ? `<button class="btn btn-outline btn-block cm-google" type="button" data-cm-auth-action="google">Continue with Google</button><div class="cm-auth-divider"><span>or</span></div>`
+      : `<div class="cm-auth-provider-note">Secure email sign-in is available on this site.</div>`;
+
     return `<section class="section"><div class="container" style="max-width:900px">
       <div class="cm-auth-layout">
         <div class="card cm-auth-card">
@@ -216,8 +240,7 @@
           <h1 class="serif">Welcome back.</h1>
           <p>Sign in to keep your Capital Mastery account connected.</p>
           ${message ? `<div class="cm-auth-message ${esc(messageType)}">${esc(message)}</div>` : ''}
-          <button class="btn btn-outline btn-block cm-google" type="button" data-cm-auth-action="google">Continue with Google</button>
-          <div class="cm-auth-divider"><span>or</span></div>
+          ${googleEntry}
           <form id="cm-signin-form" class="cm-auth-form">
             <label>Email<input required type="email" name="email" autocomplete="email" placeholder="you@example.com"></label>
             <label>Password<input required type="password" name="password" autocomplete="current-password" minlength="6" placeholder="Password"></label>
@@ -292,7 +315,7 @@
       .cm-auth-form input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}
       .cm-auth-divider{display:flex;align-items:center;gap:12px;color:#8a929b;font-size:.8rem;margin:17px 0}.cm-auth-divider:before,.cm-auth-divider:after{content:"";height:1px;background:#e0e4e8;flex:1}
       .cm-auth-message{padding:11px 13px;border-radius:10px;background:#eef2f6;color:var(--navy);font-size:.88rem;margin:14px 0}.cm-auth-message.good{background:#eaf6ef;color:#245b43}.cm-auth-message.bad{background:#fff0f0;color:#8b3232}
-      .cm-google{background:white}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 0 0;text-decoration:underline;cursor:pointer}
+      .cm-google{background:white}.cm-auth-provider-note{padding:10px 12px;margin:12px 0;border:1px solid #d8e1e9;border-radius:10px;background:#f5f8fa;color:#46586a;font-size:.84rem}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 0 0;text-decoration:underline;cursor:pointer}
       .cm-account-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.cm-account-grid>div{background:#f5f7f9;border:1px solid #e3e7eb;border-radius:12px;padding:14px}.cm-account-grid span{display:block;color:#77818d;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.cm-account-grid strong{display:block;color:var(--navy);margin-top:5px;word-break:break-word}.cm-uid{font-size:.78rem}.cm-auth-actions{display:flex;flex-wrap:wrap;gap:10px}
       .cm-account-privacy{margin-top:22px;padding:16px;border:1px solid #ead1d1;background:#fff8f8;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}.cm-account-privacy b{color:#7d2727}.cm-account-privacy p{margin:5px 0 0;color:#6d6262;font-size:.82rem;line-height:1.45}.cm-account-privacy>div:last-child{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn-danger{background:#8b2f2f;color:#fff;border-color:#8b2f2f}.btn-danger:hover{background:#702626}
       @media(max-width:760px){.cm-auth-layout,.cm-account-grid{grid-template-columns:1fr}.cm-account-privacy{align-items:stretch;flex-direction:column}.cm-account-privacy>div:last-child{justify-content:flex-start}.cm-auth-card h1{font-size:2.2rem}}

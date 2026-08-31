@@ -13,6 +13,22 @@ function assert(condition, message) {
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded', timeout: 30000 });
     await page.waitForFunction(() => window.CAPITAL_MASTERY_FIREBASE_CONFIG?.apiKey, null, { timeout: 15000 });
+    await page.waitForFunction(() => window.CM_AUTH?.ready === true, null, { timeout: 15000 });
+    const providerState=await page.evaluate(async()=>{
+      const key=window.CAPITAL_MASTERY_FIREBASE_CONFIG.apiKey;
+      const response=await fetch(`https://identitytoolkit.googleapis.com/v1/projects?key=${encodeURIComponent(key)}`);
+      const data=await response.json();
+      return {authorized:Array.isArray(data.authorizedDomains)&&data.authorizedDomains.includes(location.hostname),googleAvailable:window.CM_AUTH.googleAvailable===true};
+    });
+    if(!providerState.authorized){
+      await page.goto(`${BASE.replace(/\/$/,'')}/#/login`,{waitUntil:'domcontentloaded',timeout:30000});
+      await page.waitForFunction(()=>window.CM_AUTH?.ready===true,null,{timeout:15000});
+      assert(providerState.googleAvailable===false,'Google provider must fail closed when the canonical domain is not authorized');
+      assert(await page.locator('[data-cm-auth-action="google"]').count()===0,'Unauthorized Google sign-in control must not be exposed');
+      assert(await page.locator('#cm-signin-form input[name="email"]').isVisible(),'Secure email sign-in must remain available');
+      console.log(`FIREBASE PROVIDER SAFETY AUDIT PASS: unauthorized Google flow suppressed and email authentication available on ${new URL(BASE).hostname}`);
+      return;
+    }
 
     await page.evaluate(() => {
       const button = document.createElement('button');

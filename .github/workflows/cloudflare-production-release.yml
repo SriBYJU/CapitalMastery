@@ -119,13 +119,13 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/visual-contrast-browser-audit.cjs
+          CM_CANONICAL_URL=http://127.0.0.1:4173/ node tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Require live Firebase readiness before any D1 mutation
         run: |
           set -euo pipefail
           CM_AUDIT_URL="${FALLBACK_URL}/" node tests/live-firebase-auth-browser-audit.cjs
-          CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
-          echo 'Firebase email/password persistence + canonical Google authorized-domain gates: PASS'
+          echo 'Firebase email/password persistence + exact-artifact provider-safety gate: PASS'
 
       - name: Prepare and verify production D1 schema before Worker
         run: |
@@ -216,6 +216,7 @@ jobs:
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-role-matrix-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/visual-contrast-browser-audit.cjs
+          CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Release boundary summary
         run: |
@@ -227,13 +228,14 @@ jobs:
           - Worker dry-run packaging passed before deployment
           - exact dist-pages artifact survived fifteen hostile Chromium suites before any production mutation
           - live Firebase email/password credential-name persistence passed before any D1 mutation
-          - canonical Google Firebase authorized-domain probe passed before any D1 mutation
+          - exact-artifact Firebase provider-safety probe passed before any D1 mutation
           - production D1 schema was inspected and only missing migrations 016/017/018 were conditionally applied
           - D1 row-count preservation, quick_check and foreign_key_check passed before Worker deployment
           - Worker deployed only after D1 compatibility was proven
           - Worker public/auth/origin boundaries passed
           - protected /admin/integrity route exists
           - exact production Pages allowlist deployed
+          - canonical Firebase provider-safety probe passed after Pages deployment
           - canonical generation/security headers passed
           - fifteen canonical Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, visual contrast, the Admin auth-timing race, and Program Completion verification
 
