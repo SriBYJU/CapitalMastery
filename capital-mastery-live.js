@@ -230,6 +230,13 @@
       return;
     }
 
+    const forceRetake=hashQuery().get('retake')==='1';
+    const savedBest=mirroredBestScore(pathwayId,itemId);
+    if(itemId!=='simulation' && savedBest>=PASS && !forceRetake){
+      renderSavedAssessmentReview(pathwayId,itemId,savedBest);
+      return;
+    }
+
     const renderEpoch = secureRouteEpoch;
     const renderHash = location.hash;
     const signal = secureRouteController?.signal;
@@ -307,13 +314,44 @@
     }
   }
 
-  function nextHref(pathwayId, itemId, passed, assignmentId='') {
-    if (!passed) {
-      if (itemId === 'simulation') return `#/official-simulation/${pathwayId}${assignmentId?`?assignment=${encodeURIComponent(assignmentId)}`:''}`;
-      if (itemId === 'final') return `#/final/${pathwayId}`;
-      const n = Number(itemId.split('-')[1]);
-      return `#/quiz/${pathwayId}/${n}`;
+  function mirroredBestScore(pathwayId,itemId){
+    try {
+      const state=JSON.parse(localStorage.getItem(STATE_KEY)||'null');
+      const cs=state?.careers?.[pathwayId];
+      if(!cs) return 0;
+      const part=/^part-(\d+)$/.exec(itemId);
+      if(part){
+        const n=Number(part[1]);
+        return n===5?Number(cs.simulationKnowledge||0):Number(cs.quizScores?.[n]||0);
+      }
+      if(itemId==='final') return Number(cs.finalScore||0);
+      return 0;
+    } catch (_) { return 0; }
+  }
+
+  function retryHref(pathwayId,itemId,assignmentId=''){
+    const nonce=Date.now();
+    if(itemId==='simulation'){
+      const params=new URLSearchParams();
+      if(assignmentId) params.set('assignment',assignmentId);
+      params.set('retake','1'); params.set('attempt',String(nonce));
+      return `#/official-simulation/${pathwayId}?${params.toString()}`;
     }
+    if(itemId==='final') return `#/final/${pathwayId}?retake=1&attempt=${nonce}`;
+    const n=Number(itemId.split('-')[1]);
+    return `#/quiz/${pathwayId}/${n}?retake=1&attempt=${nonce}`;
+  }
+
+  function renderSavedAssessmentReview(pathwayId,itemId,best){
+    const el=main(); if(!el) return;
+    const part=/^part-(\d+)$/.exec(itemId);
+    const n=part?Number(part[1]):null;
+    const label=itemId==='final'?'Professional Readiness Final':n===5?'Job Simulation Knowledge Check':`Part ${n} Assessment`;
+    el.innerHTML=`<section class="section"><div class="container" style="max-width:860px"><div class="card cm-result passed cm-assessment-review"><div class="eyebrow">SAVED PASS · REVIEW MODE</div><div class="cm-result-score">${Number(best)}%</div><h1 class="serif">${esc(label)} already passed.</h1><p>Your best recorded score is preserved. Reviewing this course does not erase the pass, and retaking is optional.</p><div class="cm-result-actions"><a class="btn btn-gold" href="${nextHref(pathwayId,itemId,true)}">Continue →</a><a class="btn btn-outline" href="${retryHref(pathwayId,itemId)}">Retake assessment (optional)</a><a class="btn btn-soft" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
+  }
+
+  function nextHref(pathwayId, itemId, passed, assignmentId='') {
+    if (!passed) return retryHref(pathwayId,itemId,assignmentId);
     if (/^part-[1-4]$/.test(itemId)) {
       const n = Number(itemId.split('-')[1]);
       return `#/learn/${pathwayId}/${n+1}`;
@@ -454,6 +492,7 @@
     document.head.appendChild(style);
   }
 
+  window.CM_LIVE_ROUTE = route;
   window.addEventListener('hashchange', () => setTimeout(route, 0));
   document.addEventListener('cm-auth-changed', () => setTimeout(route, 0));
   injectStyles();

@@ -450,11 +450,36 @@
     return `<div class="path-step ${!unlocked?'locked':''}"><div class="step-num">${marker}</div><div><h3>${p.name}</h3><p>${partSummary(p.n)}</p>${score?`<div class="small kicker">Assessment: ${score}%</div>`:''}</div>${cert?`<div class="credential-marker">${cert}</div>`:''}${unlocked?`<a class="btn btn-${completed?'soft':'primary'} btn-sm" href="#/learn/${c.id}/${p.n}">${completed?'Review':'Start'} →</a>`:'<span class="small muted">Complete the previous stage first</span>'}</div>`;
   }
 
+  function assessmentBestScore(c,n,final=false){
+    const cs=getCareerState(c.id);
+    if(final) return Number(cs.finalScore||0);
+    if(n===5) return Number(cs.simulationKnowledge||0);
+    return Number(cs.quizScores?.[n]||0);
+  }
+  function assessmentContinuePath(c,n,final=false){
+    if(final) return `achievement/${c.id}/career`;
+    if(n===5) return `official-simulation/${c.id}`;
+    if(n===2) return `achievement/${c.id}/foundations`;
+    if(n===4) return `achievement/${c.id}/applied`;
+    return `learn/${c.id}/${Math.min(5,n+1)}`;
+  }
+  function assessmentRetryPath(c,n,final=false){
+    const base=final?`final/${c.id}`:`quiz/${c.id}/${n}`;
+    return `${base}?retake=1&attempt=${Date.now()}`;
+  }
+  function renderPassedAssessmentReview(c,n,final,best){
+    const label=final?'Professional Readiness Final':n===5?'Job Simulation Knowledge Check':`Part ${n} Assessment`;
+    render(`<section class="section"><div class="container" style="max-width:860px"><div class="card cm-assessment-review passed"><div class="eyebrow">SAVED PASS · REVIEW MODE</div><div class="score-big">${best}%</div><h1 class="serif">${esc(label)} already passed.</h1><p>Your best recorded score is preserved. Reviewing the course does <strong>not</strong> erase this pass and you do not need to retake the assessment to continue.</p><div class="cm-result-actions"><a class="btn btn-gold" href="#/${assessmentContinuePath(c,n,final)}">Continue →</a><a class="btn btn-outline" href="#/${assessmentRetryPath(c,n,final)}">Retake assessment (optional)</a><a class="btn btn-soft" href="#/${final?`career/${c.id}`:`learn/${c.id}/${n}`}">Review learning</a></div></div></div></section>`,'learning');
+  }
+
   function learnPage(c,n){
     if(!canAccessPart(c,n)){ toast('Complete the previous stage first.','warn'); return nav(`career/${c.id}`); }
     const body=partContent(c,n);
+    const assessmentScore=assessmentBestScore(c,n,false);
+    const assessmentPassed=assessmentScore>=PASS;
+    const assessmentLabel=assessmentPassed ? (n===5?`Review passed knowledge check · ${assessmentScore}%`:`Review passed assessment · ${assessmentScore}%`) : (n===5?'Take simulation knowledge check':'Take 10-question assessment');
     render(`<div class="learning-shell"><div class="learning-layout"><aside class="lesson-sidebar"><div class="sidebar-title"><strong>${esc(c.title)}</strong><span>${esc(c.role)}</span></div><nav class="sidebar-nav">${PARTS.map(p=>`<a class="${p.n===n?'active':''} ${!canAccessPart(c,p.n)?'disabled':''}" href="${canAccessPart(c,p.n)?`#/learn/${c.id}/${p.n}`:'#'}"><span>${isPartComplete(c,p.n)?'✓':p.n}</span>${p.name}</a>`).join('')}</nav><a class="btn btn-soft btn-block btn-sm" href="#/career/${c.id}">← Pathway overview</a></aside>
-    <article class="lesson-content"><div class="lesson-top"><div class="eyebrow">PART ${n} OF 5 · ${pctFor(c)}% COMPLETE</div><h1>${PARTS[n-1].name}</h1><p>${partSummary(n)}</p></div>${body}<div class="lesson-actions"><button class="btn btn-outline" onclick="CM.markPart('${c.id}',${n})">Mark learning complete</button><a class="btn btn-primary" href="#/quiz/${c.id}/${n}">${n===5?'Take simulation knowledge check':'Take 10-question assessment'} →</a></div></article></div></div>`,'learning');
+    <article class="lesson-content"><div class="lesson-top"><div class="eyebrow">PART ${n} OF 5 · ${pctFor(c)}% COMPLETE</div><h1>${PARTS[n-1].name}</h1><p>${partSummary(n)}</p></div>${body}<div class="lesson-actions"><button class="btn btn-outline" onclick="CM.markPart('${c.id}',${n})">${getCareerState(c.id).learningComplete.includes(n)?'Learning complete ✓':'Mark learning complete'}</button><a class="btn ${assessmentPassed?'btn-soft':'btn-primary'}" href="#/quiz/${c.id}/${n}">${assessmentLabel} →</a></div></article></div></div>`,'learning');
   }
   function partContent(c,n){
     if(n===1) return foundationsContent(c);
@@ -553,6 +578,9 @@
     if(n===5 && !isPartComplete(c,5) && !qaMode()){
       // allow knowledge check after opening part 5; marking complete is not required for knowledge check
     }
+    const best=assessmentBestScore(c,n,final);
+    const retake=routeParts().query.get('retake')==='1';
+    if(best>=PASS && !retake && !qaMode()) return renderPassedAssessmentReview(c,n,final,best);
     const q=buildQuiz(c,n,final);
     sessionStorage.setItem('cmCurrentQuiz',JSON.stringify({careerId:c.id,n,final,q}));
     render(`<section class="quiz-shell"><div class="quiz-wrap"><div class="quiz-head"><div><div class="eyebrow">${final?'PROFESSIONAL READINESS FINAL':n===5?'JOB SIMULATION KNOWLEDGE CHECK':`PART ${n} ASSESSMENT`}</div><h1>${final?`${c.title} Professional Readiness Final`:PARTS[n-1].name}</h1><p>${q.length} scored decisions · 80% required · ${final?'16/20 to pass':'8/10 to pass'}</p></div><a class="btn btn-outline" href="#/career/${c.id}">Exit</a></div><form id="quiz-form">${q.map((x,i)=>`<fieldset class="question"><legend><span>${i+1}</span>${esc(x.prompt)}</legend>${x.options.map((o,j)=>`<label class="option"><input type="radio" name="q${i}" value="${esc(o)}"><span>${String.fromCharCode(65+j)}</span><p>${esc(o)}</p></label>`).join('')}<div class="explanation" id="ex-${i}" hidden></div></fieldset>`).join('')}<button class="btn btn-primary btn-block" type="submit">Submit ${final?'Readiness Final':'Assessment'}</button></form></div></section>`,'learning');
@@ -568,7 +596,8 @@
     if(final && score>=PASS) issueIfEligible(c,'career');
     saveState();
     const passed=score>=PASS;
-    const next = final ? (passed?`achievement/${c.id}/career`:`final/${c.id}`) : n===5 ? (passed?`official-simulation/${c.id}`:`quiz/${c.id}/5`) : n===2 ? (passed?`achievement/${c.id}/foundations`:`quiz/${c.id}/${n}`) : n===4 ? (passed?`achievement/${c.id}/applied`:`quiz/${c.id}/${n}`) : (passed?`career/${c.id}`:`quiz/${c.id}/${n}`);
+    const retry=assessmentRetryPath(c,n,final);
+    const next = passed ? assessmentContinuePath(c,n,final) : retry;
     const results=document.createElement('div'); results.className='quiz-result'; results.innerHTML=`<div class="${passed?'pass':'fail'}"><div class="score-big">${score}%</div><h2>${passed?'Passed':'Not yet'}</h2><p>${passed?'You met the Capital Mastery 80% standard.':'Review the explanations and try a new variant. You need 80%.'}</p><a class="btn ${passed?'btn-gold':'btn-primary'}" href="#/${next}">${passed?(final||n===2||n===4?'View Achievement':'Continue'):'Try Again'} →</a></div>`; form.prepend(results); form.querySelector('button[type=submit]').disabled=true; window.scrollTo({top:0,behavior:'smooth'});
   }
 
