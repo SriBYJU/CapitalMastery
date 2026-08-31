@@ -2813,6 +2813,7 @@ async function verifyFirebaseIdToken(
 
 function simNum(id,label,answer,tolerance,unit,section,instruction,cell='') { return {id,type:'numeric',prompt:label,answer,tolerance,unit,workProduct:{section,label,cell,instruction}}; }
 function simText(id,label,keywords,minHits,minWords,section,instruction) { return {id,type:'text',prompt:label,keywords,minHits,minWords,workProduct:{section,label,instruction}}; }
+function simUpdate(id,label,update,section,instruction) { return {id,type:'text',prompt:label,evidenceGroups:[...(update.impactGroups||[]),...(update.actionGroups||[])],minGroups:6,minWords:45,workProduct:{section,label,instruction}}; }
 
 const CAREER_WORKBENCHES = {
   'private-equity': {
@@ -3287,9 +3288,12 @@ function v2DynamicLabByKey(key) { for(const p of ALL_PATHWAYS){if(p.id!=='invest
 
 function buildCareerWorkbenchSimulation(pathway) {
   const b=CAREER_WORKBENCHES[pathway.id]; if(!b) return null;
+  const update=CAREER_ROLELAB_UPDATES[pathway.id]||null;
+  const updateTask=update ? simUpdate(`${pathway.code.toLowerCase()}-live-update`,'Mid-assignment change note',update,'manager-update',`A new fact arrived mid-assignment: ${update.message} Trace it through the affected analysis, decision and controlled next action.`) : null;
+  const questions=updateTask?[...b.tasks,updateTask]:[...b.tasks];
   return {
-    version:'2.0-workbench', itemType:'simulation', questions:b.tasks, writingPrompt:b.writingPrompt,
-    simulationProfile:{kind:'career-workbench-v2',pathwayId:pathway.id,project:b.project,role:b.role,reviewer:b.reviewer,client:b.client,deadline:b.deadline,objective:b.objective,files:b.files,workflow:[...new Set(b.tasks.map(x=>x.workProduct.section))],reviewStandard:CAREER_REVIEW_STANDARDS[pathway.id]||[]}
+    version:'2.1-workday', itemType:'simulation', questions, writingPrompt:b.writingPrompt,
+    simulationProfile:{kind:'career-workbench-v2',pathwayId:pathway.id,project:b.project,role:b.role,reviewer:b.reviewer,client:b.client,deadline:b.deadline,objective:b.objective,files:b.files,workflow:[...new Set(questions.map(x=>x.workProduct.section))],reviewStandard:CAREER_REVIEW_STANDARDS[pathway.id]||[],managerUpdate:update?{title:update.title,timestamp:update.timestamp,fileName:update.fileName,deliverable:update.deliverable,message:update.message}:null}
   };
 }
 
@@ -4339,7 +4343,9 @@ function gradeAssessment(
       const text=cleanString(submitted||"",3000).toLowerCase();
       const words=text.split(/\s+/).filter(Boolean);
       const hits=(q.keywords||[]).filter(k=>text.includes(String(k).toLowerCase())).length;
-      if(words.length>=Number(q.minWords||12) && hits>=Number(q.minHits||1)) correct++;
+      const groupHits=Array.isArray(q.evidenceGroups)?q.evidenceGroups.filter(group=>(group||[]).some(k=>text.includes(String(k).toLowerCase()))).length:null;
+      const evidenceOk=groupHits===null ? hits>=Number(q.minHits||1) : groupHits>=Number(q.minGroups||4);
+      if(words.length>=Number(q.minWords||12) && evidenceOk) correct++;
     } else if (
       typeof submitted === "string" &&
       submitted === q.answer
