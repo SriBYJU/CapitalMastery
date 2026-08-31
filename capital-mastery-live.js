@@ -222,6 +222,21 @@
     });
   }
 
+  function professionalSimulationPayload(data){
+    const kind=data?.simulationProfile?.kind;
+    if(!['ib-deal-workbench-v2','career-workbench-v2'].includes(kind)) return false;
+    if(!Array.isArray(data?.questions)||!data.questions.length) return false;
+    return data.questions.every(q=>{
+      if(!['numeric','text'].includes(q?.type)) return false;
+      if(Array.isArray(q?.options)&&q.options.length) return false;
+      return !!q?.workProduct;
+    });
+  }
+
+  function renderProfessionalSimulationUnavailable(pathwayId,el){
+    el.innerHTML=`<section class="section"><div class="container" style="max-width:860px"><div class="card cm-live-card cm-workbench-required"><div class="eyebrow">PROFESSIONAL JOB SIMULATION</div><h1 class="serif">Professional workbench update required.</h1><p>This pathway will not present a multiple-choice or answer-picking exercise as a job simulation. The official simulation must provide source files, calculated or authored work products, and a reviewer-facing handoff.</p><p class="muted">Your course progress is preserved. Return to the pathway while the secure workbench generation is updated.</p><div class="cm-result-actions"><a class="btn btn-primary" href="#/career/${encodeURIComponent(pathwayId)}">Back to pathway →</a><a class="btn btn-outline" href="#/learn/${encodeURIComponent(pathwayId)}/5">Review simulation briefing</a></div></div></div></section>`;
+  }
+
   async function renderAssessment(pathwayId, itemId) {
     if (!authReady()) {
       waitForAuthReady('Checking your account…');
@@ -253,6 +268,10 @@
       if (!el) return;
       const isSimulation = itemId === 'simulation';
       const isFinal = itemId === 'final';
+      if (isSimulation && !professionalSimulationPayload(data)) {
+        renderProfessionalSimulationUnavailable(pathwayId,el);
+        return;
+      }
       if (isSimulation && data.simulationProfile?.kind === 'ib-deal-workbench-v2') {
         renderIbSimulationWorkbench(data, pathwayId, itemId, el);
         return;
