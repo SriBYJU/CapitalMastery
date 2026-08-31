@@ -42,6 +42,9 @@ jobs:
           set -euo pipefail
           node --check admin-route-guard.js
           node --check app.js
+          node --check course-state.js
+          node --check course-continuity.js
+          node --check course-release-fix.js
           node --check training-tracks.js
           node --check capital-mastery-live.js
           node --check capital-mastery-live-ui.js
@@ -54,6 +57,11 @@ jobs:
           node --check tests/firebase-authorized-domain-browser-audit.cjs
           node --check tests/live-firebase-auth-browser-audit.cjs
           node --check tests/adversarial-chaos-browser-audit.cjs
+          node --check tests/course-assessment-state-browser-audit.cjs
+          node --check tests/course-pass-continuity-browser-audit.cjs
+          node --check tests/legacy-simulation-refusal-browser-audit.cjs
+          node --check tests/v2-assessment-review-browser-audit.cjs
+          node --check tests/visual-contrast-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
           node --check tests/admin-simulation-route-stability-browser-audit.cjs
           node --check tests/program-completion-public-browser-audit.cjs
@@ -97,6 +105,10 @@ jobs:
             sleep 1
           done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-assessment-state-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/legacy-simulation-refusal-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/v2-assessment-review-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
@@ -106,6 +118,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/visual-contrast-browser-audit.cjs
 
       - name: Require live Firebase readiness before any D1 mutation
         run: |
@@ -163,7 +176,7 @@ jobs:
           ready=false
           for i in {1..30}; do
             curl -fsS -D /tmp/cm-headers "${CANONICAL_URL}/" -o /tmp/cm-index || true
-            if grep -q 'training-tracks.css' /tmp/cm-index 2>/dev/null && grep -qi '^x-frame-options: *DENY' /tmp/cm-headers 2>/dev/null && grep -qi '^permissions-policy:' /tmp/cm-headers 2>/dev/null; then
+            if grep -q 'accessibility-fixes.css' /tmp/cm-index 2>/dev/null && grep -qi '^x-frame-options: *DENY' /tmp/cm-headers 2>/dev/null && grep -qi '^permissions-policy:' /tmp/cm-headers 2>/dev/null; then
               ready=true
               break
             fi
@@ -178,6 +191,8 @@ jobs:
             exit 1
           }
           grep -q 'training-tracks.js' /tmp/cm-index
+          grep -q 'course-state.js' /tmp/cm-index
+          grep -q 'course-release-fix.js' /tmp/cm-index
           grep -q 'learner-guide.js' /tmp/cm-index
           grep -q 'enterprise-v2.js' /tmp/cm-index
           grep -q 'admin-route-guard.js' /tmp/cm-index
@@ -187,6 +202,10 @@ jobs:
         run: |
           set -euo pipefail
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/course-assessment-state-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/legacy-simulation-refusal-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/v2-assessment-review-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
@@ -196,6 +215,7 @@ jobs:
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/visual-contrast-browser-audit.cjs
 
       - name: Release boundary summary
         run: |
@@ -205,17 +225,17 @@ jobs:
           This proves:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
-          - exact dist-pages artifact survived ten hostile Chromium suites before any production mutation
+          - exact dist-pages artifact survived fifteen hostile Chromium suites before any production mutation
           - live Firebase email/password credential-name persistence passed before any D1 mutation
           - canonical Google Firebase authorized-domain probe passed before any D1 mutation
-          - production D1 schema was inspected and only missing Career Skills migrations 016/017 were conditionally applied
+          - production D1 schema was inspected and only missing migrations 016/017/018 were conditionally applied
           - D1 row-count preservation, quick_check and foreign_key_check passed before Worker deployment
           - Worker deployed only after D1 compatibility was proven
           - Worker public/auth/origin boundaries passed
           - protected /admin/integrity route exists
           - exact production Pages allowlist deployed
           - canonical generation/security headers passed
-          - ten canonical Chromium suites passed again after deployment, including the Admin auth-timing race and Program Completion verification
+          - fifteen canonical Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, visual contrast, the Admin auth-timing race, and Program Completion verification
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts

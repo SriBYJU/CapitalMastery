@@ -27,6 +27,7 @@ const legacyPayload={
   try{
     await context.addInitScript(()=>{
       localStorage.setItem('cmCredentialNameOnboardedV3:legacy-sim-audit','true');
+      localStorage.setItem('capitalMasteryActiveUidV1','legacy-sim-audit');
       localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking','career-skills');
     });
     await context.route(/\/firebase-auth\.js(?:\?.*)?$/,r=>r.fulfill({status:200,contentType:'application/javascript',body:authStub()}));
@@ -40,7 +41,12 @@ const legacyPayload={
     const page=await context.newPage();
     page.on('pageerror',e=>errors.push(`pageerror:${e.message}`));
     page.on('console',m=>{if(m.type()==='error'&&!/favicon/i.test(m.text()))errors.push(`console:${m.text()}`);});
-    await page.goto(`${BASE}/#/official-simulation/investment-banking`,{waitUntil:'domcontentloaded',timeout:30000});
+    await page.goto(`${BASE}/#/`,{waitUntil:'domcontentloaded',timeout:30000});
+    await page.waitForSelector('#app main#main',{timeout:15000});
+    await page.evaluate(()=>{
+      localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking','career-skills');
+      location.hash='#/official-simulation/investment-banking';
+    });
     await page.waitForSelector('.cm-workbench-required',{timeout:15000});
     const text=await page.locator('#app main#main').innerText();
     assert(/Professional workbench update required/i.test(text),'Stale Worker payload did not enter safe workbench-required state');

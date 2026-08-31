@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawnPython } from './python-runtime.mjs';
 
 const migration = fs.readFileSync('migrations/016_phase2_career_skills_track_constraints.sql', 'utf8');
 
@@ -123,7 +123,7 @@ assert conn.execute('PRAGMA foreign_key_check').fetchall() == []
 print('SQLITE CAREER SKILLS ENTERPRISE MIGRATION EXECUTION PASS')
 `;
 
-const result = spawnSync('python3', ['-c', python, migrationPath], { encoding:'utf8' });
+const result = spawnPython(['-c', python, migrationPath], { encoding:'utf8' });
 if (result.status !== 0) {
   throw new Error(`Career Skills schema migration execution failed:\n${result.stdout}\n${result.stderr}`);
 }

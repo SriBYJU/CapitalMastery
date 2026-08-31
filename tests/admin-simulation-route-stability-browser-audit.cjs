@@ -23,9 +23,9 @@ async function installArtifactWatch(page){
   });
 }
 async function stableState(page,label,wait=900){
-  await page.waitForSelector('.sim-shell',{timeout:10000});
+  await page.waitForSelector('[data-cm-admin-workbench="1"],.sim-shell',{timeout:10000});
   await page.waitForTimeout(wait);
-  const s=await page.evaluate(()=>({hash:location.hash,sim:!!document.querySelector('.sim-shell'),secure:!!document.querySelector('.cm-live-card'),artifacts:[...(window.__cmPreviewArtifacts||[])],text:(document.querySelector('#app')?.textContent||'').slice(0,5000)}));
+  const s=await page.evaluate(()=>({hash:location.hash,sim:!!document.querySelector('[data-cm-admin-workbench="1"],.sim-shell'),secure:!!document.querySelector('.cm-live-card'),artifacts:[...(window.__cmPreviewArtifacts||[])],text:(document.querySelector('#app')?.textContent||'').slice(0,5000)}));
   assert(s.sim,label+': simulation shell missing');
   assert(!s.secure,label+': secure renderer owns the Admin preview DOM');
   assert(!/Loading secure assessment|SECURE CAPITAL MASTERY|Not available yet/i.test(s.text),label+': secure assessment UI remains visible');

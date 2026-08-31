@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import {spawnSync} from 'node:child_process';
+import {spawnPython} from './python-runtime.mjs';
 const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
 const live=fs.readFileSync('capital-mastery-live.js','utf8');
 const liveUi=fs.readFileSync('capital-mastery-live-ui.js','utf8');
@@ -46,7 +46,7 @@ con.execute("UPDATE program_completion_records SET status='revoked',revoked_at='
 assert con.execute("SELECT status FROM program_completion_records").fetchone()[0]=='revoked'
 print('SQLITE PROGRAM COMPLETION PUBLIC PRIVACY FIXTURE PASS')
 `;
-const run=spawnSync('python3',['-c',py],{encoding:'utf8'});
+const run=spawnPython(['-c',py],{encoding:'utf8'});
 if(run.status!==0) throw new Error(run.stderr||run.stdout||'SQLite fixture failed');
 process.stdout.write(run.stdout);
 console.log('PROGRAM COMPLETION PUBLIC VERIFICATION AUDIT PASS');

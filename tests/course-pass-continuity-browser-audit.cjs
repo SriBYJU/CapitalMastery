@@ -88,17 +88,17 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
       throw new Error(`Reviewed lesson never stabilized into saved-pass Continue CTA. snapshot=${JSON.stringify(snapshot)}; cause=${error.message}`);
     });
     assert(/90%/.test(await passCta.textContent()),'Saved-pass lesson CTA did not show best score');
-    assert((await passCta.getAttribute('href'))==='#/career/investment-banking','Professional Readiness Part 5 should continue to the pathway/Role Lab sequence, not retake the quiz');
+    assert((await passCta.getAttribute('href'))==='#/role-lab/investment-banking','Professional Readiness Part 5 should continue directly to the Role Lab, not retake the quiz');
     await passCta.click();
-    await page.waitForFunction(()=>location.hash==='#/career/investment-banking',null,{timeout:10000});
+    await page.waitForFunction(()=>location.hash==='#/role-lab/investment-banking',null,{timeout:10000});
     assert(assessmentGets===getsAfterPass,'Clicking Next/Continue after reviewing a passed lesson must not reopen the quiz');
 
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('[data-cm-review-passed]',{timeout:10000});
     await page.locator('[data-cm-review-passed]').first().click();
-    await page.waitForSelector('.cm-continuity-review',{timeout:10000});
+    await page.waitForSelector('.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review',{timeout:10000});
     assert(await page.locator('#cm-official-form').count()===0,'Reviewing an already-passed assessment should not silently open a blank quiz');
-    assert(/90%/.test(await page.locator('.cm-continuity-review').innerText()),'Saved-pass review did not preserve best score');
+    assert(/90%/.test(await page.locator('.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review').first().innerText()),'Saved-pass review did not preserve best score');
 
     const getsBeforeOptional=assessmentGets;
     await page.getByRole('link',{name:/Retake assessment \(optional\)/}).click();

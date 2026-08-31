@@ -7,7 +7,7 @@ const fail=[]; const ok=(v,m)=>{if(!v)fail.push(m)};
 ok(worker.includes('url.pathname === "/account/delete-data"'),'self-service server deletion route missing');
 ok(worker.includes('user.sub === env.ADMIN_UID'),'platform admin self-deletion must be blocked');
 ok(worker.includes("m2.role='owner' AND m2.status='active'"),'sole-owner transfer guard missing');
-for(const table of ['credential_evidence_items','credential_events','role_lab_submissions','manager_reviews','enterprise_notifications','v2_assessment_attempts','diagnostic_attempts','competency_evidence','competency_scores','readiness_snapshots','role_lab_runs','program_completion_records','credentials','assessment_attempts','official_progress','request_log','cohort_members','employer_profiles','organization_invites','organization_members']) ok(worker.includes(`DELETE FROM ${table}`),`D1 deletion missing ${table}`);
+for(const table of ['credential_evidence_items','credential_events','role_lab_submissions','manager_reviews','enterprise_notifications','v2_assessment_attempts','diagnostic_attempts','competency_evidence','competency_scores','readiness_snapshots','role_lab_runs','program_completion_records','credentials','assessment_attempt_reviews','assessment_attempts','official_progress','request_log','cohort_members','employer_profiles','organization_invites','organization_members']) ok(worker.includes(`DELETE FROM ${table}`),`D1 deletion missing ${table}`);
 ok(worker.includes("const markerUid='deleted_user'"),'shared employer record pseudonymization marker missing');
 ok(auth.includes("fs.deleteDoc(fs.doc(db, 'users', uid, 'progress', 'state'))"),'Firestore progress deletion missing');
 ok(auth.includes("fs.deleteDoc(fs.doc(db, 'users', uid))"),'Firestore root profile deletion missing');

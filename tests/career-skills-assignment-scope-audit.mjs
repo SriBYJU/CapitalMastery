@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {spawnSync} from 'node:child_process';
+import {spawnPython} from './python-runtime.mjs';
 
 const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
 const enterprise=fs.readFileSync('enterprise-v2.js','utf8');
@@ -64,7 +64,7 @@ assert conn.execute(q,('learner','org_b','asn_b','private-equity')).fetchone()==
 assert conn.execute('PRAGMA foreign_key_check').fetchall()==[]
 print('SQLITE ASSIGNMENT SCOPE ATTACK FIXTURE PASS')
 `;
-const r=spawnSync('python3',['-c',py,migrationPath],{encoding:'utf8'});
+const r=spawnPython(['-c',py,migrationPath],{encoding:'utf8'});
 if(r.status!==0)throw new Error(`${r.stdout}\n${r.stderr}`);
 process.stdout.write(r.stdout);
 console.log('CAREER SKILLS ASSIGNMENT SCOPE AUDIT PASS: public/other-assignment evidence cannot satisfy a scoped employer assignment');

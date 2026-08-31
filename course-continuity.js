@@ -58,12 +58,15 @@
   }
 
   function continueHref(pathway, part) {
+    if(window.CM_COURSE_STATE?.getNextCourseDestination){
+      return window.CM_COURSE_STATE.getNextCourseDestination({pathway,currentStage:`part-${Number(part)}`,track:selectedTrack(pathway)});
+    }
     const id = encodeURIComponent(pathway);
     if (part === 1) return `#/learn/${id}/2`;
     if (part === 2) return `#/achievement/${id}/foundations`;
     if (part === 3) return `#/learn/${id}/4`;
     if (part === 4) return `#/achievement/${id}/applied`;
-    if (part === 5) return selectedTrack(pathway) === CAREER_SKILLS ? `#/official-simulation/${id}` : `#/career/${id}`;
+    if (part === 5) return selectedTrack(pathway) === CAREER_SKILLS ? `#/official-simulation/${id}` : `#/role-lab/${encodeURIComponent(pathway==='quant-finance'?'quantitative-finance':pathway)}`;
     return `#/career/${id}`;
   }
 
@@ -114,7 +117,8 @@
     if (r.root !== 'quiz' || r.pathway !== pathway || Number(r.rawPart) !== Number(part) || r.query.get('retake') === '1') return;
     const main = document.querySelector('#app main#main');
     if (!main) return;
-    const current = main.querySelector('.cm-continuity-review');
+    if (main.querySelector('.cm-server-assessment-review')) return;
+    const current = main.querySelector('.cm-assessment-review');
     if (current && Number(current.dataset.best || 0) >= Number(best || 0)) return;
     main.innerHTML = `<section class="section"><div class="container" style="max-width:860px"><div class="card cm-assessment-review cm-continuity-review passed" data-best="${Number(best)}"><div class="eyebrow">SAVED PASS · REVIEW MODE</div><div class="cm-result-score">${Number(best)}%</div><h1 class="serif">Assessment already passed.</h1><p>Your best recorded score is preserved. Reviewing the lesson never resets this pass, and you do not need to take the quiz again to continue.</p><div class="cm-result-actions"><a class="btn btn-gold" data-cm-pass-continue href="${esc(continueHref(pathway,part))}">Continue →</a><a class="btn btn-outline" data-cm-continuity-retake href="${esc(retakeHref(pathway,part))}">Retake assessment (optional)</a><a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathway)}/${part}">Review learning</a></div></div></div></section>`;
   }
@@ -140,7 +144,7 @@
       actions.appendChild(review);
     }
     review.href = `#/quiz/${encodeURIComponent(pathway)}/${part}`;
-    review.textContent = 'Review passed assessment';
+    review.textContent = part === 5 ? 'Review passed knowledge check' : 'Review passed assessment';
     let status = actions.parentElement?.querySelector('.cm-lesson-pass-status');
     if (!status && actions.parentElement) {
       status = document.createElement('div');
@@ -239,7 +243,7 @@
     enforceDirectQuizGate();
   }
 
-  window.CM_COURSE_CONTINUITY = { localBest, authoritativeBest, continueHref, renderSavedPass };
+  window.CM_COURSE_CONTINUITY = { localBest, authoritativeBest, continueHref, renderSavedPass, resolveLearnerCourseState:window.CM_COURSE_STATE?.resolveLearnerCourseState, getCourseAccessState:window.CM_COURSE_STATE?.getCourseAccessState };
   window.addEventListener('hashchange', () => setTimeout(enhance, 20));
   window.addEventListener('popstate', () => setTimeout(enhance, 20));
   document.addEventListener('cm-auth-changed', () => { progressCache.clear(); setTimeout(enhance, 40); });

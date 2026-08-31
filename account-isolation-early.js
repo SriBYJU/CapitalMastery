@@ -5,6 +5,7 @@
   const USER_STATE_PREFIX = 'capitalMasteryUserStateV1:';
   const ACTIVE_UID_KEY = 'capitalMasteryActiveUidV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
+  const QA_STATE_KEY = 'capitalMasteryQaStateV2';
   const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV3:';
   const DEFAULT_NAME = 'Jordan Smith';
 
@@ -75,7 +76,10 @@
     const previousUid = localStorage.getItem(ACTIVE_UID_KEY);
     if (previousUid && previousUid !== user.uid) snapshot(previousUid);
 
-    if (previousUid !== user.uid) localStorage.removeItem(QA_KEY);
+    if (previousUid !== user.uid) {
+      localStorage.removeItem(QA_KEY);
+      localStorage.removeItem(QA_STATE_KEY);
+    }
 
     // A repeated auth-ready/backend-verification event for the SAME Firebase user
     // must never roll current course progress back to an older per-user snapshot.
@@ -103,6 +107,7 @@
     if (previousUid) snapshot(previousUid);
     localStorage.removeItem(ACTIVE_UID_KEY);
     localStorage.removeItem(QA_KEY);
+    localStorage.removeItem(QA_STATE_KEY);
     localStorage.setItem(STATE_KEY, JSON.stringify(blank(null)));
   }
 

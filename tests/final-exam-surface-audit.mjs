@@ -6,7 +6,7 @@ const index=fs.readFileSync('index.html','utf8');
 ok(app.includes('<h3>Professional Readiness Final</h3>'),'pathway must visibly surface the readiness final');
 ok(app.includes('Pass the Job Simulation first'),'final exam must show a locked prerequisite state');
 ok(app.includes('Take Readiness Final'),'passed simulation must expose final assessment CTA');
-ok(app.includes('function refreshLocalState(){ state=loadState(); }'),'app must expose an in-memory state refresh');
+ok(app.includes('function refreshLocalState(){ stateSourceKey=activeStateKey(); state=stateSourceKey===QA_STATE_KEY?loadQaState():loadState(); }'),'app must refresh from the active isolated learner/QA namespace');
 ok(app.includes('refreshLocalState,resetState'),'refreshLocalState must be exported through CM');
 ok(live.includes('window.CM?.refreshLocalState?.();'),'official result mirror must refresh in-memory app state');
 ok(/app\.js\?v=[A-Za-z0-9._-]+/.test(index),'app release must be cache-busted');

@@ -6,6 +6,7 @@
   const USER_STATE_PREFIX = 'capitalMasteryUserStateV1:';
   const ACTIVE_UID_KEY = 'capitalMasteryActiveUidV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
+  const QA_STATE_KEY = 'capitalMasteryQaStateV2';
   const DEFAULT_NAME = 'Jordan Smith';
 
   let db = null;
@@ -138,7 +139,10 @@
 
     // QA Preview Mode is intentionally session/account-specific. Never allow an
     // admin's local QA bypass to follow them into another learner account.
-    if (previousUid !== uid) localStorage.removeItem(QA_KEY);
+    if (previousUid !== uid) {
+      localStorage.removeItem(QA_KEY);
+      localStorage.removeItem(QA_STATE_KEY);
+    }
 
     let next = readCachedUserState(uid);
     if (!next || next.profile?.accountUid !== uid) next = blankState(firebaseUser);
@@ -154,6 +158,7 @@
     if (previousUid) snapshotUserState(previousUid);
     localStorage.removeItem(ACTIVE_UID_KEY);
     localStorage.removeItem(QA_KEY);
+    localStorage.removeItem(QA_STATE_KEY);
     directWriteState(blankState(null));
   }
 

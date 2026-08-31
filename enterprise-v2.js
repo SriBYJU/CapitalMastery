@@ -91,7 +91,11 @@
     }
     const res = await fetch(`${API}${path}`, { ...options, headers });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data.ok === false) throw new Error(data.error || `Request failed (${res.status})`);
+    if (!res.ok || data.ok === false) {
+      const error = new Error(data.error || `Request failed (${res.status})`);
+      error.status = res.status;
+      throw error;
+    }
     return data;
   }
 
@@ -603,20 +607,46 @@
     return `<fieldset class="card cmv2-question"><legend><span>${String(i+1).padStart(2,'0')}</span>${esc(q.prompt)}</legend><div class="cmv2-options">${(q.options||[]).map(o=>`<label><input type="radio" name="${esc(q.id)}" value="${esc(o)}" required><span>${esc(o)}</span></label>`).join('')}</div></fieldset>`;
   }
 
+  function v2AssessmentReviewHtml(review) {
+    const questions=Array.isArray(review.questions)?review.questions:[];
+    return `<section class="cmv2-saved-review" aria-label="Saved assessment review"><div class="card cmv2-review-summary"><div class="cmv2-result-score"><strong>${Number(review.score||0)}</strong><span>${review.passed?'Passed':'Needs revision'}</span></div><div><div class="eyebrow">SAVED SERVER-GRADED ATTEMPT</div><h2>Your submitted work and feedback</h2><p>${Number(review.correct||0)} of ${Number(review.total||questions.length)} correct · submitted ${esc(fmtDate(review.submittedAt))}.</p></div></div><div class="cmv2-review-list">${questions.map((q,i)=>`<article class="card cmv2-review-question ${q.correct?'correct':'incorrect'}"><header><span>${String(Number(q.position||i+1)).padStart(2,'0')}</span><b>${q.correct?'Correct':'Review needed'}</b></header><h3>${esc(q.prompt||`Question ${i+1}`)}</h3><dl><div><dt>Your answer</dt><dd>${esc(q.submitted===''?'No answer submitted':q.submitted)}</dd></div>${q.correct?'':`<div><dt>Correct answer</dt><dd>${esc(q.correctAnswer)}</dd></div>`}</dl>${q.rationale?`<p><b>Why:</b> ${esc(q.rationale)}</p>`:''}</article>`).join('')}</div></section>`;
+  }
+
+  async function loadV2SavedReview(key, assignmentId) {
+    try {
+      const data=await api(`/enterprise/assessments/${encodeURIComponent(key)}/review${assignmentId?`?assignmentId=${encodeURIComponent(assignmentId)}`:''}`);
+      return data.review||null;
+    } catch(error) {
+      if(error.status===404) return null;
+      throw error;
+    }
+  }
+
   async function v2AssessmentPage(key, assignmentId='') {
     if(!authReady()) return loading('Preparing secure assessment…');
     if(!signedIn()) return authGate('learner');
     loading('Loading server-defined assessment…');
     try {
+      const savedReview=await loadV2SavedReview(key,assignmentId);
       const d=await api(`/enterprise/assessments/${encodeURIComponent(key)}${assignmentId?`?assignmentId=${encodeURIComponent(assignmentId)}`:''}`);
       const a=d.assessment; const questions=d.questions||[];
-      setMain(`<section class="cmv2-page"><div class="container cmv2-narrow-wide"><a class="cmv2-back" href="${assignmentId?`#/assigned/${encodeURIComponent(assignmentId)}`:`#/career/${encodeURIComponent(publicPathId(a.pathwayId))}`}">← Back</a><div class="cmv2-page-head"><div><div class="eyebrow">${esc(String(a.stage||'assessment').replace(/_/g,' ').toUpperCase())} · SERVER GRADED</div><h1>${esc(a.title)}</h1><p>${esc(a.description||'')} · ${Number(a.passScore)}% required.</p></div></div>${scenarioHtml(a.scenario)}<form id="cmv2-v2-assessment" class="cmv2-diagnostic-list">${questions.map(v2AssessmentQuestionHtml).join('')}<div class="card cmv2-submit-bar"><div><b>${Number(a.passScore)}% mastery required.</b><span>Answer keys stay on the secure Worker.</span></div><button class="btn btn-primary" type="submit">Submit ${a.stage==='final'?'Professional Final':'Assessment'} →</button></div><div class="cmv2-form-status" aria-live="polite"></div></form></div></section>`);
+      const back=assignmentId?`#/assigned/${encodeURIComponent(assignmentId)}`:`#/career/${encodeURIComponent(publicPathId(a.pathwayId))}`;
+      if(savedReview) {
+        setMain(`<section class="cmv2-page"><div class="container cmv2-narrow-wide"><a class="cmv2-back" href="${back}">← Back</a><div class="cmv2-page-head"><div><div class="eyebrow">${esc(String(a.stage||'assessment').replace(/_/g,' ').toUpperCase())} · SERVER GRADED</div><h1>${esc(a.title)}</h1><p>Your saved attempt is read from the authoritative learner record.</p></div><button class="btn btn-outline" id="cmv2-retake-assessment" type="button">Start a new attempt</button></div>${v2AssessmentReviewHtml(savedReview)}</div></section>`);
+        document.getElementById('cmv2-retake-assessment')?.addEventListener('click',()=>renderV2AssessmentForm(a,questions,assignmentId,back));
+        return;
+      }
+      renderV2AssessmentForm(a,questions,assignmentId,back);
+    } catch(e){ errorPage('Assessment unavailable.',e.message,assignmentId?`#/assigned/${assignmentId}`:'#/careers'); }
+  }
+
+  function renderV2AssessmentForm(a,questions,assignmentId,back) {
+      setMain(`<section class="cmv2-page"><div class="container cmv2-narrow-wide"><a class="cmv2-back" href="${back}">← Back</a><div class="cmv2-page-head"><div><div class="eyebrow">${esc(String(a.stage||'assessment').replace(/_/g,' ').toUpperCase())} · SERVER GRADED</div><h1>${esc(a.title)}</h1><p>${esc(a.description||'')} · ${Number(a.passScore)}% required.</p></div></div>${scenarioHtml(a.scenario)}<form id="cmv2-v2-assessment" class="cmv2-diagnostic-list">${questions.map(v2AssessmentQuestionHtml).join('')}<div class="card cmv2-submit-bar"><div><b>${Number(a.passScore)}% mastery required.</b><span>Answer keys stay on the secure Worker until you submit.</span></div><button class="btn btn-primary" type="submit">Submit ${a.stage==='final'?'Professional Final':'Assessment'} →</button></div><div class="cmv2-form-status" aria-live="polite"></div></form></div></section>`);
       document.getElementById('cmv2-v2-assessment')?.addEventListener('submit',async e=>{
         e.preventDefault(); const form=e.currentTarget; const btn=form.querySelector('button[type="submit"]'); const status=form.querySelector('.cmv2-form-status'); btn.disabled=true;
-        try { const fd=new FormData(form); const answers={}; questions.forEach(q=>answers[q.id]=String(fd.get(q.id)||'')); status.textContent='Grading securely…'; const result=await api(`/enterprise/assessments/${encodeURIComponent(key)}/submit`,{method:'POST',body:JSON.stringify({assignmentId:assignmentId||null,answers})}); renderV2AssessmentResult(a,assignmentId,result); }
+        try { const fd=new FormData(form); const answers={}; questions.forEach(q=>answers[q.id]=String(fd.get(q.id)||'')); status.textContent='Grading securely…'; const result=await api(`/enterprise/assessments/${encodeURIComponent(a.key)}/submit`,{method:'POST',body:JSON.stringify({assignmentId:assignmentId||null,answers})}); renderV2AssessmentResult(a,assignmentId,result); }
         catch(err){status.textContent=err.message;btn.disabled=false;}
       });
-    } catch(e){ errorPage('Assessment unavailable.',e.message,assignmentId?`#/assigned/${assignmentId}`:'#/careers'); }
   }
 
   function renderV2AssessmentResult(assessment, assignmentId, result) {

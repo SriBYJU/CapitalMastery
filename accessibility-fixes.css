@@ -1,0 +1,30 @@
+/* Phase 2 accessibility hardening: readable text on every light and dark surface. */
+:root{--gold-text:#76501e;--muted-accessible:#526273}
+.eyebrow,.career-card .career-group{color:var(--gold-text)}
+.cred-count{color:#526273}
+.data-card .source{color:#596675}
+.path-step.locked{opacity:1}
+.path-step.locked .step-num{background:#5f6f80;color:#fff}
+.cm-track-sequence-grid a>b{color:#76501e}
+.cm-learner-guide-nav button small{color:#52687a}
+
+/* Gold remains intentionally bright when it sits directly on navy. */
+.section-navy .eyebrow,.hero-board .eyebrow,.founder-card .eyebrow,.lesson-sidebar .eyebrow,.cm-track-panel .eyebrow,.cm-learner-guide-hero .eyebrow,.cmv2-employer-hero .eyebrow,.cmv2-assignment-hero .eyebrow,.cmv2-rolelab-hero .eyebrow,.cmv2-report-hero .eyebrow,.cmv2-academy-core .eyebrow,.cm-wb-top .eyebrow,.cm-wb-sidebar .eyebrow,.cm-review-rolelab-head .eyebrow{color:#efd498}
+.cmv2-public-tour>.container>.section-head .eyebrow{color:#efd498}
+.section-navy .card .eyebrow,.cm-track-card .eyebrow{color:var(--gold-text)}
+
+/* Employer and walkthrough labels were previously below AA on white cards. */
+.cmv2-steps .card b,.cmv2-readiness-stack b{color:#76501e}
+.cmv2-readiness-compare p,.cmv2-readiness-stack small{color:#526273}
+.cmv2-ramp-inputs label:last-child span{color:#526273}
+.cmv2-public-tour-panel{color:#172f47}
+.cmv2-public-tour-visual>small{color:#526273}
+.cmv2-tour-program span,.cmv2-tour-work span,.cmv2-tour-evidence span,.cmv2-tour-govern small{color:#526273}
+.cmv2-tour-program i{color:#76501e}
+
+/* Saved-review colors are meaningful and AA-readable. */
+.cmv2-review-question header{color:#45586a}
+.cmv2-review-question.correct header b{color:#096536}
+.cmv2-review-question.incorrect header b{color:#8f1711}
+
+@media (forced-colors:active){.btn,.card,.path-step{forced-color-adjust:auto}.progress>span,.cmv2-meter i{background:Highlight}}

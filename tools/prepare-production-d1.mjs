@@ -6,6 +6,7 @@ const WRANGLER=['--yes','wrangler@4','d1','execute',DB,'--remote'];
 const requiredEnv=['CLOUDFLARE_API_TOKEN','CLOUDFLARE_ACCOUNT_ID'];
 const MIGRATION_016='migrations/016_phase2_career_skills_track_constraints.sql';
 const MIGRATION_017='migrations/017_phase2_program_completion_records.sql';
+const MIGRATION_018='migrations/018_assessment_attempt_reviews.sql';
 for(const name of requiredEnv){
   if(!String(process.env[name]||'').trim()) throw new Error(`Missing ${name}; refusing production D1 mutation`);
 }
@@ -40,7 +41,7 @@ function requireD1SafeMigration016(){
   assert(!source.includes('pragma foreign_keys = off'),'Migration 016 must not attempt to disable foreign_keys inside D1 implicit transactions');
 }
 function schemaRows(){
-  return sql("SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('cohorts','program_assignments','program_completion_records') ORDER BY name;",'Read production table schemas');
+  return sql("SELECT name, sql FROM sqlite_master WHERE type='table' AND name IN ('cohorts','program_assignments','program_completion_records','assessment_attempt_reviews') ORDER BY name;",'Read production table schemas');
 }
 function byName(rows){return new Map(rows.map(r=>[r.name,r]));}
 function tableColumns(name){
@@ -66,7 +67,7 @@ function requireKnownRebuildObjects(){
 }
 function snapshotCounts(){
   const tables=sql("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name;",'List production tables').map(r=>r.name);
-  const wanted=['organizations','organization_members','cohorts','cohort_members','program_assignments','firm_content','credentials','official_progress','program_completion_records'].filter(x=>tables.includes(x));
+  const wanted=['organizations','organization_members','cohorts','cohort_members','program_assignments','firm_content','credentials','official_progress','program_completion_records','assessment_attempts','assessment_attempt_reviews'].filter(x=>tables.includes(x));
   const out={};
   for(const name of wanted){
     const row=sql(`SELECT COUNT(*) AS n FROM ${name};`,`Count ${name}`)[0];
@@ -129,10 +130,26 @@ for(const idx of ['idx_program_completion_uid_assignment','idx_program_completio
   assert(completionIndexes.has(idx),`program_completion_records index missing: ${idx}`);
 }
 
+schemas=byName(schemaRows());
+let applied018=false;
+if(!schemas.get('assessment_attempt_reviews')){
+  console.log('Migration 018 required: assessment_attempt_reviews is absent.');
+  file(MIGRATION_018,'Apply migration 018');
+  applied018=true;
+}else{
+  console.log('assessment_attempt_reviews already exists; validating instead of reapplying migration 018.');
+}
+requireColumns('assessment_attempt_reviews',['attempt_id','uid','pathway_id','item_id','item_type','score','passed','answers_json','review_json','submitted_at']);
+const reviewIndexes=new Set(sql("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='assessment_attempt_reviews';",'Read assessment review indexes').map(r=>r.name));
+assert(reviewIndexes.has('idx_assessment_attempt_reviews_owner'),'assessment_attempt_reviews owner index missing');
+
 const afterCounts=snapshotCounts();
-assertUnchanged(beforeCounts,afterCounts,['organizations','organization_members','cohorts','cohort_members','program_assignments','firm_content','credentials','official_progress','program_completion_records']);
+assertUnchanged(beforeCounts,afterCounts,['organizations','organization_members','cohorts','cohort_members','program_assignments','firm_content','credentials','official_progress','program_completion_records','assessment_attempts','assessment_attempt_reviews']);
 if(beforeCounts.program_completion_records===undefined){
   assert(afterCounts.program_completion_records===0,'New program_completion_records table must be empty immediately after migration 017');
+}
+if(beforeCounts.assessment_attempt_reviews===undefined){
+  assert(afterCounts.assessment_attempt_reviews===0,'New assessment_attempt_reviews table must be empty immediately after migration 018');
 }
 const quick=sql('PRAGMA quick_check;','Run D1 quick_check');
 const quickValue=String(quick[0]?.quick_check??Object.values(quick[0]||{})[0]??'');
@@ -140,7 +157,7 @@ assert(quickValue.toLowerCase()==='ok',`PRAGMA quick_check failed: ${quickValue}
 const fk=sql('PRAGMA foreign_key_check;','Run D1 foreign_key_check');
 assert(fk.length===0,`PRAGMA foreign_key_check returned ${fk.length} violation(s)`);
 
-const summary={database:DB,applied016,applied017,quickCheck:'ok',foreignKeyViolations:0,beforeCounts,afterCounts,checkedAt:new Date().toISOString()};
+const summary={database:DB,applied016,applied017,applied018,quickCheck:'ok',foreignKeyViolations:0,beforeCounts,afterCounts,checkedAt:new Date().toISOString()};
 fs.writeFileSync('d1-production-preflight.json',JSON.stringify(summary,null,2));
 console.log(JSON.stringify(summary,null,2));
 console.log('D1 PRODUCTION PREPARE GATE: PASS');

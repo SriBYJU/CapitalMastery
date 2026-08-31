@@ -5,6 +5,7 @@
   const PASS = 80;
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
+  const QA_STATE_KEY = 'capitalMasteryQaStateV2';
   const DEFAULT_NAME = 'Jordan Smith';
 
   const PARTS = [
@@ -241,15 +242,28 @@
     };
   }
 
-  function loadState(){
-    try {
-      const parsed = JSON.parse(localStorage.getItem(STATE_KEY));
-      if (parsed && parsed.version === 1) return parsed;
-    } catch(e){}
+  function blankState(){
     return {version:1, profile:{name:DEFAULT_NAME}, careers:{}, credentials:[], preferences:{}, createdAt:new Date().toISOString()};
   }
+  function loadStateFrom(key){
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key));
+      if (parsed && parsed.version === 1) return parsed;
+    } catch(e){}
+    return blankState();
+  }
+  function loadState(){ return loadStateFrom(STATE_KEY); }
+  function loadQaState(){ return loadStateFrom(QA_STATE_KEY); }
+  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.backendVerified === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }
+  let stateSourceKey = STATE_KEY;
   let state = loadState();
-  function saveState(){ localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
+  function activeStateKey(){ return qaMode() ? QA_STATE_KEY : STATE_KEY; }
+  function ensureActiveState(){
+    const key=activeStateKey();
+    if(key!==stateSourceKey){ state=key===QA_STATE_KEY?loadQaState():loadState(); stateSourceKey=key; }
+    return state;
+  }
+  function saveState(){ const key=activeStateKey(); stateSourceKey=key; localStorage.setItem(key, JSON.stringify(state)); }
   function getCareerState(id){
     if(!state.careers[id]) state.careers[id] = {learningComplete:[],completedParts:[],quizScores:{},simulationKnowledge:null,simulationScore:null,finalScore:null,applied:{},simResponses:{},readiness:null};
     const cs=state.careers[id];
@@ -260,8 +274,11 @@
     if(!cs.simResponses) cs.simResponses={};
     return cs;
   }
-  function qaMode(){ return window.CM_AUTH?.ready === true && window.CM_AUTH?.backendVerified === true && window.CM_AUTH?.isAdmin === true && localStorage.getItem(QA_KEY) === 'true'; }
-  function setQa(v){ localStorage.setItem(QA_KEY, v ? 'true':'false'); }
+  function setQa(v){
+    localStorage.setItem(QA_KEY, v ? 'true':'false');
+    stateSourceKey=v?QA_STATE_KEY:STATE_KEY;
+    state=v?loadQaState():loadState();
+  }
 
   function esc(v=''){ return String(v).replace(/[&<>'"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#039;",'"':'&quot;'}[c])); }
   function careerById(id){ return DATA.careers.find(c=>c.id===id); }
@@ -431,7 +448,7 @@
     const pct=pctFor(c), ready=readiness(c);
     const finalReady=cs.completedParts.includes(5) && Number(cs.simulationScore||0)>=PASS;
     const finalPassed=Number(cs.finalScore||0)>=PASS;
-    const finalExamStep=`<div class="path-step ${!finalReady?'locked':''}"><div class="step-num">${finalPassed?'✓':finalReady?'F':'🔒'}</div><div><h3>Professional Readiness Final</h3><p>Knowledge, calculation and workflow-quality credential gate · 80% required.</p>${cs.finalScore!=null?`<div class="small kicker">Final assessment: ${Number(cs.finalScore)}%</div>`:''}</div>${finalReady?`<a class="btn btn-${finalPassed?'soft':'gold'} btn-sm" href="#/final/${c.id}">${finalPassed?'Review Final':'Take Readiness Final'} →</a>`:'<span class="small muted">Pass the Job Simulation first</span>'}</div>`;
+    const finalExamStep=`<div class="path-step ${!finalReady?'locked':''}"><div class="step-num">${finalPassed?'✓':finalReady?'F':'🔒'}</div><div><h3>Professional Readiness Final</h3><p>Knowledge, calculation and workflow-quality credential gate · 80% required.</p>${cs.finalScore!=null?`<div class="small kicker">Final assessment: ${Number(cs.finalScore)}%</div>`:'<div class="small kicker">Not attempted.</div>'}</div>${finalReady?`<a class="btn btn-${finalPassed?'soft':'gold'} btn-sm" href="#/final/${c.id}">${finalPassed?'Review Final':'Take Readiness Final'} →</a>`:'<span class="small muted">Pass the Job Simulation first</span>'}</div>`;
     render(`<section class="page-hero"><div class="container"><div class="eyebrow">${esc(c.group)} · CAREER PATHWAY</div><h1>${esc(c.title)}</h1><p><strong>Target role:</strong> ${esc(c.role)}${c.track?` · <strong>Flagship track:</strong> ${esc(c.track)}`:''}</p></div></section>
     <section class="section-tight"><div class="container career-summary"><div>
       <div class="card"><div class="section-head"><div><div class="eyebrow">YOUR PATH</div><h2>${pct}% complete</h2></div><div><strong>${ready||'—'}</strong><div class="small muted">Readiness score</div></div></div><div class="progress progress-light"><span style="width:${pct}%"></span></div>
@@ -696,8 +713,8 @@
 
   function qaScores(score){ const c=careerById('investment-banking'),cs=getCareerState(c.id); cs.learningComplete=[1,2,3,4,5]; cs.completedParts=[1,2,3,4,5];[1,2,3,4].forEach(p=>cs.quizScores[p]=score);cs.simulationKnowledge=score;cs.simulationScore=score;cs.finalScore=score;state.credentials=state.credentials.filter(x=>x.careerId!==c.id); if(score>=80) issueAllEligible(c);saveState();toast(`IB QA scores set to ${score}%.`,score>=80?'good':'warn');renderRoute(); }
   function qaProgress(pct){ const c=careerById('investment-banking'),cs=getCareerState(c.id),n=Math.floor(pct/20);cs.learningComplete=[];cs.completedParts=[];cs.quizScores={};for(let p=1;p<=Math.min(n,4);p++){cs.learningComplete.push(p);cs.completedParts.push(p);cs.quizScores[p]=90;}if(n>=5){cs.learningComplete.push(5);cs.completedParts.push(5);cs.simulationKnowledge=90;cs.simulationScore=90;cs.finalScore=90;}else{cs.simulationKnowledge=null;cs.simulationScore=null;cs.finalScore=null;}state.credentials=state.credentials.filter(x=>x.careerId!==c.id);issueAllEligible(c);saveState();toast(`IB QA progress set to ${pct}%.`,'good');renderRoute(); }
-  function refreshLocalState(){ state=loadState(); }
-  function resetState(){ if(confirm('Reset all local Capital Mastery QA progress?')){localStorage.removeItem(STATE_KEY);state=loadState();saveState();renderRoute();} }
+  function refreshLocalState(){ stateSourceKey=activeStateKey(); state=stateSourceKey===QA_STATE_KEY?loadQaState():loadState(); }
+  function resetState(){ if(confirm('Reset the isolated Capital Mastery QA preview state? Learner progress will not be changed.')){localStorage.removeItem(QA_STATE_KEY);stateSourceKey=QA_STATE_KEY;state=loadQaState();saveState();renderRoute();} }
 
   function mobileMenu(){ modal(`<h2>Menu</h2><div class="grid"><a class="btn btn-outline" href="#/" onclick="CM.closeModal()">Home</a><a class="btn btn-outline" href="#/careers" onclick="CM.closeModal()">Careers</a><a class="btn btn-outline" href="#/credentials" onclick="CM.closeModal()">Credentials</a><a class="btn btn-outline" href="#/academy" onclick="CM.closeModal()">Academies</a><a class="btn btn-outline" href="#/passport" onclick="CM.closeModal()">My Learning</a><a class="btn btn-outline" href="#/about" onclick="CM.closeModal()">About</a></div>`); }
   function modal(html){ const d=document.createElement('div');d.className='modal-backdrop';d.id='cm-modal';d.innerHTML=`<div class="modal">${html}</div>`;d.addEventListener('click',e=>{if(e.target===d)closeModal()});document.body.appendChild(d); }
@@ -710,6 +727,7 @@
   function bindGlobal(){ document.querySelectorAll('textarea[data-applied]').forEach(t=>t.addEventListener('input',()=>{const cs=getCareerState(t.dataset.career);cs.applied[t.dataset.applied]=t.value;saveState();}));document.querySelectorAll('textarea[data-concept-practice]').forEach(t=>t.addEventListener('input',()=>{const cs=getCareerState(t.dataset.conceptCareer);cs.conceptPractice=cs.conceptPractice||{};cs.conceptPractice[t.dataset.conceptPractice]=t.value;saveState();})); }
 
   function renderRoute(){
+    ensureActiveState();
     const {parts,query}=routeParts(); const [root,a,b]=parts; document.title='Capital Mastery | 80+ Free Finance Credentials | Made by Shriyan Avadhanula';
     try{
       if(!root) return home();

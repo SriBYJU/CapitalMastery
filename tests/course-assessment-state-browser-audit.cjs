@@ -98,7 +98,8 @@ function assessmentPayload(){
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.learning-shell',{timeout:10000});
     const learningText=await page.locator('#app main#main').innerText();
-    assert(/Review passed knowledge check · 90%/.test(learningText),'Learning page forgot saved Part 5 pass');
+    const learnerState=await page.evaluate(()=>localStorage.getItem('capitalMasteryLocalStateV1'));
+    assert(/Review passed knowledge check · 90%|Continue — assessment already passed · 90%/.test(learningText),`Learning page forgot saved Part 5 pass. state=${learnerState}; main=${learningText.slice(0,1600)}`);
 
     const reviewLink=page.getByRole('link',{name:/Review passed knowledge check/});
     await reviewLink.click();

@@ -1,9 +1,11 @@
-import { chromium } from 'playwright';
+import { createRequire } from 'node:module';
+const { chromium } = createRequire(import.meta.url)('playwright');
 
 const BASE = process.env.CM_AUDIT_URL || 'http://127.0.0.1:4173';
 const WORKER = 'https://capital-mastery-api.avadhanula-shriyan.workers.dev';
 const QA_KEY = 'capitalMasteryQaPreviewV1';
 const STATE_KEY = 'capitalMasteryLocalStateV1';
+const QA_STATE_KEY = 'capitalMasteryQaStateV2';
 const errors = [];
 
 function assert(condition, message) {
@@ -254,14 +256,15 @@ try {
   // Boundary score control works and automatically enables QA mode.
   await adminPage.getByRole('button',{name:'79%'}).click();
   await adminPage.waitForTimeout(120);
-  const scoreState=await adminPage.evaluate(()=>JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'));
+  const scoreState=await adminPage.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),QA_STATE_KEY);
   assert(scoreState?.careers?.['investment-banking']?.quizScores?.['1']===79,'Admin 79% boundary control did not update local QA state');
   assert(await adminPage.evaluate(k=>localStorage.getItem(k),QA_KEY)==='true','Admin boundary control must automatically enable QA mode');
+  assert(await adminPage.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null')?.careers?.['investment-banking']?.quizScores?.['1']??null,STATE_KEY)===null,'Admin QA score contaminated normal learner progress');
 
   // Progress preset works.
   await adminPage.getByRole('button',{name:'60%'}).click();
   await adminPage.waitForTimeout(120);
-  const progressState=await adminPage.evaluate(()=>JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'));
+  const progressState=await adminPage.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),QA_STATE_KEY);
   assert(JSON.stringify(progressState?.careers?.['investment-banking']?.completedParts||[])===JSON.stringify([1,2,3]),'Admin 60% progress preset did not create the expected local state');
 
   // Local simulation preview stays local and is not redirected to official learner mode.
@@ -286,8 +289,9 @@ try {
   adminPage.once('dialog',dialog=>dialog.accept());
   await adminPage.getByRole('button',{name:'Reset Local State'}).click();
   await adminPage.waitForTimeout(120);
-  const resetState=await adminPage.evaluate(()=>JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'));
+  const resetState=await adminPage.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),QA_STATE_KEY);
   assert(Object.keys(resetState?.careers||{}).length===0,'Admin Reset Local State did not clear QA career progress');
+  assert(await adminPage.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null')?.careers?.['investment-banking']?.quizScores?.['1']??null,STATE_KEY)===null,'QA reset modified normal learner progress');
 
   // -------------------------------------------------------------------------
   // 4) Runtime errors captured across all three browser personas are blockers.

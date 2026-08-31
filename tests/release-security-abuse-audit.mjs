@@ -1,12 +1,22 @@
 import fs from 'node:fs';
 
+const {readJson,corsHeaders}=await import('../v2/worker-v2-phase1-release.js');
+
 const worker=fs.readFileSync('v2/worker-v2-phase1-release.js','utf8');
 const fail=[];
 const ok=(value,message)=>{ if(!value) fail.push(message); };
 
 // Request-size and attempt-abuse controls must remain server-side.
 ok(worker.includes('const MAX_BODY_BYTES = 60000;'),'Worker request-body ceiling changed or disappeared');
-ok(worker.includes('length > MAX_BODY_BYTES')&&worker.includes('new HttpError(\n      413,')&&worker.includes('Request body too large'),'Oversized JSON must fail with HTTP 413');
+const oversized='x'.repeat(60001);
+for(const request of [
+  new Request('https://worker.invalid/test',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({oversized})}),
+  new Request('https://worker.invalid/test',{method:'POST',headers:{'content-type':'application/json','content-length':'999999'},body:'{}'})
+]) {
+  let status=0;
+  try { await readJson(request); } catch(error) { status=error.status; }
+  ok(status===413,'Oversized JSON must fail with HTTP 413, including when Content-Length is absent or exceeds the ceiling');
+}
 ok(worker.includes('const MAX_ATTEMPTS_10_MIN = 10;'),'Assessment attempt ceiling changed or disappeared');
 ok(worker.includes('total >= MAX_ATTEMPTS_10_MIN')&&worker.includes('Too many recent attempts. Please wait before trying again.'),'Assessment attempt limiter must fail closed');
 ok(worker.includes('429'),'Attempt abuse control must return HTTP 429');
@@ -15,11 +25,11 @@ ok(worker.includes('429'),'Attempt abuse control must return HTTP 429');
 // response CORS is intentionally wildcard during the Pages-host migration.
 ok(worker.includes('function allowedOriginList(env)'),'Explicit request-origin allowlist parser missing');
 ok(worker.includes('origin && !allowedOriginList(env).includes(origin)')&&worker.includes('new HttpError(403, "Origin not allowed")'),'Unapproved browser origins must be rejected server-side');
-ok(worker.includes('"Vary":\n      "Origin"'),'Worker responses must preserve Origin cache variance');
+ok(corsHeaders({ALLOWED_ORIGINS:'https://capitalmastery.pages.dev'}).Vary==='Origin','Worker responses must preserve Origin cache variance');
 
 // Assessment GETs must never serialize answer keys or grading rationales.
 const assessmentPublicStart=worker.indexOf('function v2PublicAssessmentQuestion(row)');
-const assessmentPublicEnd=worker.indexOf('async function v2GradeAssessment',assessmentPublicStart);
+const assessmentPublicEnd=worker.indexOf('async function v2AssessmentAttemptReview',assessmentPublicStart);
 const publicAssessment=worker.slice(assessmentPublicStart,assessmentPublicEnd);
 ok(assessmentPublicStart>=0&&assessmentPublicEnd>assessmentPublicStart,'Public assessment serializer missing');
 ok(!publicAssessment.includes('correct_answer'),'Public assessment serializer leaks correct_answer');

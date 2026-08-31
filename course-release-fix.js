@@ -52,6 +52,9 @@
   }
 
   function correctContinueHref(pathway, part) {
+    if(window.CM_COURSE_STATE?.getNextCourseDestination){
+      return window.CM_COURSE_STATE.getNextCourseDestination({pathway,currentStage:`part-${Number(part)}`,track:selectedTrack(pathway)});
+    }
     const id = encodeURIComponent(pathway);
     const n = Number(part);
     if (n === 1) return `#/learn/${id}/2`;
@@ -177,6 +180,9 @@
     const saved = loadReview(pathway, part);
     const score = Math.max(Number(best || 0), Number(saved?.score || 0));
     const hasItems = Array.isArray(saved?.items) && saved.items.length > 0;
+    if (main.querySelector('.cm-server-assessment-review')) return true;
+    const current=main.querySelector('.cm-course-release-review,.cm-continuity-review');
+    if(current&&Number(current.dataset.best||0)>=score) return true;
 
     main.innerHTML = `<section class="section cm-readonly-review-shell"><div class="container" style="max-width:980px">
       <div class="card cm-assessment-review cm-course-release-review passed" data-best="${score}">
@@ -366,6 +372,7 @@
     if (!Number.isFinite(part) || part < 1 || part > 5) return;
     const best = localBest(route.pathway, part);
     if (best < PASS) return;
+    if (document.querySelector('#app main#main .cm-server-assessment-review')) return;
     renderReadOnlyReview(route.pathway, part, best);
   }
 

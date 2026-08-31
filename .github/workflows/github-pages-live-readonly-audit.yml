@@ -15,6 +15,8 @@ on:
       - 'assets/**'
       - 'tests/**'
       - 'tools/build-pages.mjs'
+      - 'migrations/**'
+      - 'v2/**'
   workflow_dispatch:
 
 permissions:
@@ -58,6 +60,7 @@ jobs:
           paths=(
             'v2/worker-v2-phase1-release.js'
             'migrations/017_phase2_program_completion_records.sql'
+            'migrations/018_assessment_attempt_reviews.sql'
             'tests/program-completion-public-verification-audit.mjs'
             'tools/prepare-production-d1.mjs'
             'wrangler.jsonc'
@@ -112,6 +115,10 @@ jobs:
         run: |
           set -euo pipefail
           CM_AUDIT_URL="${FALLBACK}/" node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/course-assessment-state-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/legacy-simulation-refusal-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/v2-assessment-review-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/adversarial-chaos-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/admin-route-zero-exposure-browser-audit.cjs
@@ -121,4 +128,5 @@ jobs:
           CM_AUDIT_URL="${FALLBACK}/" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/employer-role-matrix-browser-audit.cjs
-          echo 'GitHub Pages ten-suite live browser matrix: PASS'
+          CM_AUDIT_URL="${FALLBACK}/" node tests/visual-contrast-browser-audit.cjs
+          echo 'GitHub Pages fifteen-suite live browser matrix: PASS'

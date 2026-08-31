@@ -251,7 +251,7 @@
     const forceRetake=hashQuery().get('retake')==='1';
     const savedBest=mirroredBestScore(pathwayId,itemId);
     if(itemId!=='simulation' && savedBest>=PASS && !forceRetake){
-      renderSavedAssessmentReview(pathwayId,itemId,savedBest);
+      await renderSavedAssessmentReview(pathwayId,itemId,savedBest);
       return;
     }
 
@@ -364,12 +364,29 @@
     return `#/quiz/${pathwayId}/${n}?retake=1&attempt=${nonce}`;
   }
 
-  function renderSavedAssessmentReview(pathwayId,itemId,best){
+  function reviewQuestionHtml(item,index){
+    const status=item.correct===true?'correct':'incorrect';
+    const submitted=item.submitted===null||item.submitted===undefined||item.submitted===''?'No answer recorded':String(item.submitted);
+    return `<article class="cm-review-item ${status}"><div class="cm-review-qhead"><span>${index+1}</span><div><strong>${esc(item.prompt||`Question ${index+1}`)}</strong><small>${item.correct===true?'Correct':'Needs review'}</small></div></div><div class="cm-review-answer"><small>Your submitted answer</small><p>${esc(submitted)}</p></div>${item.correctAnswer!==null&&item.correctAnswer!==undefined&&item.correctAnswer!==''?`<p class="cm-review-correct"><strong>Correct answer:</strong> ${esc(item.correctAnswer)}</p>`:''}${item.rationale?`<p class="cm-review-explain">${esc(item.rationale)}</p>`:''}</article>`;
+  }
+
+  async function renderSavedAssessmentReview(pathwayId,itemId,best){
     const el=main(); if(!el) return;
     const part=/^part-(\d+)$/.exec(itemId);
     const n=part?Number(part[1]):null;
     const label=itemId==='final'?'Professional Readiness Final':n===5?'Job Simulation Knowledge Check':`Part ${n} Assessment`;
-    el.innerHTML=`<section class="section"><div class="container" style="max-width:860px"><div class="card cm-result passed cm-assessment-review"><div class="eyebrow">SAVED PASS · REVIEW MODE</div><div class="cm-result-score">${Number(best)}%</div><h1 class="serif">${esc(label)} already passed.</h1><p>Your best recorded score is preserved. Reviewing this course does not erase the pass, and retaking is optional.</p><div class="cm-result-actions"><a class="btn btn-gold" href="${nextHref(pathwayId,itemId,true)}">Continue →</a><a class="btn btn-outline" href="${retryHref(pathwayId,itemId)}">Retake assessment (optional)</a><a class="btn btn-soft" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
+    el.innerHTML=`<section class="section cm-server-assessment-review"><div class="container" style="max-width:980px"><div class="card cm-live-card"><div class="eyebrow">SAVED PASS · LOADING READ-ONLY REVIEW</div><h1 class="serif">${esc(label)}</h1><p>Loading your submitted attempt from the authoritative record…</p></div></div></section>`;
+    let review=null;
+    try{
+      const data=await apiFetch(`/assessment/review/${encodeURIComponent(apiPathway(pathwayId))}/${encodeURIComponent(itemId)}`);
+      review=data.review||null;
+    }catch(error){
+      if(!/not found|available/i.test(String(error?.message||''))) console.warn('Assessment review unavailable:',error);
+    }
+    if(!el.isConnected||!location.hash.startsWith(`#/quiz/${pathwayId}/`)) return;
+    const questions=Array.isArray(review?.questions)?review.questions:[];
+    const score=Math.max(Number(best||0),Number(review?.score||0));
+    el.innerHTML=`<section class="section cm-server-assessment-review"><div class="container" style="max-width:980px"><div class="card cm-result passed cm-assessment-review"><div class="eyebrow">SAVED PASS · READ-ONLY REVIEW</div><div class="cm-result-score">${score}%</div><h1 class="serif">${esc(label)} already passed.</h1><p>Your pass is preserved. This page reads your submitted attempt and creates no new attempt.</p>${questions.length?`<div class="cm-review-list">${questions.map(reviewQuestionHtml).join('')}</div>`:`<div class="cm-review-history-note"><strong>This pass predates saved-answer review.</strong><span>The official score remains valid. Future submissions preserve the submitted answers, correctness, correct answer, rationale, score, and completion time for private review.</span></div>`}${review?.submittedAt?`<p class="small muted">Completed ${esc(formatDate(review.submittedAt))} · Attempt ${esc(review.attemptId||'')}</p>`:''}<div class="cm-result-actions"><a class="btn btn-gold" data-cm-pass-continue href="${nextHref(pathwayId,itemId,true)}">Continue →</a><a class="btn btn-outline" href="${retryHref(pathwayId,itemId)}">Retake assessment (optional)</a><a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathwayId)}/${n||5}">Review learning</a></div></div></div></section>`;
   }
 
   function nextHref(pathwayId, itemId, passed, assignmentId='') {

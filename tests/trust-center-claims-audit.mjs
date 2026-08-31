@@ -29,7 +29,7 @@ ok(worker.includes('verifyFirebaseToken')||worker.includes('verifyFirebaseIdToke
 ok(worker.includes('async function requireOrgRole')&&worker.includes('await requireOrgMember(env, uid, orgId)')&&worker.includes('Insufficient organization permission'),'Worker must enforce organization membership and allowed roles');
 ok(worker.includes('function v2PublicAssessmentQuestion(row)'),'Worker must have a public assessment serializer');
 const assessmentStart=worker.indexOf('function v2PublicAssessmentQuestion(row)');
-const assessmentEnd=worker.indexOf('async function v2GradeAssessment',assessmentStart);
+const assessmentEnd=worker.indexOf('async function v2AssessmentAttemptReview',assessmentStart);
 const publicAssessment=worker.slice(assessmentStart,assessmentEnd);
 ok(!publicAssessment.includes('correct_answer')&&!publicAssessment.includes('rationale'),'Trust claim fails: public assessment serialization exposes protected grading data');
 ok(worker.includes('credential_evidence')||worker.includes('v2_credential'),'Worker must persist versioned credential/evidence records in D1');

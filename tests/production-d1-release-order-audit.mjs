@@ -27,6 +27,7 @@ must(completionBrowserCount>=3,'Program Completion browser regression must be sy
 must(tool.includes("const DB='capital-mastery-prod'"),'D1 preparation must pin the production database explicitly');
 must(tool.includes("MIGRATION_016='migrations/016_phase2_career_skills_track_constraints.sql'"),'D1 tool may conditionally apply exact migration 016');
 must(tool.includes("MIGRATION_017='migrations/017_phase2_program_completion_records.sql'"),'D1 tool may conditionally apply exact migration 017');
+must(tool.includes("MIGRATION_018='migrations/018_assessment_attempt_reviews.sql'"),'D1 tool may conditionally apply exact migration 018');
 must(!tool.includes('d1 migrations apply'),'Production preparation must not blindly apply the migration directory/ledger');
 must(!tool.includes('migrations/015_'),'Production preparation must not replay older migrations');
 must(tool.includes("assert(cohortCareer===assignmentCareer,'Partial Career Skills constraint migration detected; refusing automatic repair')"),'Partial 016 state must fail closed');
@@ -34,6 +35,7 @@ must(tool.includes('requireKnownRebuildObjects();'),'Migration 016 must fail clo
 must(tool.includes("program_completion_records already exists; validating instead of reapplying migration 017"),'Existing 017 schema must be validated rather than blindly reapplied');
 must(tool.includes("'program_completion_records'"),'Existing Program Completion rows must be included in before/after preservation checks');
 must(tool.includes("New program_completion_records table must be empty immediately after migration 017"),'A newly created Program Completion table must start empty');
+must(tool.includes("New assessment_attempt_reviews table must be empty immediately after migration 018"),'A newly created assessment review table must start empty');
 must(tool.includes('assertUnchanged(beforeCounts,afterCounts'),'Critical production row counts must be compared before/after migration');
 must(tool.includes("PRAGMA quick_check;"),'Production D1 gate must require quick_check');
 must(tool.includes("PRAGMA foreign_key_check;"),'Production D1 gate must require foreign_key_check');
@@ -46,4 +48,4 @@ must(/PRAGMA\s+defer_foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 
 must(!/PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 must never rely on foreign_keys=OFF inside D1 implicit transactions');
 must(tool.includes("Migration 016 must not attempt to disable foreign_keys inside D1 implicit transactions"),'Production preflight must reject regression to the unsafe D1 pragma');
 
-console.log('PRODUCTION D1 RELEASE ORDER AUDIT PASS: source/artifact -> live Firebase readiness -> D1-safe 016/017 -> integrity -> Worker -> Pages ordering is fail-closed');
+console.log('PRODUCTION D1 RELEASE ORDER AUDIT PASS: source/artifact -> live Firebase readiness -> D1-safe 016/017/018 -> integrity -> Worker -> Pages ordering is fail-closed');

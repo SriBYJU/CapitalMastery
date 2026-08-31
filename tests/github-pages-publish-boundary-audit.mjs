@@ -40,7 +40,7 @@ for(const required of ['index.html','404.html','manifest.webmanifest','robots.tx
 // at minimum protect every backend/database/QA class that the live audit attacks.
 const liveAudit=fs.readFileSync('.github/workflows/github-pages-live-readonly-audit.yml','utf8');
 for(const marker of [
-  'v2/worker-v2-phase1-release.js','migrations/017_phase2_program_completion_records.sql',
+  'v2/worker-v2-phase1-release.js','migrations/017_phase2_program_completion_records.sql','migrations/018_assessment_attempt_reviews.sql',
   'tests/program-completion-public-verification-audit.mjs','tools/prepare-production-d1.mjs',
   'wrangler.jsonc','auth-test.html','firestore.rules','firebase-config.example.js'
 ]) must(liveAudit.includes(marker),`Live fallback audit must attack ${marker}`);

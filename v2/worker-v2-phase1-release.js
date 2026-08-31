@@ -561,6 +561,23 @@ const PATHWAY_ALIASES = {
 
 const ALL_PATHWAYS = Object.values(PATHWAYS);
 
+function enterpriseCatalog() {
+  return {
+    version: "2.0",
+    credentialLadder: [
+      { id: "foundations", title: "Foundations Credential", track: "career_skills", level: "foundational" },
+      { id: "essentials", title: "Essentials Credential", track: "career_skills", level: "foundational" },
+      { id: "applied", title: "Applied Skills Credential", track: "career_skills", level: "applied" },
+      { id: "role_lab", title: "Role Lab Credential", track: "professional", level: "advanced" },
+      { id: "professional_readiness", title: "Professional Readiness Credential", track: "professional", level: "advanced" }
+    ],
+    programCompletions: [
+      { id: "career", title: "Career Skills Program Completion Certificate", track: "career_skills", verifiedCredentialLevel: false, requires: "practical_capstone" }
+    ],
+    pathways: ALL_PATHWAYS.map(p => ({ id: p.id, code: p.code, title: p.title, role: p.role, group: p.group, purpose: p.purpose, focus: p.focus, simulation: p.simulation }))
+  };
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -684,6 +701,7 @@ export default {
           env.DB.prepare(`DELETE FROM role_lab_runs WHERE uid=?`).bind(user.sub),
           env.DB.prepare(`DELETE FROM program_completion_records WHERE uid=?`).bind(user.sub),
           env.DB.prepare(`DELETE FROM credentials WHERE uid=?`).bind(user.sub),
+          env.DB.prepare(`DELETE FROM assessment_attempt_reviews WHERE uid=?`).bind(user.sub),
           env.DB.prepare(`DELETE FROM assessment_attempts WHERE uid=?`).bind(user.sub),
           env.DB.prepare(`DELETE FROM official_progress WHERE uid=?`).bind(user.sub),
           env.DB.prepare(`DELETE FROM request_log WHERE uid=?`).bind(user.sub),
@@ -897,14 +915,18 @@ export default {
 
         const passed = result.score >= PASS_SCORE;
 
-        await recordOfficialAttempt(
+        const attemptId = await recordOfficialAttempt(
           env,
           user.sub,
           pathway.id,
           itemId,
           assessment.itemType,
           result.score,
-          passed
+          passed,
+          assessment,
+          body.answers,
+          body.writing,
+          result
         );
 
         let issuedCredentials = [];
@@ -928,6 +950,7 @@ export default {
             ok: true,
             pathwayId: pathway.id,
             itemId,
+            attemptId,
             score: result.score,
             passed,
             masteryScore: PASS_SCORE,
@@ -946,6 +969,45 @@ export default {
           200,
           env
         );
+      }
+
+      // Saved review is read-only, post-submission, and owner-scoped. Correct
+      // answers never appear on the assessment GET surface.
+      if (
+        request.method === "GET" &&
+        parts[0] === "assessment" &&
+        parts[1] === "review" &&
+        parts.length === 4
+      ) {
+        const user = await requireUser(request, env);
+        const pathway = getPathway(parts[2]);
+        const itemId = validateItem(parts[3]);
+        const attempt = await env.DB.prepare(`
+          SELECT attempt_id,pathway_id,item_id,item_type,score,passed,review_json,submitted_at
+          FROM assessment_attempt_reviews
+          WHERE uid=? AND pathway_id=? AND item_id=?
+          ORDER BY passed DESC,score DESC,submitted_at DESC
+          LIMIT 1
+        `).bind(user.sub,pathway.id,itemId).first();
+        if(!attempt) throw new HttpError(404,"No submitted assessment review is available");
+        return json({ok:true,review:publicAttemptReview(attempt)},200,env);
+      }
+
+      if (
+        request.method === "GET" &&
+        parts[0] === "assessment" &&
+        parts[1] === "attempt" &&
+        parts[3] === "review" &&
+        parts.length === 4
+      ) {
+        const user = await requireUser(request, env);
+        const attemptId=cleanId(parts[2]);
+        const attempt=await env.DB.prepare(`
+          SELECT attempt_id,pathway_id,item_id,item_type,score,passed,review_json,submitted_at
+          FROM assessment_attempt_reviews WHERE attempt_id=? AND uid=? LIMIT 1
+        `).bind(attemptId,user.sub).first();
+        if(!attempt) throw new HttpError(404,"Assessment review not found");
+        return json({ok:true,review:publicAttemptReview(attempt)},200,env);
       }
 
       // --------------------------------------------------
@@ -1841,21 +1903,7 @@ export default {
       // ==================================================
 
       if (request.method === "GET" && url.pathname === "/enterprise/catalog") {
-        return json({
-          ok: true,
-          version: "2.0",
-          credentialLadder: [
-            { id: "foundations", title: "Foundations Credential", track: "career_skills", level: "foundational" },
-            { id: "essentials", title: "Essentials Credential", track: "career_skills", level: "foundational" },
-            { id: "applied", title: "Applied Skills Credential", track: "career_skills", level: "applied" },
-            { id: "role_lab", title: "Role Lab Credential", track: "professional", level: "advanced" },
-            { id: "professional_readiness", title: "Professional Readiness Credential", track: "professional", level: "advanced" }
-          ],
-          programCompletions: [
-            { id: "career", title: "Career Skills Program Completion Certificate", track: "career_skills", verifiedCredentialLevel: false, requires: "practical_capstone" }
-          ],
-          pathways: ALL_PATHWAYS.map(p => ({ id: p.id, code: p.code, title: p.title, role: p.role, group: p.group, purpose: p.purpose, focus: p.focus, simulation: p.simulation }))
-        }, 200, env);
+        return json({ ok: true, ...enterpriseCatalog() }, 200, env);
       }
 
       if (request.method === "GET" && url.pathname === "/enterprise/learner/assignments") {
@@ -2135,6 +2183,27 @@ export default {
       // CAPITAL MASTERY V2 — ASSESSMENTS + CREDENTIAL EVIDENCE
       // ==================================================
 
+      if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'assessments' && parts[3] === 'review' && parts.length === 4) {
+        const user=await requireUser(request,env);
+        const key=cleanId(parts[2]);
+        const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null;
+        const attempt=await env.DB.prepare(`
+          SELECT * FROM v2_assessment_attempts
+          WHERE uid=? AND assessment_key=? AND COALESCE(assignment_id,'public')=?
+          ORDER BY passed DESC, score DESC, submitted_at DESC LIMIT 1
+        `).bind(user.sub,key,assignmentId||'public').first();
+        if(!attempt) throw new HttpError(404,'No saved assessment attempt');
+        return json({ok:true,review:await v2AssessmentAttemptReview(env,attempt)},200,env);
+      }
+
+      if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'assessment-attempts' && parts[3] === 'review' && parts.length === 4) {
+        const user=await requireUser(request,env);
+        const attemptId=cleanId(parts[2]);
+        const attempt=await env.DB.prepare(`SELECT * FROM v2_assessment_attempts WHERE id=? AND uid=? LIMIT 1`).bind(attemptId,user.sub).first();
+        if(!attempt) throw new HttpError(404,'Assessment attempt not found');
+        return json({ok:true,review:await v2AssessmentAttemptReview(env,attempt)},200,env);
+      }
+
       if (request.method === 'GET' && parts[0] === 'enterprise' && parts[1] === 'assessments' && parts.length === 3) {
         const user=await requireUser(request,env);
         const key=cleanId(parts[2]);
@@ -2391,12 +2460,18 @@ export default {
 
       throw new HttpError(404, "Endpoint not found");
     } catch (error) {
-      console.error(error);
-
       const status =
         error instanceof HttpError
           ? error.status
           : 500;
+
+      console.error(JSON.stringify({
+        message: "Capital Mastery API request failed",
+        method: request.method,
+        path: new URL(request.url).pathname,
+        status,
+        error: error instanceof Error ? error.message : String(error)
+      }));
 
       return json(
         {
@@ -2478,10 +2553,10 @@ async function requireUser(request, env) {
       env.FIREBASE_PROJECT_ID
     );
   } catch (error) {
-    console.error(
-      "Firebase token verification failed:",
-      error
-    );
+    console.error(JSON.stringify({
+      message: "Firebase token verification failed",
+      error: error instanceof Error ? error.message : String(error)
+    }));
 
     throw new HttpError(
       401,
@@ -4327,6 +4402,7 @@ function gradeAssessment(
       : {};
 
   let correct = 0;
+  const questionResults = [];
 
   for (
     const q of assessment.questions
@@ -4334,24 +4410,25 @@ function gradeAssessment(
     const submitted =
       answers[q.id];
 
+    let accepted = false;
     if (q.type === "numeric") {
       const value = Number(submitted);
-      if (Number.isFinite(value) && Math.abs(value - Number(q.answer)) <= Number(q.tolerance || 0)) {
-        correct++;
-      }
+      accepted = Number.isFinite(value) && Math.abs(value - Number(q.answer)) <= Number(q.tolerance || 0);
     } else if (q.type === "text") {
       const text=cleanString(submitted||"",3000).toLowerCase();
       const words=text.split(/\s+/).filter(Boolean);
       const hits=(q.keywords||[]).filter(k=>text.includes(String(k).toLowerCase())).length;
       const groupHits=Array.isArray(q.evidenceGroups)?q.evidenceGroups.filter(group=>(group||[]).some(k=>text.includes(String(k).toLowerCase()))).length:null;
       const evidenceOk=groupHits===null ? hits>=Number(q.minHits||1) : groupHits>=Number(q.minGroups||4);
-      if(words.length>=Number(q.minWords||12) && evidenceOk) correct++;
+      accepted = words.length>=Number(q.minWords||12) && evidenceOk;
     } else if (
       typeof submitted === "string" &&
       submitted === q.answer
     ) {
-      correct++;
+      accepted = true;
     }
+    if(accepted) correct++;
+    questionResults.push({id:q.id,correct:accepted});
   }
 
   const total =
@@ -4372,7 +4449,8 @@ function gradeAssessment(
       score,
       correct,
       total,
-      writingScore: null
+      writingScore: null,
+      questionResults
     };
   }
 
@@ -4398,7 +4476,8 @@ function gradeAssessment(
     ),
     correct,
     total,
-    writingScore
+    writingScore,
+    questionResults
   };
 }
 
@@ -4641,6 +4720,30 @@ async function enforceAttemptLimit(
 // OFFICIAL D1 PROGRESS
 // ======================================================
 
+function assessmentReviewDetails(assessment,rawAnswers,rawWriting,result) {
+  const answers=rawAnswers&&typeof rawAnswers==='object'&&!Array.isArray(rawAnswers)?rawAnswers:{};
+  const outcomes=new Map((result?.questionResults||[]).map(entry=>[String(entry.id),entry.correct===true]));
+  const questions=(assessment?.questions||[]).map((q,index)=>{
+    const submitted=answers[q.id]??'';
+    const correctAnswer=q.type==='text'?null:q.answer;
+    let rationale='Review the source, units, assumptions, and professional standard before resubmitting.';
+    if(q.type==='numeric') rationale=`Expected ${String(q.answer)}${q.unit?` ${q.unit}`:''}${Number(q.tolerance||0)>0?` within ±${Number(q.tolerance)}`:''}.`;
+    else if(q.type==='mc') rationale=`The correct response is “${String(q.answer)}”; it best follows the stated finance workflow and quality-control standard.`;
+    else if(q.type==='text') rationale=`Evaluated against the required evidence, professional-writing, and minimum-detail criteria for this work product.`;
+    return {id:q.id,position:index+1,type:q.type,prompt:q.prompt,submitted,correct:outcomes.get(String(q.id))===true,correctAnswer,rationale,tolerance:q.type==='numeric'?Number(q.tolerance||0):null,unit:q.unit||null};
+  });
+  if(assessment?.writingPrompt){
+    questions.push({id:'writing',position:questions.length+1,type:'text',prompt:assessment.writingPrompt,submitted:cleanString(rawWriting||'',5000),correct:Number(result?.writingScore||0)>0,correctAnswer:null,rationale:'Evaluated against the simulation’s evidence, recommendation, risk, revision, and manager-handoff rubric.',tolerance:null,unit:null,score:Number(result?.writingScore||0)});
+  }
+  return questions;
+}
+
+function publicAttemptReview(row) {
+  let questions=[];
+  try { const parsed=JSON.parse(row.review_json||'[]'); if(Array.isArray(parsed)) questions=parsed; } catch (_) {}
+  return {attemptId:row.attempt_id,pathwayId:row.pathway_id,itemId:row.item_id,itemType:row.item_type,score:Number(row.score),passed:Number(row.passed)===1,submittedAt:row.submitted_at,questions};
+}
+
 async function recordOfficialAttempt(
   env,
   uid,
@@ -4648,7 +4751,11 @@ async function recordOfficialAttempt(
   itemId,
   itemType,
   score,
-  passed
+  passed,
+  assessment,
+  answers,
+  writing,
+  result
 ) {
   const attemptId =
     crypto.randomUUID();
@@ -4656,6 +4763,7 @@ async function recordOfficialAttempt(
   const completed =
     passed ? 1 : 0;
 
+  const review=assessmentReviewDetails(assessment,answers,writing,result);
   await env.DB.batch([
     env.DB
       .prepare(`
@@ -4680,6 +4788,12 @@ async function recordOfficialAttempt(
         score,
         completed
       ),
+
+    env.DB.prepare(`
+      INSERT INTO assessment_attempt_reviews
+      (attempt_id,uid,pathway_id,item_id,item_type,score,passed,answers_json,review_json)
+      VALUES (?,?,?,?,?,?,?,?,?)
+    `).bind(attemptId,uid,pathwayId,itemId,itemType,score,completed,JSON.stringify(answers||{}),JSON.stringify(review)),
 
     env.DB
       .prepare(`
@@ -4772,6 +4886,7 @@ async function recordOfficialAttempt(
         completed
       )
   ]);
+  return attemptId;
 }
 
 async function progressMap(
@@ -5196,15 +5311,36 @@ async function readJson(request) {
     );
   }
 
-  let body;
-
+  let raw="";
   try {
-    body = await request.json();
-  } catch {
+    if(!request.body) throw new Error("Missing body");
+    const reader=request.body.getReader();
+    const decoder=new TextDecoder();
+    let bytes=0;
+    while(true){
+      const {done,value}=await reader.read();
+      if(done) break;
+      bytes+=value?.byteLength||0;
+      if(bytes>MAX_BODY_BYTES){
+        await reader.cancel("Request body too large").catch(()=>{});
+        throw new HttpError(413,"Request body too large");
+      }
+      raw+=decoder.decode(value,{stream:true});
+    }
+    raw+=decoder.decode();
+  } catch(error) {
+    if(error instanceof HttpError) throw error;
     throw new HttpError(
       400,
       "Invalid JSON body"
     );
+  }
+
+  let body;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    throw new HttpError(400, "Invalid JSON body");
   }
 
   if (
@@ -6110,6 +6246,43 @@ function v2PublicAssessmentQuestion(row) {
   return {id:row.id,position:Number(row.position),competencyId:row.competency_id,type,prompt:row.prompt,options,weight:Number(row.weight||1),tolerance:Number(row.tolerance||0),unit:row.unit||''};
 }
 
+async function v2AssessmentAttemptReview(env, attempt) {
+  const answers=v2ParseJson(attempt.answers_json,{});
+  const stored=v2ParseJson(attempt.result_json,{});
+  let questions=[];
+  const rows=await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? ORDER BY position`).bind(attempt.assessment_key,attempt.assessment_version).all();
+  questions=rows.results||[];
+  if(!questions.length){
+    const dynamic=v2DynamicAssessmentFromKey(attempt.assessment_key);
+    if(dynamic?.definition?.version===attempt.assessment_version) questions=dynamic.questions||[];
+  }
+  const storedById=new Map((Array.isArray(stored.details)?stored.details:[]).map(x=>[String(x.id),x]));
+  const details=questions.map((q,index)=>{
+    const options=v2ParseJson(q.options_json,[]);
+    const type=q.question_type||(options.length?'mc':'numeric');
+    const submitted=answers[q.id]??'';
+    const old=storedById.get(String(q.id));
+    const correct=typeof old?.correct==='boolean' ? old.correct : (type==='numeric'
+      ? Number.isFinite(Number(submitted)) && Math.abs(Number(submitted)-Number(q.correct_answer))<=Number(q.tolerance||0)
+      : String(submitted)===String(q.correct_answer));
+    return {id:q.id,position:Number(q.position||index+1),type,prompt:q.prompt,options,unit:q.unit||'',submitted,correct,correctAnswer:q.correct_answer,rationale:q.rationale||''};
+  });
+  return {
+    attemptId:attempt.id,
+    assessmentKey:attempt.assessment_key,
+    version:attempt.assessment_version,
+    pathwayId:attempt.pathway_id,
+    assignmentId:attempt.assignment_id||null,
+    score:Number(attempt.score),
+    passed:Number(attempt.passed)===1,
+    submittedAt:attempt.submitted_at,
+    correct:Number(stored.correct??details.filter(x=>x.correct).length),
+    total:Number(stored.total??details.length),
+    competencyScores:stored.competencyScores||{},
+    questions:details
+  };
+}
+
 async function v2GradeAssessment(env, { user, assessment, answers, assignmentId = null, orgId = null, cohortId = null, curriculumVersion = V2_STANDARD_VERSION, dynamicQuestions = null }) {
   const qres=dynamicQuestions?{results:dynamicQuestions}:await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? AND status='active' ORDER BY position`).bind(assessment.assessment_key,assessment.version).all();
   const qs=qres.results||[];
@@ -6123,7 +6296,7 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
     const ok=qType==='numeric' ? (Number.isFinite(Number(submitted)) && Math.abs(Number(submitted)-Number(q.correct_answer))<=Number(q.tolerance||0)) : String(submitted??'')===String(q.correct_answer);
     if(ok){earned+=weight;correct++;}
     (byComp[q.competency_id] ||= []).push({score:ok?100:0,weight});
-    details.push({id:q.id,correct:ok,rationale:q.rationale});
+    details.push({id:q.id,position:Number(q.position||details.length+1),type:qType,prompt:q.prompt,options,unit:q.unit||'',submitted:submitted??'',correct:ok,correctAnswer:q.correct_answer,rationale:q.rationale||''});
   }
   const score=totalWeight?Math.round((earned/totalWeight)*100):0;
   const passed=score>=Number(assessment.pass_score);
@@ -6133,7 +6306,7 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
     const w=vals.reduce((s,x)=>s+x.weight,0); compScores[cid]=Math.round(vals.reduce((s,x)=>s+x.score*x.weight,0)/w);
   }
   await env.DB.prepare(`INSERT INTO v2_assessment_attempts (id,uid,org_id,cohort_id,assignment_id,pathway_id,assessment_key,assessment_version,score,passed,answers_json,result_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(attemptId,user.sub,orgId,cohortId,assignmentId,assessment.pathway_id,assessment.assessment_key,assessment.version,score,passed?1:0,JSON.stringify(answers||{}),JSON.stringify({correct,total:qs.length,competencyScores:compScores})).run();
+    .bind(attemptId,user.sub,orgId,cohortId,assignmentId,assessment.pathway_id,assessment.assessment_key,assessment.version,score,passed?1:0,JSON.stringify(answers||{}),JSON.stringify({correct,total:qs.length,competencyScores:compScores,details})).run();
 
   let readiness=null;
   if(passed){
@@ -6170,3 +6343,5 @@ async function v2EnforceAssessmentRate(env, uid, pathwayId, assessmentKey, assig
   const row=await env.DB.prepare(`SELECT COUNT(*) AS n FROM v2_assessment_attempts WHERE uid=? AND pathway_id=? AND assessment_key=? AND COALESCE(assignment_id,'public')=? AND submitted_at>=datetime('now','-10 minutes')`).bind(uid,pathwayId,assessmentKey,scope).first();
   if(Number(row?.n||0)>=10) throw new HttpError(429,'Too many recent assessment attempts. Please wait before trying again.');
 }
+
+export { readJson, corsHeaders, enterpriseCatalog };
