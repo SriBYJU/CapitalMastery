@@ -203,7 +203,8 @@
     if (r.root === 'learn' && r.pathway) {
       const part = Number(r.rawPart);
       const quizHref = link.getAttribute('href') || '';
-      if (/^#\/quiz\//.test(quizHref) && Number.isFinite(part)) {
+      const isReviewPassed = link.matches('[data-cm-review-passed]');
+      if (!isReviewPassed && /^#\/quiz\//.test(quizHref) && Number.isFinite(part)) {
         event.preventDefault(); event.stopImmediatePropagation();
         authoritativeBest(r.pathway,itemIdForPart(part)).then(best => {
           location.hash = best >= PASS ? continueHref(r.pathway,part) : quizHref;
