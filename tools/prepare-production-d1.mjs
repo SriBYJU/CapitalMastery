@@ -1,5 +1,6 @@
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const DB='capital-mastery-prod';
 const WRANGLER=['--yes','wrangler@4','d1','execute',DB,'--remote'];
@@ -14,8 +15,10 @@ for(const name of requiredEnv){
 if(allowWranglerOAuth) console.log('Using the explicitly authorized local Wrangler OAuth session.');
 
 function wrangler(args,label){
-  const executable=process.platform==='win32'?'npx.cmd':'npx';
-  const r=spawnSync(executable,[...WRANGLER,...args],{encoding:'utf8',env:process.env,maxBuffer:16*1024*1024});
+  const windowsNpx=path.join(path.dirname(process.execPath),'node_modules','npm','bin','npx-cli.js');
+  const executable=process.platform==='win32'?process.execPath:'npx';
+  const prefix=process.platform==='win32'?[windowsNpx]:[];
+  const r=spawnSync(executable,[...prefix,...WRANGLER,...args],{encoding:'utf8',env:process.env,maxBuffer:16*1024*1024});
   if(r.error) throw new Error(`${label} could not start ${executable}: ${r.error.message}`);
   if(r.status!==0) throw new Error(`${label} failed (exit ${r.status ?? 'unknown'})\n${r.stderr||r.stdout||'Wrangler returned no diagnostic output.'}`);
   return r.stdout;

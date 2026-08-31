@@ -17,6 +17,7 @@ ok(bridge.includes("Cache-Control':'no-store'")&&bridge.includes("X-Content-Type
 ok(config.includes('"name": "capital-mastery-d1-release-bridge"'),'Bridge config must pin a distinct disposable Worker name');
 ok(config.includes('"database_name": "capital-mastery-prod"')&&config.includes('"database_id": "d007e8e7-8540-47dc-89b1-1aec4154b69b"'),'Bridge must pin the exact production D1 binding');
 ok(runner.includes("randomBytes(32).toString('base64url')"),'Bridge runner must generate a high-entropy one-time secret');
+ok(runner.includes("'node_modules','npm','bin','npx-cli.js'")&&runner.includes("process.platform==='win32'?process.execPath:'npx'"),'Bridge runner must invoke npx safely on Node 24 for Windows');
 ok(runner.includes("secret','put','CM_RELEASE_TOKEN"),'One-time authorization must be stored as a Worker secret, not a plaintext variable');
 ok(runner.includes("finally")&&runner.includes("delete','--name',NAME,'--force'"),'Bridge runner must delete the exact disposable Worker even after failure');
 ok(!runner.includes('--var'),'Bridge runner must never expose its token through a plaintext Wrangler variable');

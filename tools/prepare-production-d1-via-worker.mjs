@@ -1,14 +1,17 @@
 import {randomBytes} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 
 const CONFIG='tools/wrangler.d1-release-bridge.jsonc';
 const NAME='capital-mastery-d1-release-bridge';
-const executable=process.platform==='win32'?'npx.cmd':'npx';
+const windowsNpx=path.join(path.dirname(process.execPath),'node_modules','npm','bin','npx-cli.js');
+const executable=process.platform==='win32'?process.execPath:'npx';
+const npxPrefix=process.platform==='win32'?[windowsNpx]:[];
 if(process.env.CM_ALLOW_WRANGLER_OAUTH!=='1')throw new Error('Set CM_ALLOW_WRANGLER_OAUTH=1 to authorize the ephemeral production D1 bridge');
 
 function wrangler(args,label,input){
-  const result=spawnSync(executable,['--yes','wrangler@4',...args],{encoding:'utf8',env:process.env,input,maxBuffer:16*1024*1024});
+  const result=spawnSync(executable,[...npxPrefix,'--yes','wrangler@4',...args],{encoding:'utf8',env:process.env,input,maxBuffer:16*1024*1024});
   if(result.error)throw new Error(`${label} could not start: ${result.error.message}`);
   if(result.status!==0)throw new Error(`${label} failed (exit ${result.status??'unknown'})\n${result.stderr||result.stdout||'Wrangler returned no diagnostic output.'}`);
   return `${result.stdout||''}\n${result.stderr||''}`;
