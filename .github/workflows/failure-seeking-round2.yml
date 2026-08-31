@@ -68,6 +68,7 @@ jobs:
           node --check tests/all-career-browser-sweep.cjs
           node --check tests/employer-public-browser-audit.cjs
           node --check tests/employer-role-matrix-browser-audit.cjs
+          node --check tests/employer-invite-lifecycle-browser-audit.cjs
           node --check tests/state-resilience-browser-audit.cjs
           node --check tests/course-pass-continuity-browser-audit.cjs
 
@@ -138,3 +139,4 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-invite-lifecycle-browser-audit.cjs

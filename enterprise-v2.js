@@ -4,6 +4,7 @@
   const API = window.CAPITAL_MASTERY_V2_API_URL || window.CAPITAL_MASTERY_API_URL;
   const PENDING_INVITE = 'cmPendingEnterpriseInviteV2';
   const EMPLOYER_INTENT = 'cmEmployerOnboardingIntentV2';
+  const PENDING_LEARNER_ROUTE = 'cmPendingLearningRouteV1';
   const STANDARD_STAGES = {
     foundations: [
       { id:'foundations-core', title:'Career Foundations', copy:'Understand the role, team, workflow, terminology and fundamental finance concepts.', required:true },
@@ -119,11 +120,16 @@
   }
 
   function authGate(kind='employer') {
-    const title = kind === 'learner' ? 'Your assigned training is tied to your account.' : 'Sign in to open your employer workspace.';
-    const copy = kind === 'learner'
+    const learner = kind === 'learner';
+    if (learner) {
+      localStorage.removeItem(EMPLOYER_INTENT);
+      if (location.hash && !location.hash.startsWith('#/login')) sessionStorage.setItem(PENDING_LEARNER_ROUTE, location.hash);
+    }
+    const title = learner ? 'Your assigned training is tied to your account.' : 'Sign in to open your employer workspace.';
+    const copy = learner
       ? 'Use the same Capital Mastery account that received or accepted your company invitation.'
       : 'Employer workspaces use the same secure Capital Mastery account system as the learner platform.';
-    setMain(`<section class="cmv2-page"><div class="container cmv2-narrow"><div class="card cmv2-auth-gate"><div class="eyebrow">SECURE ACCOUNT REQUIRED</div><h1>${esc(title)}</h1><p>${esc(copy)}</p><a class="btn btn-primary" href="#/employer-start">Employer Sign in / Create Account →</a><a class="btn btn-outline" href="#/employers">Learn about Capital Mastery for Employers</a></div></div></section>`);
+    setMain(`<section class="cmv2-page"><div class="container cmv2-narrow"><div class="card cmv2-auth-gate"><div class="eyebrow">SECURE ACCOUNT REQUIRED</div><h1>${esc(title)}</h1><p>${esc(copy)}</p><a class="btn btn-primary" href="${learner?'#/login':'#/employer-start'}">${learner?'Sign in / Create Account':'Employer Sign in / Create Account'} →</a>${learner?'<p class="small muted">No separate employee account is needed. After sign-in, you will return to this training page.</p>':'<a class="btn btn-outline" href="#/employers">Learn about Capital Mastery for Employers</a>'}</div></div></section>`);
   }
 
   function employerEvidenceCards(){
@@ -808,7 +814,7 @@
     if (!token) return errorPage('Invalid invitation.','The invitation link is missing its secure token.','#/');
     localStorage.setItem(PENDING_INVITE, token);
     let preview=null;
-    try { preview=await api(`/enterprise/invites/preview/${encodeURIComponent(token)}`,{},false); } catch(e) { return errorPage('Invitation unavailable.',e.message,'#/'); }
+    try { preview=await api(`/enterprise/invites/preview/${encodeURIComponent(token)}`,{},false); } catch(e) { if([404,410].includes(Number(e.status))) localStorage.removeItem(PENDING_INVITE); return errorPage('Invitation unavailable.',e.message,'#/'); }
     const inv=preview.invite||{};
     if (!authReady()) return loading(`Opening ${inv.organizationName||'company'} invitation…`);
     if (!signedIn()) {
@@ -817,14 +823,14 @@
     }
     loading(`Joining ${inv.organizationName||'company'} training…`);
     try { await api('/enterprise/invites/accept',{method:'POST',body:JSON.stringify({token})}); localStorage.removeItem(PENDING_INVITE); location.hash='#/assigned'; }
-    catch(e){ errorPage('Could not accept invitation.',e.message,'#/assigned'); }
+    catch(e){ if([404,410].includes(Number(e.status))) localStorage.removeItem(PENDING_INVITE); errorPage(Number(e.status)===403?'Invitation email does not match.':'Could not accept invitation.',e.message,Number(e.status)===403?'#/login':'#/assigned'); }
   }
 
   async function acceptPendingInviteAfterAuth() {
     const token=localStorage.getItem(PENDING_INVITE); if(!token||!signedIn()) return;
     if (!['login'].includes(parts().parts[0]||'')) return;
     try { await api('/enterprise/invites/accept',{method:'POST',body:JSON.stringify({token})}); localStorage.removeItem(PENDING_INVITE); location.hash='#/assigned'; }
-    catch(e) { console.warn('Pending Capital Mastery employer invite not accepted:',e); }
+    catch(e) { if([404,410].includes(Number(e.status))) localStorage.removeItem(PENDING_INVITE); location.hash=`#/join/${encodeURIComponent(token)}`; }
   }
 
 

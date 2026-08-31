@@ -1876,17 +1876,22 @@ export default {
           throw new HttpError(410, "Invite expired");
         }
         const userEmail = normalizeEnterpriseEmail(user.email || "", true);
-        if (userEmail && userEmail !== invite.email_normalized) throw new HttpError(403, "This invite was issued to a different email address");
+        if (!userEmail || userEmail !== invite.email_normalized) throw new HttpError(403, "This invite was issued to a different email address");
+        const existingMembership = await env.DB.prepare(`SELECT role FROM organization_members WHERE org_id=? AND uid=? LIMIT 1`).bind(invite.org_id, user.sub).first();
+        const existingRole = cleanString(existingMembership?.role || '', 40);
+        const effectiveRole = existingRole === 'owner' || (invite.role === 'learner' && ENTERPRISE_EMPLOYER_ROLES.includes(existingRole))
+          ? existingRole
+          : invite.role;
         const statements = [
-          env.DB.prepare(`INSERT INTO organization_members (org_id, uid, role, status) VALUES (?, ?, ?, 'active') ON CONFLICT(org_id, uid) DO UPDATE SET status='active', updated_at=CURRENT_TIMESTAMP`).bind(invite.org_id, user.sub, invite.role),
+          env.DB.prepare(`INSERT INTO organization_members (org_id, uid, role, status) VALUES (?, ?, ?, 'active') ON CONFLICT(org_id, uid) DO UPDATE SET role=excluded.role,status='active',updated_at=CURRENT_TIMESTAMP`).bind(invite.org_id, user.sub, effectiveRole),
           env.DB.prepare(`UPDATE organization_invites SET status='accepted', accepted_by_uid=?, accepted_at=CURRENT_TIMESTAMP WHERE id=?`).bind(user.sub, invite.id),
-          enterpriseAuditStatement(env, invite.org_id, user.sub, "invite.accepted", "invite", invite.id, { cohortId: invite.cohort_id, role: invite.role })
+          enterpriseAuditStatement(env, invite.org_id, user.sub, "invite.accepted", "invite", invite.id, { cohortId: invite.cohort_id, invitedRole: invite.role, effectiveRole, previousRole: existingRole || null })
         ];
         if (invite.cohort_id) {
           statements.push(env.DB.prepare(`INSERT INTO cohort_members (cohort_id, org_id, uid, status) VALUES (?, ?, ?, 'active') ON CONFLICT(cohort_id, uid) DO UPDATE SET status='active'`).bind(invite.cohort_id, invite.org_id, user.sub));
         }
         await env.DB.batch(statements);
-        return json({ ok: true, organizationId: invite.org_id, cohortId: invite.cohort_id || null, role: invite.role }, 200, env);
+        return json({ ok: true, organizationId: invite.org_id, cohortId: invite.cohort_id || null, role: effectiveRole }, 200, env);
       }
 
       if (request.method === "GET" && parts[0] === "enterprise" && parts[1] === "competencies" && parts.length === 3) {

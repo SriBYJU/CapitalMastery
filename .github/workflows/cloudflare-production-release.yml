@@ -61,6 +61,7 @@ jobs:
           node --check tests/course-pass-continuity-browser-audit.cjs
           node --check tests/legacy-simulation-refusal-browser-audit.cjs
           node --check tests/ib-workbench-navigation-guide-browser-audit.cjs
+          node --check tests/employer-invite-lifecycle-browser-audit.cjs
           node --check tests/v2-assessment-review-browser-audit.cjs
           node --check tests/visual-contrast-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
@@ -120,6 +121,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-invite-lifecycle-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/visual-contrast-browser-audit.cjs
           CM_CANONICAL_URL=http://127.0.0.1:4173/ node tests/firebase-authorized-domain-browser-audit.cjs
 
@@ -218,6 +220,7 @@ jobs:
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-invite-lifecycle-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/visual-contrast-browser-audit.cjs
           CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
 
@@ -229,7 +232,7 @@ jobs:
           This proves:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
-          - exact dist-pages artifact survived sixteen hostile Chromium suites before any production mutation
+          - exact dist-pages artifact survived seventeen hostile Chromium suites before any production mutation
           - live Firebase email/password credential-name persistence passed before any D1 mutation
           - exact-artifact Firebase provider-safety probe passed before any D1 mutation
           - production D1 schema was inspected and only missing migrations 016/017/018 were conditionally applied
@@ -240,7 +243,7 @@ jobs:
           - exact production Pages allowlist deployed
           - canonical Firebase provider-safety probe passed after Pages deployment
           - canonical generation/security headers passed
-          - fifteen canonical Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, visual contrast, the Admin auth-timing race, and Program Completion verification
+          - sixteen canonical Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, employer invitation lifecycle, visual contrast, the Admin auth-timing race, and Program Completion verification
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts

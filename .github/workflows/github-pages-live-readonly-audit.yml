@@ -129,5 +129,6 @@ jobs:
           CM_AUDIT_URL="${FALLBACK}/" node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL="${FALLBACK}/" node tests/employer-invite-lifecycle-browser-audit.cjs
           CM_AUDIT_URL="${FALLBACK}/" node tests/visual-contrast-browser-audit.cjs
-          echo 'GitHub Pages sixteen-suite live browser matrix: PASS'
+          echo 'GitHub Pages seventeen-suite live browser matrix: PASS'
