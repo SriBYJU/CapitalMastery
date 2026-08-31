@@ -14,8 +14,10 @@ for(const name of requiredEnv){
 if(allowWranglerOAuth) console.log('Using the explicitly authorized local Wrangler OAuth session.');
 
 function wrangler(args,label){
-  const r=spawnSync('npx',[...WRANGLER,...args],{encoding:'utf8',env:process.env,maxBuffer:16*1024*1024});
-  if(r.status!==0) throw new Error(`${label} failed\n${r.stderr||r.stdout}`);
+  const executable=process.platform==='win32'?'npx.cmd':'npx';
+  const r=spawnSync(executable,[...WRANGLER,...args],{encoding:'utf8',env:process.env,maxBuffer:16*1024*1024});
+  if(r.error) throw new Error(`${label} could not start ${executable}: ${r.error.message}`);
+  if(r.status!==0) throw new Error(`${label} failed (exit ${r.status ?? 'unknown'})\n${r.stderr||r.stdout||'Wrangler returned no diagnostic output.'}`);
   return r.stdout;
 }
 function parseJson(text,label){
