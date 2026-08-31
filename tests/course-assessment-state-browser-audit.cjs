@@ -24,6 +24,7 @@ function assessmentPayload(){
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900}});
   let assessmentGets=0;
+  let submitCalls=0;
   let submitScore=70;
   const errors=[];
   try{
@@ -38,6 +39,7 @@ function assessmentPayload(){
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(assessmentPayload())});
       }
       if(url.pathname==='/assessment/submit'){
+        submitCalls++;
         const score=submitScore;
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,score,passed:score>=80,objectiveTotal:10,objectiveCorrect:Math.round(score/10),writingScore:null,issuedCredentials:[]})});
       }
@@ -63,8 +65,15 @@ function assessmentPayload(){
     });
     await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:15000});
     const getsBeforeFail=assessmentGets;
+    for(let i=1;i<=10;i++) await page.locator(`input[name="audit-q${i}"]`).first().check();
     await page.locator('#cm-official-form button[type="submit"]').click();
-    await page.waitForSelector('.cm-result.failed',{timeout:10000});
+    await page.waitForFunction(()=>document.querySelector('.cm-result.failed')||document.querySelector('.cm-live-error'),null,{timeout:10000}).catch(async error=>{
+      const snapshot=await page.locator('#app main#main').innerText().catch(()=>'<main unavailable>');
+      throw new Error(`Failed attempt did not reach result UI. submitCalls=${submitCalls}; assessmentGets=${assessmentGets}; url=${page.url()}; main=${JSON.stringify(snapshot.slice(0,1600))}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
+    });
+    assert(submitCalls===1,`Expected one server submit for first attempt, got ${submitCalls}`);
+    assert(await page.locator('.cm-live-error').count()===0,`First submit rendered error: ${await page.locator('.cm-live-error').allTextContents()}`);
+    assert(await page.locator('.cm-result.failed').count()===1,'Expected reproduced 70% failed result');
     assert((await page.locator('.cm-result-score').textContent()).trim()==='70%','Expected reproduced 70% failed result');
     const retry=page.getByRole('link',{name:/Try Again/});
     assert(await retry.count()===1,'Failed result missing Try Again link');
@@ -76,8 +85,10 @@ function assessmentPayload(){
     assert(/retake=1/.test(page.url()),'Retry route lost explicit retake mode');
 
     submitScore=90;
+    for(let i=1;i<=10;i++) await page.locator(`input[name="audit-q${i}"]`).first().check();
     await page.locator('#cm-official-form button[type="submit"]').click();
     await page.waitForSelector('.cm-result.passed',{timeout:10000});
+    assert(submitCalls===2,`Expected two server submits after retake, got ${submitCalls}`);
     assert((await page.locator('.cm-result-score').textContent()).trim()==='90%','Expected 90% passed result');
 
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
