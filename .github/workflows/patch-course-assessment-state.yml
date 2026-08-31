@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'tools/patch-course-assessment-state.mjs'
+      - 'tools/patch-course-retry-navigation.mjs'
       - 'tests/course-assessment-state-audit.mjs'
       - 'tests/course-assessment-state-browser-audit.cjs'
       - 'tests/official-simulation-job-realism-audit.mjs'
@@ -23,7 +24,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Apply guarded course assessment state repair
-        run: node tools/patch-course-assessment-state.mjs
+        run: |
+          node tools/patch-course-assessment-state.mjs
+          node tools/patch-course-retry-navigation.mjs
 
       - name: Validate syntax and static state contract
         run: |
