@@ -1,0 +1,36 @@
+name: Apply legacy simulation refusal once
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply guarded simulation refusal patch
+        run: node tools/patch-legacy-simulation-refusal.mjs
+      - name: Validate professional simulation boundary
+        run: |
+          node --check capital-mastery-live.js
+          node tests/legacy-simulation-refusal-audit.mjs
+          node tests/firm-ready-course-workbench-audit.mjs
+          node tests/official-simulation-job-realism-audit.mjs
+          node tests/ib-official-workbench-audit.mjs
+          node tests/multi-career-workbench-audit.mjs
+      - name: Commit repair
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add capital-mastery-live.js
+          if git diff --cached --quiet; then
+            echo 'No runtime changes were required.'
+            exit 0
+          fi
+          git commit -m 'Refuse degraded official simulation payloads'
+          git push origin HEAD:main
