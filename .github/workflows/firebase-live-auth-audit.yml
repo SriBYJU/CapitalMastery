@@ -61,7 +61,8 @@ jobs:
           set -euo pipefail
           ready=false
           for i in {1..30}; do
-            if curl -fsS https://sribyju.github.io/CapitalMastery/certificate-name.js | grep -q 'Credential identity is authoritative on the protected user-root document'; then
+            if curl -fsS https://sribyju.github.io/CapitalMastery/certificate-name.js -o /tmp/live-certificate-name.js \
+              && grep -Fq 'Credential identity is authoritative on the protected user-root document' /tmp/live-certificate-name.js; then
               ready=true
               break
             fi
