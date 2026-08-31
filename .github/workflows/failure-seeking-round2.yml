@@ -64,6 +64,7 @@ jobs:
           node --check tests/admin-simulation-route-stability-browser-audit.cjs
           node --check tests/program-completion-public-browser-audit.cjs
           node --check tests/learner-guide-mobile-browser-audit.cjs
+          node --check tests/ib-workbench-navigation-guide-browser-audit.cjs
           node --check tests/all-career-browser-sweep.cjs
           node --check tests/employer-public-browser-audit.cjs
           node --check tests/employer-role-matrix-browser-audit.cjs
@@ -133,6 +134,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-simulation-route-stability-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/program-completion-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/ib-workbench-navigation-guide-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs

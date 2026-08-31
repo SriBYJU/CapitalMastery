@@ -60,6 +60,7 @@ jobs:
           node --check tests/course-assessment-state-browser-audit.cjs
           node --check tests/course-pass-continuity-browser-audit.cjs
           node --check tests/legacy-simulation-refusal-browser-audit.cjs
+          node --check tests/ib-workbench-navigation-guide-browser-audit.cjs
           node --check tests/v2-assessment-review-browser-audit.cjs
           node --check tests/visual-contrast-browser-audit.cjs
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
@@ -108,6 +109,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-assessment-state-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-pass-continuity-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/legacy-simulation-refusal-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/ib-workbench-navigation-guide-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/v2-assessment-review-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
@@ -205,6 +207,7 @@ jobs:
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/course-assessment-state-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/course-pass-continuity-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/legacy-simulation-refusal-browser-audit.cjs
+          CM_AUDIT_URL="${CANONICAL_URL}" node tests/ib-workbench-navigation-guide-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/v2-assessment-review-browser-audit.cjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL="${CANONICAL_URL}" node tests/adversarial-chaos-browser-audit.cjs
@@ -226,7 +229,7 @@ jobs:
           This proves:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
-          - exact dist-pages artifact survived fifteen hostile Chromium suites before any production mutation
+          - exact dist-pages artifact survived sixteen hostile Chromium suites before any production mutation
           - live Firebase email/password credential-name persistence passed before any D1 mutation
           - exact-artifact Firebase provider-safety probe passed before any D1 mutation
           - production D1 schema was inspected and only missing migrations 016/017/018 were conditionally applied

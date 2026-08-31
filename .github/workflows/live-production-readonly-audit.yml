@@ -143,6 +143,7 @@ jobs:
             tests/adversarial-chaos-browser-audit.cjs \
             tests/admin-route-zero-exposure-browser-audit.cjs \
             tests/learner-guide-mobile-browser-audit.cjs \
+            tests/ib-workbench-navigation-guide-browser-audit.cjs \
             tests/all-career-browser-sweep.cjs \
             tests/employer-public-browser-audit.cjs \
             tests/employer-role-matrix-browser-audit.cjs; do

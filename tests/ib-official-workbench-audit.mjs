@@ -12,11 +12,21 @@ ok(worker.includes('2.0-workbench'),'IB workbench must remain independently vers
 
 ok(live.includes('PRACTICAL ANALYST JOB SIMULATION · NO MULTIPLE CHOICE'),'Official IB simulation must render as a practical analyst workbench');
 ok(live.includes('VIRTUAL DATA ROOM'),'Official simulation must expose a data room');
+ok(live.includes('Open file preview'),'Data-room files must be visibly openable');
+ok(live.includes('friendlyFileDescription'),'Every source file must explain what it contains before the learner opens it');
+ok(live.includes('How to complete this step'),'Every work stage must include a beginner-friendly practical guide');
+ok(live.includes('data-cm-wb-progress-text'),'Workbench must show visible completion progress');
+ok(live.includes('data-cm-wb-target'),'Workbench navigation must use SPA-safe interactive controls');
+ok(!live.includes('<a href="#cm-wb-inbox">'),'Workbench navigation must never replace the application hash with a fragment anchor');
 ok(live.includes('Northstar_Orion_Valuation_v03.xlsx'),'Official simulation must expose workbook-style work product');
 for(const marker of ['Transaction Model','Trading Comps & Implied Value','Precedent Transactions','DCF Valuation','Management Update','Model QA','Client / Senior-Review Takeaway']){
   ok(live.includes(marker),`Official IB workbench missing ${marker}`);
 }
 ok(live.includes('OUTLOOK / COMPOSE'),'Final recommendation must render as an Associate email');
+ok(live.includes('data-structured-writing="true"'),'IB handoff must be split into guided professional sections');
+ok(worker.includes('Professional work-product quality gate'),'Pass decisions must use a named automatic quality gate');
+ok(worker.includes('rubricFloorsMet'),'A high aggregate score must not hide a missing critical writing category');
+ok(worker.includes('description:"The offer-price'),'IB source files must carry plain-language descriptions from the authoritative payload');
 ok(!live.includes("data.simulationProfile?.kind === 'ib-deal-workbench-v2') {\n        return;"),'IB workbench branch must actually render');
 
 // The secure official workbench is now the learner route for every career, including IB.

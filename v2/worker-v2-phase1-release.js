@@ -913,7 +913,8 @@ export default {
           body.writing
         );
 
-        const passed = result.score >= PASS_SCORE;
+        const qualityDecision = assessmentPassDecision(assessment, result, PASS_SCORE);
+        const passed = qualityDecision.passed;
 
         const attemptId = await recordOfficialAttempt(
           env,
@@ -957,6 +958,8 @@ export default {
             objectiveCorrect: result.correct,
             objectiveTotal: result.total,
             writingScore: result.writingScore,
+            writingRubric: result.writingRubric || null,
+            qualityDecision,
             issuedCredentials,
             assignmentCompletion,
             nextEligibleCertificates:
@@ -3513,13 +3516,13 @@ function buildInvestmentBankingSimulation(pathway) {
         { time:"2:17 PM", from:"Maya Chen · Associate", subject:"NEW INFO — management guidance changed", body:"Orion just lowered Year 1 revenue guidance by 5% from the $480m case. Update the forecast and every dependent valuation output. Flag what changed and whether it affects our recommendation." }
       ],
       files: [
-        { id:"cap", name:"01_Orion_Capitalization.xlsx", type:"Excel", label:"Capitalization", rows:[["Diluted shares","40.0m"],["Offer price / share","$19.75"],["Equity value","$790m"],["Debt","$95m"],["Cash","$35m"]] },
-        { id:"forecast", name:"02_Orion_Management_Forecast.xlsx", type:"Excel", label:"Forecast", rows:[["LTM Revenue","$445m"],["LTM EBITDA","$80m"],["NTM Revenue — initial","$480m"],["NTM EBITDA — initial","$88m"],["NTM EBITDA — revised","$83.5m"]] },
-        { id:"comps", name:"03_Trading_Comps.xlsx", type:"Excel", label:"Trading comps", rows:[["Peer","Enterprise Value","NTM EBITDA","Business fit"],["Aster Cloud","$1,020m","$100m","High"],["Beacon Software","$1,240m","$120m","High"],["Cobalt Systems","$820m","$80m","High"],["Delta Apps","$1,075m","$100m","High"],["Mega Hardware","$4,800m","$240m","Low — hardware-heavy"]] },
-        { id:"qa", name:"04_Model_Check_Notes.txt", type:"QA", label:"Model check", rows:[["Check","Observation"],["EV bridge","Formula currently subtracts cash"],["Share count","Matches capitalization file"],["Units","All model outputs in $m"],["Sensitivity","Updates when selected multiple changes"]] },
-        { id:"process", name:"05_Diligence_Request_List.pdf", type:"PDF", label:"Diligence", rows:[["Priority","Request"],["High","Top-10 customer revenue and renewal dates"],["High","Revenue bridge: recurring vs services"],["High","Synergy build and one-time implementation costs"],["Medium","Employee retention / key technical staff"]] },
-        { id:"precedents", name:"06_Precedent_Transactions.xlsx", type:"Excel", label:"Precedent transactions", rows:[["Transaction","Enterprise Value","LTM EBITDA","EV / LTM EBITDA"],["Atlas / Nova","$972m","$90m","10.8x"],["Cedar / Prism","$1,140m","$100m","11.4x"],["Elm / Vector","$1,044m","$90m","11.6x"],["Granite / Pulse","$1,220m","$100m","12.2x"]] },
-        { id:"dcf", name:"07_Orion_DCF.xlsx", type:"Excel", label:"DCF assumptions", rows:[["Metric","Year 1","Year 2","Year 3","Year 4","Year 5"],["Unlevered FCF","$60m","$66m","$72m","$78m","$84m"],["WACC","9.0%","","","",""],["Terminal growth","3.0%","","","",""]] }
+        { id:"cap", name:"01_Orion_Capitalization.xlsx", type:"Excel", label:"Capitalization", description:"The offer-price, diluted-share, debt, and cash schedule used to build equity value and the enterprise-value bridge.", useFor:"Transaction model and every EV-to-equity bridge", rows:[["Diluted shares","40.0m"],["Offer price / share","$19.75"],["Equity value","$790m"],["Debt","$95m"],["Cash","$35m"]] },
+        { id:"forecast", name:"02_Orion_Management_Forecast.xlsx", type:"Excel", label:"Forecast", description:"Orion’s historical and forward operating case, including the revised EBITDA input received in the afternoon update.", useFor:"Transaction multiple, trading comps, and management update", rows:[["LTM Revenue","$445m"],["LTM EBITDA","$80m"],["NTM Revenue — initial","$480m"],["NTM EBITDA — initial","$88m"],["NTM EBITDA — revised","$83.5m"]] },
+        { id:"comps", name:"03_Trading_Comps.xlsx", type:"Excel", label:"Trading comps", description:"Market values, forward EBITDA, and business-fit notes for the potential peer set. One company is intentionally a weak fit.", useFor:"Peer selection, median NTM EV / EBITDA, and implied value", rows:[["Peer","Enterprise Value","NTM EBITDA","Business fit"],["Aster Cloud","$1,020m","$100m","High"],["Beacon Software","$1,240m","$120m","High"],["Cobalt Systems","$820m","$80m","High"],["Delta Apps","$1,075m","$100m","High"],["Mega Hardware","$4,800m","$240m","Low — hardware-heavy"]] },
+        { id:"qa", name:"04_Model_Check_Notes.txt", type:"QA", label:"Model check", description:"A reviewer-style control note listing model checks and one material sign-convention issue that must be corrected before the file goes up.", useFor:"Model QA and EV-to-equity correction", rows:[["Check","Observation"],["EV bridge","Formula currently subtracts cash"],["Share count","Matches capitalization file"],["Units","All model outputs in $m"],["Sensitivity","Updates when selected multiple changes"]] },
+        { id:"process", name:"05_Diligence_Request_List.pdf", type:"PDF", label:"Diligence", description:"The outstanding commercial and operational questions that could change valuation or the decision to continue diligence.", useFor:"Senior-review risks, recommendation, and next actions", rows:[["Priority","Request"],["High","Top-10 customer revenue and renewal dates"],["High","Revenue bridge: recurring vs services"],["High","Synergy build and one-time implementation costs"],["Medium","Employee retention / key technical staff"]] },
+        { id:"precedents", name:"06_Precedent_Transactions.xlsx", type:"Excel", label:"Precedent transactions", description:"Four relevant control transactions with enterprise value, LTM EBITDA, and transaction multiples for the precedent cross-check.", useFor:"Precedent median and implied equity value", rows:[["Transaction","Enterprise Value","LTM EBITDA","EV / LTM EBITDA"],["Atlas / Nova","$972m","$90m","10.8x"],["Cedar / Prism","$1,140m","$100m","11.4x"],["Elm / Vector","$1,044m","$90m","11.6x"],["Granite / Pulse","$1,220m","$100m","12.2x"]] },
+        { id:"dcf", name:"07_Orion_DCF.xlsx", type:"Excel", label:"DCF assumptions", description:"The five-year unlevered free-cash-flow forecast plus WACC and terminal-growth assumptions for the intrinsic-value cross-check.", useFor:"Terminal value, DCF enterprise value, and DCF equity value", rows:[["Metric","Year 1","Year 2","Year 3","Year 4","Year 5"],["Unlevered FCF","$60m","$66m","$72m","$78m","$84m"],["WACC","9.0%","","","",""],["Terminal growth","3.0%","","","",""]] }
       ],
       workflow: [
         { id:"model", title:"1 · Transaction Model", subtitle:"Build the EV bridge and headline transaction multiple." },
@@ -4463,11 +4466,8 @@ function gradeAssessment(
       (correct / total) * 70
     );
 
-  const writingScore =
-    gradeWriting(
-      rawWriting,
-      assessment
-    );
+  const writingEvaluation = gradeWritingDetailed(rawWriting, assessment);
+  const writingScore = writingEvaluation.score;
 
   return {
     score: Math.min(
@@ -4477,7 +4477,55 @@ function gradeAssessment(
     correct,
     total,
     writingScore,
+    writingRubric: writingEvaluation.rubric,
     questionResults
+  };
+}
+
+function assessmentPassDecision(assessment, result, passScore=80) {
+  const score=Number(result?.score||0);
+  if(assessment?.itemType!=='simulation'){
+    return {passed:score>=passScore,scoreFloor:passScore,scoreFloorMet:score>=passScore,automatic:true};
+  }
+  const total=Number(result?.total||0);
+  const correct=Number(result?.correct||0);
+  const objectivePercent=total?Math.round(correct/total*100):0;
+  const writingScore=Number(result?.writingScore||0);
+  const writingRubric=Array.isArray(result?.writingRubric)?result.writingRubric:[];
+  const rubricById=new Map(writingRubric.map(row=>[row.id,Number(row.earned||0)]));
+  const isIbWorkbench=assessment?.simulationProfile?.kind==='ib-deal-workbench-v2';
+  const rubricFloorsMet=!isIbWorkbench||(
+    Number(rubricById.get('decision')||0)>=4&&
+    Number(rubricById.get('valuation')||0)>=4&&
+    Number(rubricById.get('update')||0)>=3&&
+    Number(rubricById.get('risk')||0)>=5&&
+    Number(rubricById.get('action')||0)>=3&&
+    Number(rubricById.get('communication')||0)>=2
+  );
+  const objectiveFloor=75;
+  const writingFloor=20;
+  const scoreFloorMet=score>=passScore;
+  const objectiveFloorMet=objectivePercent>=objectiveFloor;
+  const writingFloorMet=writingScore>=writingFloor&&rubricFloorsMet;
+  const reasons=[];
+  if(!scoreFloorMet) reasons.push(`Overall score must reach ${passScore}%.`);
+  if(!objectiveFloorMet) reasons.push(`At least ${objectiveFloor}% of required work products must be accepted.`);
+  if(writingScore<writingFloor) reasons.push(`The reviewer handoff must earn at least ${writingFloor}/30.`);
+  else if(!rubricFloorsMet) reasons.push('The handoff must meet every critical rubric category: recommendation, valuation evidence, management update, two material risks, next action, and professional communication.');
+  return {
+    passed:scoreFloorMet&&objectiveFloorMet&&writingFloorMet,
+    automatic:true,
+    standard:'Professional work-product quality gate',
+    scoreFloor:passScore,
+    scoreFloorMet,
+    objectivePercent,
+    objectiveFloor,
+    objectiveFloorMet,
+    writingScore,
+    writingFloor,
+    writingFloorMet,
+    rubricFloorsMet,
+    reasons
   };
 }
 
@@ -4536,6 +4584,47 @@ function gradeCareerWorkbenchWriting(rawWriting, assessment) {
   return Math.min(30,points);
 }
 
+function gradeIbWorkbenchWriting(rawWriting) {
+  const text=cleanString(rawWriting||'',5000).trim();
+  const lower=text.toLowerCase();
+  const words=text.split(/\s+/).filter(Boolean);
+  const rubric=[];
+  const add=(id,label,earned,possible,evidence)=>rubric.push({id,label,earned:Math.min(possible,earned),possible,evidence});
+
+  const decisionVerb=/\b(recommend|proceed|continue diligence|do not proceed|pause|decline)\b/i.test(text);
+  const decisionReason=/\b(because|based on|given|subject to|provided that|conditional|conditioned)\b/i.test(text);
+  add('decision','Clear recommendation',decisionVerb?(decisionReason?5:4):0,5,decisionVerb?'A decision verb is present.':'No explicit recommendation was identified.');
+
+  const methods=[/\b(offer|purchase price)\b/i,/\b(comps?|trading)\b/i,/\b(precedent|transactions?)\b/i,/\b(dcf|discounted cash flow)\b/i].filter(rx=>rx.test(text)).length;
+  const valuationFigures=['10.25','793','794','840','850','860','1153','1213','19.75'].filter(x=>lower.includes(x)).length;
+  add('valuation','Valuation evidence',Math.min(4,methods)+Math.min(3,valuationFigures),7,`${methods} valuation method${methods===1?'':'s'} and ${valuationFigures} case figure${valuationFigures===1?'':'s'} cited.`);
+
+  const updateNamed=/\b(guidance|revised|management update)\b/i.test(text);
+  const updateQuantified=/\b(5\s*%|456|83\.5|lower(?:ed)?|declin(?:e|ed))\b/i.test(text);
+  const updateImpact=/\b(impact|reduc|compress|lower|change|valuation|recommendation|downside)\b/i.test(text);
+  add('update','Management-update trace-through',(updateNamed?2:0)+(updateQuantified?2:0)+(updateImpact?1:0),5,updateNamed&&updateQuantified?'The revised case is identified and quantified.':'The revised guidance and its quantified effect both need to be clear.');
+
+  const riskGroups=[
+    /\b(customer|concentration|renewal|contract)\b/i,
+    /\b(revenue mix|recurring|services|churn)\b/i,
+    /\b(synerg|implementation cost|one-time cost)\b/i,
+    /\b(retention|employee|technical staff|talent)\b/i,
+    /\b(execution|integration|downside|sensitivity)\b/i
+  ].filter(rx=>rx.test(text)).length;
+  add('risk','Material risks and diligence',riskGroups>=2?5:riskGroups===1?2:0,5,`${riskGroups} distinct case-specific risk area${riskGroups===1?'':'s'} identified.`);
+
+  const nextAction=/\b(next step|request|confirm|validate|diligence|review|rerun|recalculate|send|escalate)\b/i.test(text);
+  const actionControl=/\b(associate|vp|management|team|owner|before|by |deadline|then|after|once)\b/i.test(text);
+  add('action','Controlled next action',(nextAction?3:0)+(nextAction&&actionControl?1:0),4,nextAction?'A concrete next action is present.':'No actionable next step was identified.');
+
+  const structured=/Decision \/ recommendation:|Case evidence:|Material risk \/ what could change:|Controlled next action:/i.test(text);
+  const causal=/\b(because|therefore|driven by|based on|which (?:means|implies)|as a result)\b/i.test(text);
+  const professional=(words.length>=80&&words.length<=320?2:words.length>=55?1:0)+(structured?1:0)+(causal?1:0);
+  add('communication','Professional communication',professional,4,`${words.length} words; ${structured?'structured handoff':'unstructured response'}; ${causal?'causal reasoning present':'causal reasoning not explicit'}.`);
+
+  return {score:Math.min(30,rubric.reduce((sum,row)=>sum+row.earned,0)),rubric};
+}
+
 function gradeWriting(
   rawWriting,
   assessment
@@ -4554,24 +4643,12 @@ function gradeWriting(
   const lower =
     text.toLowerCase();
 
-  if (assessment.version === "2.0-workbench" && assessment.simulationProfile?.kind === "career-workbench-v2") {
+  if (assessment.simulationProfile?.kind === "career-workbench-v2") {
     return gradeCareerWorkbenchWriting(text, assessment);
   }
 
-  if (assessment.version === "2.0-workbench" && assessment.simulationProfile?.kind === "ib-deal-workbench-v2") {
-    let points = 0;
-    const wc = words.length;
-    if (wc >= 55) points += 3;
-    if (wc >= 85) points += 2;
-    if (/\b(recommend|proceed|continue diligence|do not proceed|pause|decline)\b/i.test(text)) points += 4;
-    const valuationSignals = ["10.25", "793", "794", "840", "equity value", "multiple", "valuation"];
-    points += Math.min(6, valuationSignals.filter(x => lower.includes(x)).length * 2);
-    if (/\b(guidance|revised|update|revenue)\b/i.test(text) && /\b(5%|456|83.5|lower|declin)\b/i.test(text)) points += 5;
-    const riskSignals = ["customer", "contract", "synergy", "retention", "churn", "diligence", "execution", "downside", "revenue mix", "implementation cost"];
-    points += Math.min(5, riskSignals.filter(x => lower.includes(x)).length * 2);
-    if (/\b(next step|request|confirm|validate|diligence|review|rerun|send)\b/i.test(text)) points += 3;
-    if (wc >= 70 && wc <= 260) points += 2;
-    return Math.min(30, points);
+  if (assessment.simulationProfile?.kind === "ib-deal-workbench-v2") {
+    return gradeIbWorkbenchWriting(text).score;
   }
 
   let lengthPoints =
@@ -4641,6 +4718,14 @@ function gradeWriting(
       decisionPoints +
       riskPoints
   );
+}
+
+function gradeWritingDetailed(rawWriting, assessment) {
+  if(assessment?.simulationProfile?.kind==='ib-deal-workbench-v2'){
+    return gradeIbWorkbenchWriting(rawWriting);
+  }
+  const score=gradeWriting(rawWriting,assessment);
+  return {score,rubric:[{id:'professional-handoff',label:'Professional reviewer handoff',earned:score,possible:30,evidence:'Evaluated for recommendation, source-backed evidence, material risk, professional judgment, and controlled next action.'}]};
 }
 
 
@@ -4733,7 +4818,9 @@ function assessmentReviewDetails(assessment,rawAnswers,rawWriting,result) {
     return {id:q.id,position:index+1,type:q.type,prompt:q.prompt,submitted,correct:outcomes.get(String(q.id))===true,correctAnswer,rationale,tolerance:q.type==='numeric'?Number(q.tolerance||0):null,unit:q.unit||null};
   });
   if(assessment?.writingPrompt){
-    questions.push({id:'writing',position:questions.length+1,type:'text',prompt:assessment.writingPrompt,submitted:cleanString(rawWriting||'',5000),correct:Number(result?.writingScore||0)>0,correctAnswer:null,rationale:'Evaluated against the simulation’s evidence, recommendation, risk, revision, and manager-handoff rubric.',tolerance:null,unit:null,score:Number(result?.writingScore||0)});
+    const rubric=Array.isArray(result?.writingRubric)?result.writingRubric:[];
+    const rubricSummary=rubric.length?rubric.map(row=>`${row.label}: ${Number(row.earned)}/${Number(row.possible)}`).join(' · '):'Evidence, recommendation, risk, revision, and manager handoff';
+    questions.push({id:'writing',position:questions.length+1,type:'text',prompt:assessment.writingPrompt,submitted:cleanString(rawWriting||'',5000),correct:Number(result?.writingScore||0)>=20,correctAnswer:null,rationale:`Automatically evaluated against the professional rubric. ${rubricSummary}.`,tolerance:null,unit:null,score:Number(result?.writingScore||0),rubric});
   }
   return questions;
 }
@@ -6344,4 +6431,4 @@ async function v2EnforceAssessmentRate(env, uid, pathwayId, assessmentKey, assig
   if(Number(row?.n||0)>=10) throw new HttpError(429,'Too many recent assessment attempts. Please wait before trying again.');
 }
 
-export { readJson, corsHeaders, enterpriseCatalog };
+export { readJson, corsHeaders, enterpriseCatalog, gradeAssessment, gradeWritingDetailed, assessmentPassDecision, buildInvestmentBankingSimulation };
