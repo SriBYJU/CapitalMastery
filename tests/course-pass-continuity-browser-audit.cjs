@@ -55,7 +55,21 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     assert(submitCalls===1,'First failed assessment should submit exactly once');
     const getsBeforeRetry=assessmentGets;
     await page.getByRole('link',{name:/Try Again/}).click();
-    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000});
+    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
+      const snapshot=await page.evaluate(()=>({
+        href:location.href,
+        hash:location.hash,
+        liveRoute:typeof window.CM_LIVE_ROUTE,
+        continuity:!!window.CM_COURSE_CONTINUITY,
+        track:localStorage.getItem('capitalMasteryTrainingTrackV1:investment-banking'),
+        state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),
+        main:(document.querySelector('#app main#main')?.innerText||'<main unavailable>').slice(0,2200),
+        form:!!document.querySelector('#cm-official-form'),
+        failed:!!document.querySelector('.cm-result.failed'),
+        loading:!!document.querySelector('.cm-live-card')
+      }));
+      throw new Error(`Retry did not reopen secure form. assessmentGets=${assessmentGets}; submitCalls=${submitCalls}; snapshot=${JSON.stringify(snapshot)}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
+    });
     assert(assessmentGets>getsBeforeRetry,`Try Again did not request a fresh secure assessment: before=${getsBeforeRetry}, after=${assessmentGets}, url=${page.url()}`);
     assert(/retake=1/.test(page.url())&&/attempt=\d+/.test(page.url()),`Retry did not own a unique retake route: ${page.url()}`);
 
