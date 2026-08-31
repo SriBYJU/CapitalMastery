@@ -6,6 +6,7 @@ on:
     paths:
       - 'tools/patch-firm-ready-course-workbenches.mjs'
       - 'tests/firm-ready-course-workbench-audit.mjs'
+      - 'tests/official-simulation-job-realism-audit.mjs'
       - '.github/workflows/patch-firm-ready-course-workbenches.yml'
   workflow_dispatch:
 
