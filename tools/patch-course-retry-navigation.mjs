@@ -18,7 +18,7 @@ app=replaceOnce(app,
 'local failed-result retry link');
 app=replaceOnce(app,
 `  window.CM={mobileMenu,markPart,toggleQa,qaScores,qaProgress,refreshLocalState,resetState,copy,closeModal,linkedinFields,postModal,postStyle,downloadSocial,downloadCertificateImage,compareGo};\n  window.addEventListener('hashchange',renderRoute);`,
-`  window.CM={mobileMenu,markPart,toggleQa,qaScores,qaProgress,refreshLocalState,resetState,copy,closeModal,linkedinFields,postModal,postStyle,downloadSocial,downloadCertificateImage,compareGo};\n  document.addEventListener('click',event=>{\n    const link=event.target.closest?.('[data-cm-assessment-nav="true"]');\n    if(!link) return;\n    const href=link.getAttribute('href')||'';\n    if(!href.startsWith('#/')) return;\n    event.preventDefault();\n    if(location.hash===href){ renderRoute(); return; }\n    location.hash=href;\n    queueMicrotask(renderRoute);\n  });\n  window.addEventListener('hashchange',renderRoute);`,
+`  window.CM={mobileMenu,markPart,toggleQa,qaScores,qaProgress,refreshLocalState,resetState,copy,closeModal,linkedinFields,postModal,postStyle,downloadSocial,downloadCertificateImage,compareGo};\n  document.addEventListener('click',event=>{\n    const link=event.target.closest?.('[data-cm-assessment-nav="true"]');\n    if(!link) return;\n    const href=link.getAttribute('href')||'';\n    if(!href.startsWith('#/')) return;\n    event.preventDefault();\n    history.pushState({cmAssessmentNav:true},'',href);\n    renderRoute();\n  });\n  window.addEventListener('hashchange',renderRoute);`,
 'local deterministic assessment navigation');
 write(APP,app);
 
@@ -33,7 +33,7 @@ live=replaceOnce(live,
 'secure failed-result retry link');
 live=replaceOnce(live,
 `  window.addEventListener('hashchange', () => setTimeout(route, 0));`,
-`  document.addEventListener('click',event=>{\n    const link=event.target.closest?.('[data-cm-secure-assessment-nav="true"]');\n    if(!link) return;\n    const href=link.getAttribute('href')||'';\n    if(!href.startsWith('#/')) return;\n    event.preventDefault();\n    if(location.hash===href){ route(); return; }\n    location.hash=href;\n    queueMicrotask(route);\n  });\n  window.addEventListener('hashchange', () => setTimeout(route, 0));`,
+`  document.addEventListener('click',event=>{\n    const link=event.target.closest?.('[data-cm-secure-assessment-nav="true"]');\n    if(!link) return;\n    const href=link.getAttribute('href')||'';\n    if(!href.startsWith('#/')) return;\n    event.preventDefault();\n    history.pushState({cmSecureAssessmentNav:true},'',href);\n    route();\n  });\n  window.addEventListener('hashchange', () => setTimeout(route, 0));`,
 'secure deterministic assessment navigation');
 write(LIVE,live);
-console.log('COURSE RETRY NAVIGATION PATCH APPLIED: failed and optional-retake actions force a fresh local + secure route render instead of relying on hashchange alone');
+console.log('COURSE RETRY NAVIGATION PATCH APPLIED: failed and optional-retake actions use direct router-owned history navigation, eliminating duplicate hashchange races');
