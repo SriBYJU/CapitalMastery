@@ -68,6 +68,7 @@ jobs:
           node --check tests/employer-public-browser-audit.cjs
           node --check tests/employer-role-matrix-browser-audit.cjs
           node --check tests/state-resilience-browser-audit.cjs
+          node --check tests/course-pass-continuity-browser-audit.cjs
 
       - name: Failure-seeking static audits
         run: |
@@ -124,6 +125,7 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 1
           done
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-pass-continuity-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
