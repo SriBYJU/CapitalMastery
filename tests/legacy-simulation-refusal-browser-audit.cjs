@@ -25,7 +25,10 @@ const legacyPayload={
   const context=await browser.newContext({viewport:{width:1280,height:900}});
   const errors=[];
   try{
-    await context.addInitScript(()=>localStorage.setItem('cmCredentialNameOnboardedV3:legacy-sim-audit','true'));
+    await context.addInitScript(()=>{
+      localStorage.setItem('cmCredentialNameOnboardedV3:legacy-sim-audit','true');
+      localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking','career-skills');
+    });
     await context.route(/\/firebase-auth\.js(?:\?.*)?$/,r=>r.fulfill({status:200,contentType:'application/javascript',body:authStub()}));
     await context.route(/\/firebase-sync\.js(?:\?.*)?$/,r=>r.fulfill({status:200,contentType:'application/javascript',body:'window.CM_SYNC={ready:true,status:"synced",flush:async()=>true};'}));
     await context.route(`${WORKER}/**`,async r=>{
@@ -48,6 +51,6 @@ const legacyPayload={
     assert(await page.locator('select').count()===0,'Legacy simulation rendered select-answer UI');
     assert(await page.locator('#cm-official-form').count()===0,'Legacy simulation rendered an official submission form');
     assert(errors.length===0,`Browser errors: ${[...new Set(errors)].join(' | ')}`);
-    console.log('LEGACY SIMULATION REFUSAL BROWSER AUDIT PASS: stale MCQ Worker payload is blocked and never presented as an official job simulation');
+    console.log('LEGACY SIMULATION REFUSAL BROWSER AUDIT PASS: stale MCQ Worker payload is blocked and never presented as an official job simulation on the Career Skills capstone route');
   }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});
