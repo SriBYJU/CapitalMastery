@@ -1,10 +1,7 @@
 name: Apply course assessment state once
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/apply-course-assessment-state-once.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
