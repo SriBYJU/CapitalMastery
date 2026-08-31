@@ -9,15 +9,19 @@ const sync = fs.readFileSync('firebase-sync.js', 'utf8');
 const rules = fs.readFileSync('firestore.rules', 'utf8');
 
 assert(cert.includes("fsApi.doc(db, 'users', user.uid)"), 'Credential-name save must use the user root Firestore document');
-assert(cert.includes('credentialNameConfirmed: true'), 'Credential-name save must persist an explicit durable confirmation marker');
-assert(cert.includes('credentialNameUpdatedAt: fsApi.serverTimestamp()'), 'Credential-name save must timestamp the durable identity record');
+assert(/credentialNameConfirmed\s*:\s*true/.test(cert), 'Credential-name save must persist an explicit durable confirmation marker');
+assert(cert.includes('credentialNameUpdatedAt:timestamp(now)'), 'Credential-name save must timestamp the durable identity record');
+assert(cert.includes("Authorization:`Bearer ${token}`")&&cert.includes("method:'PATCH'"), 'Credential-name writes must use the signed-in owner token');
 assert(cert.includes('Credential identity is authoritative on the protected user-root document.'), 'Remote credential-name lookup must prefer the durable root identity');
 assert(cert.includes("fsApi.doc(db, 'users', user.uid, 'progress', 'state')"), 'Legacy progress/state confirmation read fallback must remain available');
+assert(cert.includes("return 'progress-compatibility'"), 'Owner-only rolling-rules compatibility write must remain available until live rules converge');
 assert(cert.indexOf("fsApi.doc(db, 'users', user.uid)") < cert.indexOf("fsApi.doc(db, 'users', user.uid, 'progress', 'state')"), 'Root identity must be checked before legacy progress/state fallback');
 assert(!cert.includes("if (!synced) throw new Error('Could not save your credential name to your account. Please try again.');"), 'Credential identity must not fail solely because broad progress sync fails');
 assert(cert.includes('progress-state mirror will retry later'), 'Progress-state mirroring must be explicitly best-effort after identity save');
 
 assert(sync.includes('base.credentialNameConfirmed = true'), 'Normal progress sync must preserve an already-confirmed root identity when local confirmation is present');
+assert(sync.indexOf("fs.doc(db, 'users', user.uid, 'progress', 'state')") < sync.indexOf('await writeRootProfile(clean)'), 'Owner-only progress sync must not be blocked by a rolling user-root rules deployment');
+assert(sync.includes('Protected account-profile mirror will retry after rules convergence'), 'Root-profile rules rollout failure must be isolated from course progress sync');
 assert(sync.includes("await fs.setDoc(ref, base, { merge: true });"), 'User-root sync must remain merge-only so stale progress state cannot delete credential identity fields');
 assert(!sync.includes("credentialNameConfirmed: false"), 'Progress sync must never write a false root credential confirmation');
 

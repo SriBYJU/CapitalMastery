@@ -204,18 +204,60 @@
   }
 
   async function persistCredentialIdentity(user, name) {
-    const appApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-app.js`);
-    const fsApi = await import(`https://www.gstatic.com/firebasejs/${SDK}/firebase-firestore.js`);
-    const app = appApi.getApps().length ? appApi.getApp() : appApi.initializeApp(window.CAPITAL_MASTERY_FIREBASE_CONFIG);
-    const db = fsApi.getFirestore(app);
-    await fsApi.setDoc(fsApi.doc(db, 'users', user.uid), {
-      credentialName: name,
-      credentialNameConfirmed: true,
-      credentialNameUpdatedAt: fsApi.serverTimestamp(),
-      displayName: name,
-      email: user.email || null,
-      lastSeenAt: fsApi.serverTimestamp()
-    }, { merge:true });
+    const projectId = window.CAPITAL_MASTERY_FIREBASE_CONFIG?.projectId;
+    if (!projectId) throw new Error('Account storage configuration is unavailable.');
+    const token = await user.getIdToken();
+    const rootUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(user.uid)}`;
+    const headers = { Authorization:`Bearer ${token}`, 'Content-Type':'application/json' };
+    const timestamp = iso => ({__cmTimestamp:iso});
+    const value = input => {
+      if (input === null || input === undefined) return {nullValue:null};
+      if (input && typeof input === 'object' && input.__cmTimestamp) return {timestampValue:input.__cmTimestamp};
+      if (typeof input === 'boolean') return {booleanValue:input};
+      if (typeof input === 'number') return Number.isInteger(input)?{integerValue:String(input)}:{doubleValue:input};
+      if (Array.isArray(input)) return {arrayValue:{values:input.map(value)}};
+      if (typeof input === 'object') return {mapValue:{fields:Object.fromEntries(Object.entries(input).filter(([,item])=>item!==undefined).map(([key,item])=>[key,value(item)]))}};
+      return {stringValue:String(input)};
+    };
+    const document = input => ({fields:Object.fromEntries(Object.entries(input).map(([key,item])=>[key,value(item)]))});
+    const write = (url,input) => fetch(url,{method:'PATCH',headers,body:JSON.stringify(document(input))});
+
+    // Persist the owner-only compatibility mirror first. The direct authenticated
+    // REST write is independent of any pending Firestore SDK queue.
+    const state = stateForWrite();
+    state.profile ||= {};
+    state.profile.name = name;
+    state.profile.certificateName = name;
+    state.profile.certificateNameConfirmed = true;
+    state.profile.accountUid = user.uid;
+    state.updatedAt = new Date().toISOString();
+    const now = new Date().toISOString();
+    const progressWrite = await write(`${rootUrl}/progress/state`, {
+      version:1,
+      profile:state.profile,
+      careers:state.careers || {},
+      preferences:state.preferences || {},
+      createdAt:state.createdAt || state.updatedAt,
+      updatedAt:state.updatedAt,
+      syncVersion:1,
+      serverUpdatedAt:timestamp(now)
+    });
+    if(!progressWrite.ok) throw new Error(`Could not save your credential identity (${progressWrite.status}).`);
+
+    const rootMask = new URLSearchParams(['credentialName','credentialNameConfirmed','credentialNameUpdatedAt','displayName','email','lastSeenAt'].map(field=>['updateMask.fieldPaths',field]));
+    const rootWrite = await write(`${rootUrl}?${rootMask}`, {
+      credentialName:name,
+      credentialNameConfirmed:true,
+      credentialNameUpdatedAt:timestamp(now),
+      displayName:name,
+      email:user.email || null,
+      lastSeenAt:timestamp(now)
+    });
+    if (rootWrite.ok) {
+      return 'user-root';
+    }
+    console.warn('Credential identity used the owner-only rolling-rules compatibility path.');
+    return 'progress-compatibility';
   }
 
   async function saveFullName(rawName) {

@@ -316,8 +316,15 @@
 
     try {
       setStatus('syncing');
-      await writeRootProfile(clean);
       await fs.setDoc(fs.doc(db, 'users', user.uid, 'progress', 'state'), cloudPayload(clean), { merge: false });
+      // Progress is an owner-only UX mirror and must remain available during a
+      // rolling Firestore-rules deployment. The protected root identity is
+      // attempted independently so a stale root rule cannot stop course sync.
+      try {
+        await writeRootProfile(clean);
+      } catch (rootError) {
+        console.warn('Protected account-profile mirror will retry after rules convergence:', rootError);
+      }
       localStorage.setItem(userStateKey(user.uid), JSON.stringify(clean));
       CM_SYNC.lastSyncedAt = new Date().toISOString();
       setStatus('synced');

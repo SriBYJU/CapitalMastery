@@ -49,6 +49,19 @@ function assert(condition, message) {
     }
   }
 
+  async function remoteFailureSnapshot() {
+    if (!created || !projectId || !uid) return null;
+    const token = await freshToken();
+    if (!token) return {token:false};
+    const root = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}`;
+    const out = {};
+    for (const [name,url] of [['root',root],['progress',`${root}/progress/state`]]) {
+      const response = await api.get(url,{headers:{Authorization:`Bearer ${token}`}});
+      out[name]={status:response.status(),body:(await response.text()).slice(0,1800)};
+    }
+    return out;
+  }
+
   async function deleteIdentity() {
     if (!created || !apiKey) return;
     const token = await freshToken();
@@ -126,7 +139,8 @@ function assert(condition, message) {
         [email,fullName], {timeout:30000});
     } catch (error) {
       const snapshot = await postSaveFailureSnapshot();
-      throw new Error(`Credential-name save did not complete its intentional reload contract. SNAPSHOT=${JSON.stringify(snapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))} CAUSE=${error.message}`);
+      const remoteSnapshot = await remoteFailureSnapshot();
+      throw new Error(`Credential-name save did not complete its intentional reload contract. SNAPSHOT=${JSON.stringify(snapshot)} REMOTE=${JSON.stringify(remoteSnapshot)} PAGE_ERRORS=${JSON.stringify(pageErrors)} CONSOLE_ERRORS=${JSON.stringify(consoleErrors.slice(-12))} CAUSE=${error.message}`);
     }
 
     lastToken = await page.evaluate(() => window.CM_AUTH.getIdToken());
