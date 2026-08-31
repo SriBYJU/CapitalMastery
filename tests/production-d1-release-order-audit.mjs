@@ -41,6 +41,7 @@ must(tool.includes('assertUnchanged(beforeCounts,afterCounts'),'Critical product
 must(tool.includes("PRAGMA quick_check;"),'Production D1 gate must require quick_check');
 must(tool.includes("PRAGMA foreign_key_check;"),'Production D1 gate must require foreign_key_check');
 must(tool.includes("requiredEnv=['CLOUDFLARE_API_TOKEN','CLOUDFLARE_ACCOUNT_ID']"),'D1 mutation must require Cloudflare credentials');
+must(tool.includes("process.env.CM_ALLOW_WRANGLER_OAUTH==='1'"),'Manual D1 promotion may use only an explicit Wrangler OAuth authorization flag');
 must(tool.includes('refusing production D1 mutation'),'Missing deployment credentials must fail closed');
 must(tool.includes("fs.writeFileSync('d1-production-preflight.json'"),'D1 preparation must emit release evidence');
 

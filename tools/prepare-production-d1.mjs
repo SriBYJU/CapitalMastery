@@ -4,12 +4,14 @@ import fs from 'node:fs';
 const DB='capital-mastery-prod';
 const WRANGLER=['--yes','wrangler@4','d1','execute',DB,'--remote'];
 const requiredEnv=['CLOUDFLARE_API_TOKEN','CLOUDFLARE_ACCOUNT_ID'];
+const allowWranglerOAuth=process.env.CM_ALLOW_WRANGLER_OAUTH==='1';
 const MIGRATION_016='migrations/016_phase2_career_skills_track_constraints.sql';
 const MIGRATION_017='migrations/017_phase2_program_completion_records.sql';
 const MIGRATION_018='migrations/018_assessment_attempt_reviews.sql';
 for(const name of requiredEnv){
-  if(!String(process.env[name]||'').trim()) throw new Error(`Missing ${name}; refusing production D1 mutation`);
+  if(!allowWranglerOAuth&&!String(process.env[name]||'').trim()) throw new Error(`Missing ${name}; refusing production D1 mutation`);
 }
+if(allowWranglerOAuth) console.log('Using the explicitly authorized local Wrangler OAuth session.');
 
 function wrangler(args,label){
   const r=spawnSync('npx',[...WRANGLER,...args],{encoding:'utf8',env:process.env,maxBuffer:16*1024*1024});
