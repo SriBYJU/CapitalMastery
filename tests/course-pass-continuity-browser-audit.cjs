@@ -60,14 +60,7 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     const getsBeforeRetry=assessmentGets;
     await page.getByRole('link',{name:/Try Again/}).click();
     await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
-      const snapshot=await page.evaluate(()=>({
-        href:location.href,hash:location.hash,liveRoute:typeof window.CM_LIVE_ROUTE,continuity:!!window.CM_COURSE_CONTINUITY,
-        track:localStorage.getItem('capitalMasteryTrainingTrackV1:investment-banking'),
-        activeUid:localStorage.getItem('capitalMasteryActiveUidV1'),
-        state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),
-        userState:JSON.parse(localStorage.getItem('capitalMasteryUserStateV1:continuity-audit-user')||'null'),
-        main:(document.querySelector('#app main#main')?.innerText||'<main unavailable>').slice(0,2200),form:!!document.querySelector('#cm-official-form'),failed:!!document.querySelector('.cm-result.failed'),loading:!!document.querySelector('.cm-live-card')
-      }));
+      const snapshot=await page.evaluate(()=>({href:location.href,hash:location.hash,liveRoute:typeof window.CM_LIVE_ROUTE,continuity:!!window.CM_COURSE_CONTINUITY,track:localStorage.getItem('capitalMasteryTrainingTrackV1:investment-banking'),activeUid:localStorage.getItem('capitalMasteryActiveUidV1'),state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),userState:JSON.parse(localStorage.getItem('capitalMasteryUserStateV1:continuity-audit-user')||'null'),main:(document.querySelector('#app main#main')?.innerText||'<main unavailable>').slice(0,2200),form:!!document.querySelector('#cm-official-form'),failed:!!document.querySelector('.cm-result.failed'),loading:!!document.querySelector('.cm-live-card')}));
       throw new Error(`Retry did not reopen secure form. assessmentGets=${assessmentGets}; submitCalls=${submitCalls}; snapshot=${JSON.stringify(snapshot)}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
     });
     assert(assessmentGets>getsBeforeRetry,`Try Again did not request a fresh secure assessment: before=${getsBeforeRetry}, after=${assessmentGets}, url=${page.url()}`);
@@ -89,9 +82,11 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     const getsAfterPass=assessmentGets;
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.lesson-actions',{timeout:10000});
-    await page.waitForFunction(()=>/assessment already passed/i.test(document.querySelector('.lesson-actions')?.innerText||''),null,{timeout:10000});
+    await page.waitForSelector('.lesson-actions [data-cm-passed-assessment="true"]',{timeout:10000}).catch(async error=>{
+      const snapshot=await page.evaluate(()=>({href:location.href,actions:document.querySelector('.lesson-actions')?.innerHTML||'',state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),main:(document.querySelector('#app main#main')?.innerText||'').slice(0,1800)}));
+      throw new Error(`Reviewed lesson never stabilized into saved-pass CTA. snapshot=${JSON.stringify(snapshot)}; cause=${error.message}`);
+    });
     const passCta=page.locator('.lesson-actions [data-cm-passed-assessment="true"]');
-    assert(await passCta.count()===1,'Reviewed lesson did not replace quiz CTA with saved-pass Continue');
     assert(/90%/.test(await passCta.textContent()),'Saved-pass lesson CTA did not show best score');
     assert((await passCta.getAttribute('href'))==='#/career/investment-banking','Professional Readiness Part 5 should continue to the pathway/Role Lab sequence, not retake the quiz');
     await passCta.click();
@@ -117,7 +112,7 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
       location.hash='#/learn/investment-banking/5';
     });
     await page.waitForSelector('.lesson-actions',{timeout:10000});
-    await page.waitForFunction(()=>/assessment already passed/i.test(document.querySelector('.lesson-actions')?.innerText||''),null,{timeout:10000});
+    await page.waitForSelector('.lesson-actions [data-cm-passed-assessment="true"]',{timeout:10000});
     assert(/90%/.test(await page.locator('.lesson-actions').innerText()),'Authoritative server progress did not restore a pass after local score was cleared');
 
     await page.evaluate(()=>{localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking','career-skills');location.hash='#/learn/investment-banking/5';});
