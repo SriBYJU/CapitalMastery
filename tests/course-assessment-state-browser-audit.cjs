@@ -80,7 +80,11 @@ function assessmentPayload(){
     const retryHref=await retry.getAttribute('href');
     assert(/retake=1/.test(retryHref||'')&&/attempt=\d+/.test(retryHref||''),`Retry href is not unique: ${retryHref}`);
     await retry.click();
-    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000});
+    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
+      const snapshot=await page.locator('#app main#main').innerText().catch(()=>'<main unavailable>');
+      const html=await page.locator('#app main#main').innerHTML().catch(()=>'<main unavailable>');
+      throw new Error(`Try Again did not render fresh secure form. retryHref=${retryHref}; submitCalls=${submitCalls}; assessmentGets=${assessmentGets}; getsBeforeFail=${getsBeforeFail}; url=${page.url()}; main=${JSON.stringify(snapshot.slice(0,1800))}; html=${JSON.stringify(html.slice(0,2400))}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
+    });
     assert(assessmentGets>getsBeforeFail,'Try Again did not request/render a fresh assessment');
     assert(/retake=1/.test(page.url()),'Retry route lost explicit retake mode');
 
@@ -108,7 +112,10 @@ function assessmentPayload(){
     assert(await optional.count()===1,'Saved pass review is missing explicit optional retake');
     const getsBeforeOptional=assessmentGets;
     await optional.click();
-    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000});
+    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
+      const snapshot=await page.locator('#app main#main').innerText().catch(()=>'<main unavailable>');
+      throw new Error(`Optional retake did not render a fresh secure form. assessmentGets=${assessmentGets}; getsBeforeOptional=${getsBeforeOptional}; url=${page.url()}; main=${JSON.stringify(snapshot.slice(0,1800))}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
+    });
     assert(assessmentGets>getsBeforeOptional,'Optional retake did not open a fresh assessment');
 
     assert(errors.length===0,`Course assessment browser errors: ${[...new Set(errors)].join(' | ')}`);
