@@ -77,7 +77,14 @@
 
     if (previousUid !== user.uid) localStorage.removeItem(QA_KEY);
 
-    let state = parse(localStorage.getItem(key(user.uid)));
+    // A repeated auth-ready/backend-verification event for the SAME Firebase user
+    // must never roll current course progress back to an older per-user snapshot.
+    // Prefer the active shared state when it is already owned by this UID; use the
+    // stored per-user snapshot only when activating/switching into the account.
+    const activeShared = parse(localStorage.getItem(STATE_KEY));
+    let state = activeShared?.profile?.accountUid === user.uid
+      ? activeShared
+      : parse(localStorage.getItem(key(user.uid)));
     if (!state || state.profile?.accountUid !== user.uid) {
       state = !previousUid ? safeLegacyStateFor(user) : null;
     }
