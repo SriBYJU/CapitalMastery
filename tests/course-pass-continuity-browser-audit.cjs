@@ -82,11 +82,11 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     const getsAfterPass=assessmentGets;
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.lesson-actions',{timeout:10000});
-    await page.waitForSelector('.lesson-actions [data-cm-passed-assessment="true"]',{timeout:10000}).catch(async error=>{
+    const passCta=page.getByRole('link',{name:/^Continue — assessment already passed/});
+    await passCta.waitFor({state:'visible',timeout:10000}).catch(async error=>{
       const snapshot=await page.evaluate(()=>({href:location.href,actions:document.querySelector('.lesson-actions')?.innerHTML||'',state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),main:(document.querySelector('#app main#main')?.innerText||'').slice(0,1800)}));
-      throw new Error(`Reviewed lesson never stabilized into saved-pass CTA. snapshot=${JSON.stringify(snapshot)}; cause=${error.message}`);
+      throw new Error(`Reviewed lesson never stabilized into saved-pass Continue CTA. snapshot=${JSON.stringify(snapshot)}; cause=${error.message}`);
     });
-    const passCta=page.locator('.lesson-actions [data-cm-passed-assessment="true"]');
     assert(/90%/.test(await passCta.textContent()),'Saved-pass lesson CTA did not show best score');
     assert((await passCta.getAttribute('href'))==='#/career/investment-banking','Professional Readiness Part 5 should continue to the pathway/Role Lab sequence, not retake the quiz');
     await passCta.click();
@@ -95,7 +95,7 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
 
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('[data-cm-review-passed]',{timeout:10000});
-    await page.locator('[data-cm-review-passed]').click();
+    await page.locator('[data-cm-review-passed]').first().click();
     await page.waitForSelector('.cm-continuity-review',{timeout:10000});
     assert(await page.locator('#cm-official-form').count()===0,'Reviewing an already-passed assessment should not silently open a blank quiz');
     assert(/90%/.test(await page.locator('.cm-continuity-review').innerText()),'Saved-pass review did not preserve best score');
@@ -112,13 +112,15 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
       location.hash='#/learn/investment-banking/5';
     });
     await page.waitForSelector('.lesson-actions',{timeout:10000});
-    await page.waitForSelector('.lesson-actions [data-cm-passed-assessment="true"]',{timeout:10000});
+    await page.getByRole('link',{name:/^Continue — assessment already passed/}).waitFor({state:'visible',timeout:10000});
     assert(/90%/.test(await page.locator('.lesson-actions').innerText()),'Authoritative server progress did not restore a pass after local score was cleared');
 
     await page.evaluate(()=>{localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking','career-skills');location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.lesson-actions',{timeout:10000});
-    await page.waitForFunction(()=>document.querySelector('.lesson-actions [data-cm-passed-assessment="true"]')?.getAttribute('href')==='#/official-simulation/investment-banking',null,{timeout:10000});
-    assert((await page.locator('.lesson-actions [data-cm-passed-assessment="true"]').getAttribute('href'))==='#/official-simulation/investment-banking','Career Skills Part 5 should continue to its practical capstone after the knowledge check pass');
+    const careerSkillsContinue=page.getByRole('link',{name:/^Continue — assessment already passed/});
+    await careerSkillsContinue.waitFor({state:'visible',timeout:10000});
+    await page.waitForFunction(()=>[...document.querySelectorAll('.lesson-actions a')].some(a=>/^Continue — assessment already passed/.test(a.textContent||'')&&a.getAttribute('href')==='#/official-simulation/investment-banking'),null,{timeout:10000});
+    assert((await careerSkillsContinue.getAttribute('href'))==='#/official-simulation/investment-banking','Career Skills Part 5 should continue to its practical capstone after the knowledge check pass');
 
     assert(errors.length===0,`Course continuity browser errors: ${[...new Set(errors)].join(' | ')}`);
     console.log('COURSE PASS CONTINUITY BROWSER AUDIT PASS: 70% retries cleanly; 90% pass survives lesson review and repeated auth; Next skips completed quiz; server restores pass cross-device; PR/CS continuation stays track-aware');
