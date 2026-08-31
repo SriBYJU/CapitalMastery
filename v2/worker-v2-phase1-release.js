@@ -3348,7 +3348,7 @@ function buildInvestmentBankingSimulation(pathway) {
       minHits: 3,
       minWords: 14,
       workProduct: { section:"qa", label:"Material QA finding", instruction:"Inspect the model-check notes, identify the valuation-changing error in your own words, and state how the EV-to-equity bridge must be corrected." }
-    }
+    },
     {
       id: "ib-sim-revised-equity",
       type: "numeric",
@@ -3357,7 +3357,7 @@ function buildInvestmentBankingSimulation(pathway) {
       tolerance: 0.75,
       unit: "$m",
       workProduct: { section:"update", label:"Revised Equity Value", cell:"D31", instruction:"Refresh valuation using revised NTM EBITDA of $83.5m at the same 10.25x selected multiple, then bridge to equity value." }
-    }
+    },
     {
       id: "ib-sim-precedent-median",
       type: "numeric",
