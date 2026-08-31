@@ -1,0 +1,57 @@
+name: Patch legacy simulation refusal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-legacy-simulation-refusal.mjs'
+      - 'tests/legacy-simulation-refusal-audit.mjs'
+      - 'tests/legacy-simulation-refusal-browser-audit.cjs'
+      - '.github/workflows/patch-legacy-simulation-refusal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply stale Worker simulation refusal
+        run: node tools/patch-legacy-simulation-refusal.mjs
+      - name: Validate source contract
+        run: |
+          set -euo pipefail
+          node --check capital-mastery-live.js
+          node tests/legacy-simulation-refusal-audit.mjs
+          node tests/official-simulation-job-realism-audit.mjs
+          node tests/pages-production-bundle-audit.mjs
+      - name: Prove stale MCQ payload is blocked in Chromium
+        run: |
+          set -euo pipefail
+          node tools/build-pages.mjs
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory dist-pages >/tmp/cm-legacy-sim-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/legacy-simulation-refusal-browser-audit.cjs
+      - name: Commit frontend refusal only
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- capital-mastery-live.js; then
+            echo 'No product change was required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add capital-mastery-live.js
+          git commit -m 'Refuse legacy quiz-like job simulations'
+          git push
