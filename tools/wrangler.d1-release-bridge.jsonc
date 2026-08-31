@@ -1,0 +1,16 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "capital-mastery-d1-release-bridge",
+  "main": "d1-release-bridge-worker.mjs",
+  "compatibility_date": "2026-08-28",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "capital-mastery-prod",
+      "database_id": "d007e8e7-8540-47dc-89b1-1aec4154b69b"
+    }
+  ]
+}
