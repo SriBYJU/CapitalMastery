@@ -7,6 +7,7 @@ on:
       - 'tools/course-continuity-v2.source.js'
       - 'tools/patch-course-continuity-v2.mjs'
       - 'tools/patch-account-isolation-course-continuity.mjs'
+      - 'tools/patch-secure-assessment-retry-url.mjs'
       - 'tests/course-pass-continuity-audit.mjs'
       - 'tests/account-isolation-course-continuity-audit.mjs'
       - 'tests/course-pass-continuity-browser-audit.cjs'
@@ -34,6 +35,7 @@ jobs:
           set -euo pipefail
           node tools/patch-course-continuity-v2.mjs
           node tools/patch-account-isolation-course-continuity.mjs
+          node tools/patch-secure-assessment-retry-url.mjs
           node tools/patch-legacy-simulation-refusal.mjs
           node tools/patch-firm-ready-course-workbenches.mjs
 
