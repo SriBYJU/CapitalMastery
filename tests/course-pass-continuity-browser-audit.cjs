@@ -42,8 +42,12 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
       const key='capitalMasteryLocalStateV1';
       const state=JSON.parse(localStorage.getItem(key)||'{"version":1,"careers":{},"credentials":[],"profile":{"name":"Course Continuity"}}');
       state.version=1;state.careers=state.careers||{};state.credentials=state.credentials||[];state.profile=state.profile||{name:'Course Continuity'};
+      state.profile.accountUid='continuity-audit-user';state.profile.name='Course Continuity';state.profile.certificateName='Course Continuity';
       state.careers['investment-banking']={learningComplete:[1,2,3,4,5],completedParts:[1,2,3,4],quizScores:{1:90,2:90,3:90,4:90},simulationKnowledge:0,simulationScore:null,finalScore:null,applied:{},simResponses:{},readiness:null};
-      localStorage.setItem(key,JSON.stringify(state));window.CM?.refreshLocalState?.();
+      localStorage.setItem(key,JSON.stringify(state));
+      localStorage.setItem('capitalMasteryUserStateV1:continuity-audit-user',JSON.stringify(state));
+      localStorage.setItem('capitalMasteryActiveUidV1','continuity-audit-user');
+      window.CM?.refreshLocalState?.();
       history.pushState({},'', '#/quiz/investment-banking/5?retake=1&attempt=initial');
       window.CM_LIVE_ROUTE?.();
     });
@@ -57,16 +61,12 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     await page.getByRole('link',{name:/Try Again/}).click();
     await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
       const snapshot=await page.evaluate(()=>({
-        href:location.href,
-        hash:location.hash,
-        liveRoute:typeof window.CM_LIVE_ROUTE,
-        continuity:!!window.CM_COURSE_CONTINUITY,
+        href:location.href,hash:location.hash,liveRoute:typeof window.CM_LIVE_ROUTE,continuity:!!window.CM_COURSE_CONTINUITY,
         track:localStorage.getItem('capitalMasteryTrainingTrackV1:investment-banking'),
+        activeUid:localStorage.getItem('capitalMasteryActiveUidV1'),
         state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),
-        main:(document.querySelector('#app main#main')?.innerText||'<main unavailable>').slice(0,2200),
-        form:!!document.querySelector('#cm-official-form'),
-        failed:!!document.querySelector('.cm-result.failed'),
-        loading:!!document.querySelector('.cm-live-card')
+        userState:JSON.parse(localStorage.getItem('capitalMasteryUserStateV1:continuity-audit-user')||'null'),
+        main:(document.querySelector('#app main#main')?.innerText||'<main unavailable>').slice(0,2200),form:!!document.querySelector('#cm-official-form'),failed:!!document.querySelector('.cm-result.failed'),loading:!!document.querySelector('.cm-live-card')
       }));
       throw new Error(`Retry did not reopen secure form. assessmentGets=${assessmentGets}; submitCalls=${submitCalls}; snapshot=${JSON.stringify(snapshot)}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
     });
@@ -78,6 +78,13 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     await page.locator('#cm-official-form button[type="submit"]').click();
     await page.waitForSelector('.cm-result.passed',{timeout:10000});
     assert(submitCalls===2,'Passing retry should submit exactly once');
+
+    const storedAfterPass=await page.evaluate(()=>JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null')?.careers?.['investment-banking']?.simulationKnowledge||0);
+    assert(Number(storedAfterPass)===90,`Secure pass was not mirrored into learner state: ${storedAfterPass}`);
+    await page.evaluate(()=>document.dispatchEvent(new CustomEvent('cm-auth-changed',{detail:{user:window.CM_AUTH.user,isAdmin:false,backendVerified:true}})));
+    await page.waitForTimeout(60);
+    const storedAfterRepeatedAuth=await page.evaluate(()=>JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null')?.careers?.['investment-banking']?.simulationKnowledge||0);
+    assert(Number(storedAfterRepeatedAuth)===90,`Repeated same-user auth event rolled back the recorded pass: ${storedAfterRepeatedAuth}`);
 
     const getsAfterPass=assessmentGets;
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
@@ -119,6 +126,6 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     assert((await page.locator('.lesson-actions [data-cm-passed-assessment="true"]').getAttribute('href'))==='#/official-simulation/investment-banking','Career Skills Part 5 should continue to its practical capstone after the knowledge check pass');
 
     assert(errors.length===0,`Course continuity browser errors: ${[...new Set(errors)].join(' | ')}`);
-    console.log('COURSE PASS CONTINUITY BROWSER AUDIT PASS: 70% retries cleanly; 90% pass survives lesson review; Next skips completed quiz; server restores pass cross-device; PR/CS continuation stays track-aware');
+    console.log('COURSE PASS CONTINUITY BROWSER AUDIT PASS: 70% retries cleanly; 90% pass survives lesson review and repeated auth; Next skips completed quiz; server restores pass cross-device; PR/CS continuation stays track-aware');
   } finally { await context.close(); await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});
