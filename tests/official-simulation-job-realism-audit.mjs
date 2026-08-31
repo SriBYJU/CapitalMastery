@@ -46,7 +46,9 @@ assert(ib.includes('trading comps, precedent transactions and DCF'),'IB Associat
 
 // The other 15 career workbenches are also task-based, not quiz banks.
 const careerStart=worker.indexOf('const CAREER_WORKBENCHES = {');
-const careerEnd=worker.indexOf('\nconst CAREER_REVIEW_STANDARDS',careerStart);
+const updateBoundary=worker.indexOf('\nconst CAREER_ROLELAB_UPDATES',careerStart);
+const standardsBoundary=worker.indexOf('\nconst CAREER_REVIEW_STANDARDS',careerStart);
+const careerEnd=updateBoundary>careerStart?updateBoundary:standardsBoundary;
 assert(careerStart>=0&&careerEnd>careerStart,'Career workbench catalog missing');
 const catalog=worker.slice(careerStart,careerEnd);
 const careers=['private-equity','venture-capital','equity-research','asset-management','hedge-funds','sales-trading','quantitative-finance','private-credit','corporate-banking','corporate-development','fp-and-a','treasury','wealth-management','risk-management','real-estate-finance'];
@@ -70,7 +72,9 @@ for(let i=0;i<careers.length;i++){
 const builderStart=worker.indexOf('function buildCareerWorkbenchSimulation(pathway) {');
 const builderEnd=worker.indexOf('\nfunction ',builderStart+20);
 const builder=worker.slice(builderStart,builderEnd);
-assert(builder.includes('questions:b.tasks'),'Career simulations must serve role-native workbench tasks');
+const servesTasksDirectly=builder.includes('questions:b.tasks');
+const servesExpandedWorkday=builder.includes('const questions=') && builder.includes('questions, writingPrompt:b.writingPrompt');
+assert(servesTasksDirectly || servesExpandedWorkday,'Career simulations must serve role-native workbench tasks');
 assert(!builder.includes('stageQuestions('),'Career simulation builder must not source quiz-bank questions');
 
 console.log('OFFICIAL SIMULATION JOB REALISM AUDIT PASS: all 16 learner simulations are secure workbenches; IB uses model/comps/precedents/DCF/update/QA/client handoff; practical simulations contain no answer-picking UI');
