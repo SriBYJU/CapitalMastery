@@ -69,6 +69,8 @@ async function requireColumns(db,table,required){const got=new Set(await columns
 async function explicitObjects(db,table){return rows(db,"SELECT type,name FROM sqlite_master WHERE tbl_name=? AND type IN ('index','trigger') AND sql IS NOT NULL ORDER BY type,name",table);}
 async function snapshotCounts(db){const existing=new Set((await rows(db,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")).map(row=>row.name));const result={};for(const table of COUNT_TABLES.filter(name=>existing.has(name))){const row=(await rows(db,`SELECT COUNT(*) AS n FROM ${table}`))[0];result[table]=Number(row?.n||0);}return result;}
 function assertUnchanged(before,after){for(const table of COUNT_TABLES){if(before[table]===undefined||after[table]===undefined)continue;assert(before[table]===after[table],`${table} row count changed unexpectedly: ${before[table]} -> ${after[table]}`);}}
+function migrationStatements(source){return source.split(';').map(sql=>sql.trim()).filter(Boolean);}
+async function runMigration(db,source){await db.batch(migrationStatements(source).map(sql=>db.prepare(sql)));}
 
 async function prepare(db){
   const beforeCounts=await snapshotCounts(db);
@@ -88,7 +90,7 @@ async function prepare(db){
       const unexpected=(await explicitObjects(db,table)).filter(row=>!allowed[table].has(String(row.name))).map(row=>`${row.type}:${row.name}`);
       assert(!unexpected.length,`${table} has production indexes/triggers not recreated by migration 016 (${unexpected.join(', ')}); refusing automatic rebuild`);
     }
-    await db.exec(MIGRATION_016);
+    await runMigration(db,MIGRATION_016);
     applied016=true;
     map=await schemas(db);
     const cohortSql=norm(map.get('cohorts')?.sql), nextAssignmentSql=norm(map.get('program_assignments')?.sql);
@@ -97,7 +99,7 @@ async function prepare(db){
 
   map=await schemas(db);
   let applied017=false;
-  if(!map.has('program_completion_records')){await db.exec(MIGRATION_017);applied017=true;}
+  if(!map.has('program_completion_records')){await runMigration(db,MIGRATION_017);applied017=true;}
   await requireColumns(db,'program_completion_records',['completion_id','public_token','uid','holder_name','pathway_id','program_code','completion_title','status','org_id','cohort_id','assignment_id','capstone_score','evidence_summary_json','issued_at','revoked_at','revocation_reason']);
   const completionSql=norm((await schemas(db)).get('program_completion_records')?.sql);
   assert(completionSql.includes('public_token text not null unique'),'program_completion_records public_token uniqueness contract missing');
@@ -108,7 +110,7 @@ async function prepare(db){
 
   map=await schemas(db);
   let applied018=false;
-  if(!map.has('assessment_attempt_reviews')){await db.exec(MIGRATION_018);applied018=true;}
+  if(!map.has('assessment_attempt_reviews')){await runMigration(db,MIGRATION_018);applied018=true;}
   await requireColumns(db,'assessment_attempt_reviews',['attempt_id','uid','pathway_id','item_id','item_type','score','passed','answers_json','review_json','submitted_at']);
   const reviewIndexes=new Set((await rows(db,"SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='assessment_attempt_reviews'")).map(row=>row.name));
   assert(reviewIndexes.has('idx_assessment_attempt_reviews_owner'),'assessment_attempt_reviews owner index missing');

@@ -11,6 +11,8 @@ ok(bridge.includes("request.headers.get('Authorization')!==`Bearer ${expected}`"
 ok(bridge.includes("if(!expected"),'Bridge must deny every request while its secret is absent');
 ok(bridge.includes('Partial Career Skills constraint migration detected; refusing automatic repair'),'Bridge must fail closed on a partial 016 state');
 ok(bridge.includes('indexes/triggers not recreated by migration 016'),'Bridge must refuse unknown rebuild objects');
+ok(bridge.includes("source.split(';').map(sql=>sql.trim()).filter(Boolean)")&&bridge.includes('await db.batch('),'Bridge must send complete SQL statements through one transactional D1 batch instead of line-oriented exec');
+ok(!bridge.includes('await db.exec(MIGRATION_'),'Bridge must not send multiline migrations through D1 exec');
 ok(bridge.includes('assertUnchanged(beforeCounts,afterCounts)'),'Bridge must prove critical row counts did not change');
 ok(bridge.includes("PRAGMA quick_check")&&bridge.includes("PRAGMA foreign_key_check"),'Bridge must run SQLite integrity and foreign-key checks');
 ok(bridge.includes("Cache-Control':'no-store'")&&bridge.includes("X-Content-Type-Options':'nosniff'"),'Bridge responses need no-store and nosniff protections');
