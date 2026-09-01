@@ -18,6 +18,8 @@ for(const marker of [
   "api('/admin/check',{expected:[200]})",
   "assertIntegrity(before,'Preflight')",
   'discovery.cleanup?.targeted===true',
+  "crypto.createHash('sha256').update(`${identity.uid}:${probeKey}`)",
+  "retryOperation('Idempotent demo creation'",
   "preset:'revision_cycle',size:3,pathwayId:'investment-banking',probeKey",
   'retry.payload.demo?.orgId===demoOrgId&&retry.payload.demo?.reused===true',
   '/permission-matrix',

@@ -1,3 +1,5 @@
+const crypto=require('node:crypto');
+
 const workerUrl=String(process.env.CM_WORKER_URL||'https://capital-mastery-api.avadhanula-shriyan.workers.dev').replace(/\/+$/,'');
 const origin=String(process.env.CM_PRIMARY_ORIGIN||'https://sribyju.github.io').replace(/\/+$/,'');
 const adminToken=String(process.env.CM_ADMIN_ID_TOKEN||'').trim();
@@ -27,6 +29,17 @@ async function api(path,{method='GET',body,authenticated=true,expected=[200]}={}
     throw new Error(`${method} ${path} returned ${response.status}; expected ${expected.join('/')} — ${JSON.stringify(payload).slice(0,700)}`);
   }
   return {status:response.status,payload};
+}
+
+async function retryOperation(label,operation){
+  let lastError=null;
+  for(let attempt=1;attempt<=3;attempt+=1){
+    try{return await operation();}catch(error){
+      lastError=error;
+      if(attempt<3) await new Promise(resolve=>setTimeout(resolve,attempt*300));
+    }
+  }
+  throw new Error(`${label} failed after three attempts: ${lastError?.message||'unknown error'}`);
 }
 
 function assertIntegrity(payload,label){
@@ -88,14 +101,15 @@ async function cleanupCreatedDemo(){
   assert(discovery.ok===true&&discovery.synthetic===true,'Admin Demo discovery did not identify synthetic data');
   assert(discovery.cleanup?.targeted===true,'Production Worker does not advertise exact-target demo cleanup; refusing to create disposable data');
   baselineDemoIds=(discovery.demos||[]).map(item=>String(item.id||'')).filter(Boolean);
+  demoOrgId=`demo_org_${crypto.createHash('sha256').update(`${identity.uid}:${probeKey}`).digest('hex').slice(0,10)}`;
 
   try{
-    const {payload:created}=await api('/enterprise/admin/demo/create',{
+    const {payload:created}=await retryOperation('Idempotent demo creation',()=>api('/enterprise/admin/demo/create',{
       method:'POST',
       body:{preset:'revision_cycle',size:3,pathwayId:'investment-banking',probeKey},
       expected:[201]
-    });
-    demoOrgId=String(created.demo?.orgId||'');
+    }));
+    assert(created.demo?.orgId===demoOrgId,'Demo creation did not return the deterministic closure tenant ID');
     assert(/^demo_org_[A-Za-z0-9_-]+$/.test(demoOrgId),'Demo creation returned a non-synthetic organization identifier');
     assert(created.demo?.synthetic===true,'Demo creation response did not retain the synthetic-data marker');
     assert(Number(created.demo?.size)===3,'Demo creation did not honor the bounded three-learner probe size');
@@ -139,7 +153,6 @@ async function cleanupCreatedDemo(){
   }
 
   if(cleanupFailure) throw new Error(`${primaryFailure?`${primaryFailure.message}\n`:''}Targeted cleanup failed: ${cleanupFailure.message}`);
-  if(!demoOrgId) throw primaryFailure||new Error('Disposable Admin Demo was never created');
 
   const {payload:afterList}=await api('/enterprise/admin/demo',{expected:[200]});
   const afterIds=(afterList.demos||[]).map(item=>String(item.id||'')).filter(Boolean);
