@@ -13,6 +13,7 @@
 - `669a1b1` — added idempotent retry plus remote verification for ambiguous Firestore identity writes and retry-safe disposable cleanup.
 - `1999bfa` — updated the live release sentinels to the exact current production assets.
 - `3c836a9` — recorded the completed course-integrity production evidence and the remaining privileged closure boundary.
+- `51298de` — hardened the disposable live Firestore verifier with cross-account isolation, anonymous denial, schema rejection and asserted document/identity cleanup.
 
 The exact deployable application/Worker source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`. Commit `1999bfafcb1a5329291a5eeee9f8c0fc947d4609` changes release sentinels only; later commits update release evidence without changing the deployable application.
 
@@ -21,10 +22,11 @@ The exact deployable application/Worker source is `669a1b1bc82f4025101a135e3d09c
 - Dependency-free source regressions: **84 / 84 PASS**.
 - Exact local release browser matrix: **18 / 18 PASS**.
 - GitHub Pages live browser matrix: **18 / 18 PASS**, run `33522858871`.
-- Failure-seeking / adversarial gate: **PASS**, run `33522858887`.
-- Live production read-only gate: **PASS**, run `33523908480`.
+- Failure-seeking / adversarial gate: **PASS**, including verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`, run `33529309643`.
+- Live production read-only gate: **PASS**, including verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`, run `33529309731`.
 - Audited Pages package: **PASS**, run `33522858804`.
-- GitHub Pages deployment: **PASS**, including evidence-only head `3c836a93ab4d36f618d71f6dab74c43a0e6ba200`, run `33524271038`.
+- GitHub Pages deployment: **PASS**, including verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`, run `33529308471`.
+- GitHub Pages live browser matrix at verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`: **18 / 18 PASS**, run `33529309668`.
 - Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33523908643`.
 - Direct live-primary disposable account lifecycle: **PASS** — create, one-time full-name save, intentional reload, fresh-browser Firestore recovery, data deletion and Firebase account cleanup.
 - Cloudflare mirror browser matrix: **18 / 18 PASS** against `https://capitalmastery.pages.dev/`, including provider fail-safe behavior.
@@ -57,7 +59,9 @@ The ad kit now contains three vertical H.264 masters, including dedicated 18.6-s
 
 The intended Firestore rules are correct in source and compile in the release workflow. The owner-only `users/{uid}/progress/state` compatibility path works, and the complete live signup/name/reload/fresh-device lifecycle passes. The save path now also retries idempotently and verifies an already-committed document after ambiguous Firestore 5xx responses, closing the learner-facing failure observed during this release.
 
-An additional disposable live rules probe on September 1 directly exercised both paths. The compatibility progress write passed, while the protected `users/{uid}` identity write returned `403 PERMISSION_DENIED`. The disposable identity and compatibility document were cleaned by the probe. This is explicit evidence that the checked-in protected-root rule has not yet been promoted to the live Firestore project; it is not an application-flow inference.
+An additional disposable live rules probe on September 1 directly exercised both paths. The compatibility progress write passed, while the protected `users/{uid}` identity write returned `403 PERMISSION_DENIED`. The hardened verifier additionally proved progress cross-account isolation, anonymous denial, progress schema enforcement and successful removal of the disposable documents and both Firebase identities. User-root negative checks were denied as expected but remain independently uncertifiable until the owner-positive user-root write passes. This is explicit evidence that the checked-in protected-root rule has not yet been promoted to the live Firestore project; it is not an application-flow inference.
+
+The exact checked-in rules compiled successfully in the GitHub Java 21 Firestore emulator, run `33529328549`. The fail-closed workflow then stopped at `Require Firebase deployment credential`, before any production mutation. A fresh authorization audit confirmed: Firebase CLI has no authorized accounts; the GitHub repository has no secrets; the GitHub `production` environment has no secrets; and the Cloudflare Worker retains an opaque `ADMIN_UID` secret binding whose value is correctly not readable through the deployment surface.
 
 Formal evidence still requires a rules deployment/probe performed with a Firebase-authorized operator so the protected user-root fields can be certified independently of the compatibility path.
 

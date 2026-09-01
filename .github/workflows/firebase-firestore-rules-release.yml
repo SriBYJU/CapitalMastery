@@ -7,6 +7,9 @@ on:
       - '.github/workflows/firebase-firestore-rules-release.yml'
       - 'firebase.json'
       - 'firestore.rules'
+      - 'tests/credential-name-root-persistence-audit.mjs'
+      - 'tests/live-firestore-rules-probe.cjs'
+      - 'tests/live-firebase-auth-browser-audit.cjs'
   workflow_dispatch:
 
 permissions:
