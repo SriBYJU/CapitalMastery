@@ -5,7 +5,7 @@
   const QA_KEY = 'capitalMasteryQaPreviewV1';
   const LAST_ACTIVITY_KEY = 'cmLastLearningActivityV1';
   const STATEFUL_ROOTS = new Set(['career','learn','quiz','official-simulation','simulation','final','passport','credentials','credential','certificate','achievement','login']);
-  const RESUMABLE_ROOTS = new Set(['career','learn','quiz','official-simulation','final','assigned','role-lab','assessment-lab','skills']);
+  const RESUMABLE_ROOTS = new Set(['career','learn','quiz','official-simulation','final','assigned','role-lab','role-lab-run','v2-assessment','diagnostic','readiness','assessment-lab','skills']);
   let credentialRepairTimer = null;
   let credentialRepairCount = 0;
   let enhanceScheduled = false;
@@ -77,7 +77,6 @@
     node.setAttribute('aria-label','Learning assistance');
     node.innerHTML = `
       <div class="cm-save-confidence" role="status" aria-live="polite" hidden><span></span><b></b></div>
-      <a class="cm-resume-activity" href="#/" hidden><span>RESUME</span><b>Last activity</b></a>
       <button type="button" class="cm-context-help" aria-label="Open help for this page"><span aria-hidden="true">?</span><b>Help</b></button>`;
     node.querySelector('.cm-context-help')?.addEventListener('click', () => {
       const guide = document.querySelector('.cm-wb-guide');
@@ -96,16 +95,62 @@
     return node;
   }
 
+  function publicPathway(value='') {
+    const decoded=(()=>{try{return decodeURIComponent(String(value||''));}catch(_){return '';}})();
+    if(decoded==='quantitative-finance') return 'quant-finance';
+    if(decoded==='fp-and-a') return 'fpa';
+    return decoded;
+  }
+
+  function resumePathway(hash='') {
+    const p=routeParts(hash);
+    const root=p[0]||'';
+    if(['career','learn','quiz','official-simulation','final','role-lab','diagnostic','readiness','skills'].includes(root)) return publicPathway(p[1]);
+    if(root==='v2-assessment'){
+      const key=publicPathway(p[1]);
+      if(key==='ib-professional-final'||key==='ib-essentials-case') return 'investment-banking';
+      return key.replace(/-(professional-final|essentials-case)$/i,'');
+    }
+    return '';
+  }
+
+  function canonicalResume(item) {
+    if(!item) return null;
+    const pathway=resumePathway(item.hash);
+    const stateApi=window.CM_COURSE_STATE;
+    let hash=item.hash;
+    let label=item.label||'your last activity';
+    if(pathway&&stateApi?.getResumeDestination){
+      hash=stateApi.getResumeDestination({pathway,lastRoute:item.hash,track:stateApi.selectedTrack(pathway),authenticated:false});
+      const course=stateApi.resolveLearnerCourseState(pathway,{track:stateApi.selectedTrack(pathway),authenticated:false});
+      const stageId=stateApi.stageIdForRoute(hash);
+      const stage=course.stages.find(entry=>entry.id===stageId);
+      const career=window.CM_DATA?.careers?.find(entry=>entry.id===pathway||stateApi.apiPathway(entry.id)===stateApi.apiPathway(pathway));
+      label=`${career?.title||pathway.replace(/-/g,' ')} · ${stage?.name||'next required stage'}`;
+    }
+    return {hash,label,pathway,updatedAt:item.updatedAt};
+  }
+
   function updateResumeActivity() {
-    const link = dock().querySelector('.cm-resume-activity');
-    const currentRoot = routeParts()[0];
-    const item = readLastActivity();
-    const show = !!window.CM_AUTH?.user && !!item && !RESUMABLE_ROOTS.has(currentRoot) && currentRoot !== 'certificate';
-    link.hidden = !show;
-    if (!show) return;
-    link.href = item.hash;
-    link.querySelector('b').textContent = item.label === 'your last activity' ? 'Last activity' : item.label;
-    link.setAttribute('aria-label',`Resume ${item.label}`);
+    const [currentRoot='']=routeParts();
+    const main=document.querySelector('main#main');
+    if(!main) return;
+    const allowed=['','home','passport','career','careers'].includes(currentRoot);
+    const item=canonicalResume(readLastActivity());
+    const show=!!window.CM_AUTH?.user&&!!item&&allowed;
+    let shell=main.querySelector('[data-cm-primary-resume]');
+    if(!show){ shell?.remove(); return; }
+    if(!shell){
+      shell=document.createElement('section');
+      shell.className='cm-primary-resume-shell';
+      shell.setAttribute('data-cm-primary-resume','true');
+      const hero=main.querySelector('.page-hero, .hero, section');
+      if(hero) hero.insertAdjacentElement('afterend',shell); else main.prepend(shell);
+    }
+    const signature=`${item.hash}|${item.label}`;
+    if(shell.dataset.signature===signature) return;
+    shell.dataset.signature=signature;
+    shell.innerHTML=`<div class="container"><div class="cm-primary-resume-card"><div><span>YOUR NEXT REQUIRED STAGE</span><strong>${esc(item.label)}</strong><small>Progress is saved. Completed stages stay complete, and locked stages cannot be skipped.</small></div><a class="btn btn-gold" href="${esc(item.hash)}">Continue where you left off →</a></div></div>`;
   }
 
   function showSaveConfidence(label, tone = 'saved', persist = false) {
@@ -340,11 +385,11 @@
     .cm-profile-hub-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.cm-profile-hub-head span:first-child{display:block;font-size:.68rem;letter-spacing:.12em;color:var(--gold);font-weight:900}.cm-profile-hub-head strong{display:block;color:var(--navy);margin-top:2px}.cm-profile-live{font-size:.75rem;color:#2e7456!important;letter-spacing:0!important}
     .cm-profile-hub-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.cm-profile-hub-links a{background:#fff;border:1px solid #dbe1e6;border-radius:9px;padding:8px 10px;text-decoration:none;color:var(--navy);font-size:.8rem;font-weight:800}
     .cm-experience-dock{position:fixed;right:16px;bottom:16px;z-index:850;display:flex;align-items:stretch;gap:8px;max-width:min(560px,calc(100vw - 32px));pointer-events:none}.cm-experience-dock>*{pointer-events:auto;box-shadow:0 9px 28px rgba(7,26,51,.16)}
-    .cm-save-confidence,.cm-resume-activity,.cm-context-help{border:1px solid #cbd5df;border-radius:12px;background:#fff;color:#172d43;min-height:46px}.cm-save-confidence{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:.78rem}.cm-save-confidence[hidden]{display:none}.cm-save-confidence span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#e4f2e9;color:#265c43;font-weight:900}.cm-save-confidence[data-tone="working"] span{background:#edf2f7;color:#315675}.cm-save-confidence[data-tone="attention"]{border-color:#dcc58c;background:#fffaf0}.cm-save-confidence[data-tone="attention"] span{background:#f5e8c6;color:#725721}
-    .cm-resume-activity{display:grid;grid-template-columns:auto minmax(0,180px);column-gap:8px;align-items:center;padding:7px 12px;text-decoration:none}.cm-resume-activity[hidden]{display:none}.cm-resume-activity span{grid-row:1/3;color:#866625;font-size:.58rem;letter-spacing:.1em;font-weight:900}.cm-resume-activity b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.76rem;color:#172d43}.cm-resume-activity:hover{border-color:var(--gold);transform:translateY(-1px)}
+    .cm-save-confidence,.cm-context-help{border:1px solid #cbd5df;border-radius:12px;background:#fff;color:#172d43;min-height:46px}.cm-save-confidence{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:.78rem}.cm-save-confidence[hidden]{display:none}.cm-save-confidence span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#e4f2e9;color:#265c43;font-weight:900}.cm-save-confidence[data-tone="working"] span{background:#edf2f7;color:#315675}.cm-save-confidence[data-tone="attention"]{border-color:#dcc58c;background:#fffaf0}.cm-save-confidence[data-tone="attention"] span{background:#f5e8c6;color:#725721}
+    .cm-primary-resume-shell{padding:18px 0;background:#eef3f7;border-bottom:1px solid #d7e0e8}.cm-primary-resume-card{display:flex;align-items:center;justify-content:space-between;gap:22px;padding:20px 22px;border:1px solid #31475f;border-radius:15px;background:#071a33;color:#fff;box-shadow:0 12px 30px rgba(7,26,51,.13)}.cm-primary-resume-card>div{display:grid;gap:4px}.cm-primary-resume-card span{font-size:.68rem;letter-spacing:.12em;font-weight:900;color:#e5c984}.cm-primary-resume-card strong{font-size:1.08rem;color:#fff}.cm-primary-resume-card small{color:#d4dfe9;line-height:1.45}.cm-primary-resume-card .btn{flex:0 0 auto;white-space:nowrap}
     .cm-context-help{display:flex;align-items:center;gap:7px;padding:7px 11px;font:inherit;cursor:pointer}.cm-context-help span{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#071a33;color:#fff;font-weight:900}.cm-context-help b{font-size:.77rem}.cm-context-help:hover,.cm-context-help:focus-visible{border-color:var(--gold);outline:2px solid rgba(185,138,67,.35);outline-offset:2px}
     @media(max-width:980px){.nav-actions .cm-e2e-profile-nav{display:none!important}.cm-profile-button{display:inline-flex;margin-left:auto}.mobile-menu{margin-left:0!important}.cm-profile-text{display:none}.cm-profile-button{padding:5px;border-radius:50%;width:42px;height:42px;justify-content:center}.cm-profile-avatar{width:30px;height:30px}}
-    @media(max-width:680px){.cm-profile-button{display:inline-flex!important;flex:0 0 40px;width:40px;height:40px;min-height:40px}.cm-profile-avatar{width:29px;height:29px}.cm-profile-hub-links{display:grid}.cm-profile-hub-links a{text-align:center}.cm-experience-dock{right:10px;bottom:10px;max-width:calc(100vw - 20px)}.cm-save-confidence{max-width:210px}.cm-resume-activity{display:none!important}.cm-context-help b{display:none}.cm-context-help{padding:7px}}
+    @media(max-width:680px){.cm-profile-button{display:inline-flex!important;flex:0 0 40px;width:40px;height:40px;min-height:40px}.cm-profile-avatar{width:29px;height:29px}.cm-profile-hub-links{display:grid}.cm-profile-hub-links a{text-align:center}.cm-experience-dock{right:10px;bottom:10px;max-width:calc(100vw - 20px)}.cm-save-confidence{max-width:210px}.cm-context-help b{display:none}.cm-context-help{padding:7px}.cm-primary-resume-card{display:grid;padding:18px}.cm-primary-resume-card .btn{width:100%;white-space:normal}.cm-primary-resume-card strong{font-size:1rem}}
     @media print{.cm-profile-button,.cm-experience-dock{display:none!important}}
   `;
   if (!document.getElementById(style.id)) document.head.appendChild(style);

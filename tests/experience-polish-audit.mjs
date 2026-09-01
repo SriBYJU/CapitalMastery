@@ -4,9 +4,11 @@ const ux=fs.readFileSync('ux-stability.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const must=(value,message)=>{if(!value)throw new Error(message);};
 
-must(html.includes('ux-stability.js?v=20260831-phase2rc5'),'Experience polish must ship with a fresh production cache key');
+must(html.includes('ux-stability.js?v=20260901-courseintegrity1'),'Experience polish must ship with a fresh production cache key');
 must(ux.includes("const LAST_ACTIVITY_KEY = 'cmLastLearningActivityV1'"),'Learning resume must use a dedicated account-browser record');
-must(ux.includes("const RESUMABLE_ROOTS = new Set(['career','learn','quiz','official-simulation','final','assigned','role-lab','assessment-lab','skills'])"),'Only real learner-work routes may become resumable');
+must(ux.includes("const RESUMABLE_ROOTS = new Set(['career','learn','quiz','official-simulation','final','assigned','role-lab','role-lab-run','v2-assessment','diagnostic','readiness','assessment-lab','skills'])"),'Only real learner-work routes may become resumable');
+must(ux.includes('function canonicalResume(item)'),'Resume must resolve through the canonical course state machine');
+must(ux.includes('Continue where you left off →'),'The product must expose one prominent canonical resume action');
 must(ux.includes("role=\"status\" aria-live=\"polite\""),'Save confidence must be announced accessibly');
 must(ux.includes("Saved here · account sync will retry"),'Sync errors must reassure users without falsely claiming a cloud save');
 must(ux.includes("Offline · drafts stay on this device"),'Offline mode must explain the local-draft boundary');

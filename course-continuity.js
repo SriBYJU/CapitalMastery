@@ -120,7 +120,7 @@
     if (main.querySelector('.cm-server-assessment-review')) return;
     const current = main.querySelector('.cm-assessment-review');
     if (current && Number(current.dataset.best || 0) >= Number(best || 0)) return;
-    main.innerHTML = `<section class="section"><div class="container" style="max-width:860px"><div class="card cm-assessment-review cm-continuity-review passed" data-best="${Number(best)}"><div class="eyebrow">SAVED PASS · REVIEW MODE</div><div class="cm-result-score">${Number(best)}%</div><h1 class="serif">Assessment already passed.</h1><p>Your best recorded score is preserved. Reviewing the lesson never resets this pass, and you do not need to take the quiz again to continue.</p><div class="cm-result-actions"><a class="btn btn-gold" data-cm-pass-continue href="${esc(continueHref(pathway,part))}">Continue →</a><a class="btn btn-outline" data-cm-continuity-retake href="${esc(retakeHref(pathway,part))}">Retake assessment (optional)</a><a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathway)}/${part}">Review learning</a></div></div></div></section>`;
+    main.innerHTML = `<section class="section"><div class="container" style="max-width:860px"><div class="card cm-assessment-review cm-continuity-review passed" data-best="${Number(best)}"><div class="eyebrow">SAVED PASS · READ-ONLY REVIEW</div><div class="cm-result-score">${Number(best)}%</div><h1 class="serif">Assessment already passed.</h1><p>Your passed attempt is final and preserved. This route can only show Review now; it cannot create another attempt or lower your result.</p><div class="cm-result-actions"><a class="btn btn-gold" data-cm-pass-continue href="${esc(continueHref(pathway,part))}">Continue to next stage →</a><a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathway)}/${part}">Review learning</a></div></div></div></section>`;
   }
 
   function applyLessonPass(pathway,part,best) {
@@ -185,7 +185,8 @@
     const latest = parsedRoute();
     if (latest.root !== 'quiz' || latest.pathway !== r.pathway || Number(latest.rawPart) !== part || latest.query.get('retake') === '1') return false;
     if (best >= PASS) { renderSavedPass(r.pathway,part,best); return false; }
-    location.replace(`#/learn/${encodeURIComponent(r.pathway)}/${part}`);
+    // Keep the route visible as a read-only look-ahead. app.js and the secure
+    // renderer own the locked preview, so no questions or inputs are exposed.
     return true;
   }
 
@@ -218,9 +219,8 @@
     }
     if (r.root !== 'quiz' || !r.pathway) return;
     const part = Number(r.rawPart);
-    const optional = link.matches('[data-cm-continuity-retake]');
     const failed = !!link.closest('.cm-result.failed,.quiz-result .fail') && /Try Again/i.test(link.textContent || '');
-    if (!optional && !failed) return;
+    if (!failed) return;
     event.preventDefault(); event.stopImmediatePropagation();
     secureRetryNavigation(r.pathway,part);
   }, true);

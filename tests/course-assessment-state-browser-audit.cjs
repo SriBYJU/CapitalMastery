@@ -26,6 +26,8 @@ function assessmentPayload(){
   let assessmentGets=0;
   let submitCalls=0;
   let submitScore=70;
+  let serverPass=false;
+  let latestSubmittedScore=null;
   const errors=[];
   try{
     await context.addInitScript(()=>localStorage.setItem('cmCredentialNameOnboardedV3:course-state-audit-user','true'));
@@ -38,9 +40,16 @@ function assessmentPayload(){
         assessmentGets++;
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(assessmentPayload())});
       }
+      if(url.pathname==='/assessment/review/investment-banking/part-5'){
+        if(latestSubmittedScore===null) return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'No saved attempt'})});
+        const correct=Math.round(latestSubmittedScore/10);
+        return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,review:{attemptId:serverPass?'saved-pass':'saved-failure',pathwayId:'investment-banking',itemId:'part-5',score:latestSubmittedScore,passed:serverPass,correct,total:10,submittedAt:'2026-09-01T12:00:00Z',questions:Array.from({length:10},(_,i)=>({id:`audit-q${i+1}`,position:i+1,prompt:`Audit question ${i+1}`,submitted:'Correct',correct:i<correct,correctAnswer:'Correct',rationale:i<correct?'Correct application.':'Review the underlying assumption.'}))}})});
+      }
       if(url.pathname==='/assessment/submit'){
         submitCalls++;
         const score=submitScore;
+        latestSubmittedScore=score;
+        if(score>=80) serverPass=true;
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,score,passed:score>=80,objectiveTotal:10,objectiveCorrect:Math.round(score/10),writingScore:null,issuedCredentials:[]})});
       }
       if(url.pathname.startsWith('/progress/')) return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,progress:[]})});
@@ -75,25 +84,33 @@ function assessmentPayload(){
     assert(await page.locator('.cm-live-error').count()===0,`First submit rendered error: ${await page.locator('.cm-live-error').allTextContents()}`);
     assert(await page.locator('.cm-result.failed').count()===1,'Expected reproduced 70% failed result');
     assert((await page.locator('.cm-result-score').textContent()).trim()==='70%','Expected reproduced 70% failed result');
-    const retry=page.getByRole('link',{name:/Try Again/});
-    assert(await retry.count()===1,'Failed result missing Try Again link');
+    const savedAttempt=page.getByRole('link',{name:/Review saved attempt/});
+    assert(await savedAttempt.count()===1,'Failed result missing saved-attempt review link');
+    assert(!/retake=1/.test(await savedAttempt.getAttribute('href')||''),'Failed result silently started another attempt instead of opening review');
+    await savedAttempt.click();
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
+    const failedReviewText=await page.locator('.cm-server-assessment-review').innerText();
+    assert(/7 \/ 10/.test(failedReviewText)&&/70%/.test(failedReviewText),'Failed saved review did not preserve score count and percentage');
+    assert(/Audit question 10[\s\S]*Your submitted answer[\s\S]*Correct answer/i.test(failedReviewText),'Failed saved review did not preserve question-by-question answers');
+    const retry=page.getByRole('link',{name:/Retry assessment/});
+    assert(await retry.count()===1,'Failed saved review missing explicit Retry action');
     const retryHref=await retry.getAttribute('href');
     assert(/retake=1/.test(retryHref||'')&&/attempt=\d+/.test(retryHref||''),`Retry href is not unique: ${retryHref}`);
     await retry.click();
     await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
       const snapshot=await page.locator('#app main#main').innerText().catch(()=>'<main unavailable>');
       const html=await page.locator('#app main#main').innerHTML().catch(()=>'<main unavailable>');
-      throw new Error(`Try Again did not render fresh secure form. retryHref=${retryHref}; submitCalls=${submitCalls}; assessmentGets=${assessmentGets}; getsBeforeFail=${getsBeforeFail}; url=${page.url()}; main=${JSON.stringify(snapshot.slice(0,1800))}; html=${JSON.stringify(html.slice(0,2400))}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
+      throw new Error(`Explicit Retry did not render fresh secure form. retryHref=${retryHref}; submitCalls=${submitCalls}; assessmentGets=${assessmentGets}; getsBeforeFail=${getsBeforeFail}; url=${page.url()}; main=${JSON.stringify(snapshot.slice(0,1800))}; html=${JSON.stringify(html.slice(0,2400))}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
     });
-    assert(assessmentGets>getsBeforeFail,'Try Again did not request/render a fresh assessment');
+    assert(assessmentGets>getsBeforeFail,'Explicit Retry did not request/render a fresh assessment');
     assert(/retake=1/.test(page.url()),'Retry route lost explicit retake mode');
 
     submitScore=90;
     for(let i=1;i<=10;i++) await page.locator(`input[name="audit-q${i}"]`).first().check();
     await page.locator('#cm-official-form button[type="submit"]').click();
-    await page.waitForSelector('.cm-result.passed',{timeout:10000});
+    await page.waitForSelector('.cm-result.passed,.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review',{timeout:10000});
     assert(submitCalls===2,`Expected two server submits after retake, got ${submitCalls}`);
-    assert((await page.locator('.cm-result-score').textContent()).trim()==='90%','Expected 90% passed result');
+    assert(/90%/.test(await page.locator('#app main#main').innerText()),'Expected 90% passed result or permanent saved-pass review');
 
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.learning-shell',{timeout:10000});
@@ -103,23 +120,23 @@ function assessmentPayload(){
 
     const reviewLink=page.getByRole('link',{name:/Review passed knowledge check/});
     await reviewLink.click();
-    await page.waitForSelector('.cm-assessment-review',{timeout:10000});
-    const reviewText=await page.locator('.cm-assessment-review').innerText();
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
+    const reviewText=await page.locator('.cm-server-assessment-review').innerText();
     assert(/already passed/i.test(reviewText),'Review route did not render saved-pass state');
     assert(/90%/.test(reviewText),'Review route did not preserve best score');
     assert(await page.locator('#cm-official-form').count()===0,'Review route silently started a new blank assessment');
+    assert(/9 \/ 10/.test(reviewText),'Saved pass review did not show the correct-answer count');
+    assert(/Audit question 10[\s\S]*Your submitted answer[\s\S]*Correct answer/i.test(reviewText),'Saved pass review did not preserve question-by-question answers');
+    assert(await page.getByRole('link',{name:/Retake assessment/i}).count()===0,'Passed review must not expose a retake');
 
-    const optional=page.getByRole('link',{name:/Retake assessment \(optional\)/});
-    assert(await optional.count()===1,'Saved pass review is missing explicit optional retake');
-    const getsBeforeOptional=assessmentGets;
-    await optional.click();
-    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
-      const snapshot=await page.locator('#app main#main').innerText().catch(()=>'<main unavailable>');
-      throw new Error(`Optional retake did not render a fresh secure form. assessmentGets=${assessmentGets}; getsBeforeOptional=${getsBeforeOptional}; url=${page.url()}; main=${JSON.stringify(snapshot.slice(0,1800))}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
-    });
-    assert(assessmentGets>getsBeforeOptional,'Optional retake did not open a fresh assessment');
+    const getsBeforeForgery=assessmentGets, submitsBeforeForgery=submitCalls;
+    await page.evaluate(()=>{location.hash='#/quiz/investment-banking/5?retake=1&attempt=forged-after-pass';});
+    await page.waitForSelector('.cm-assessment-review,.cm-server-assessment-review,.cm-course-release-review',{timeout:10000});
+    assert(await page.locator('#cm-official-form').count()===0,'A forged retake route reopened a permanently passed assessment');
+    assert(assessmentGets===getsBeforeForgery,'A forged retake route requested a fresh question set after pass');
+    assert(submitCalls===submitsBeforeForgery,'A forged retake route created another submission after pass');
 
     assert(errors.length===0,`Course assessment browser errors: ${[...new Set(errors)].join(' | ')}`);
-    console.log('COURSE ASSESSMENT STATE BROWSER AUDIT PASS: 70% retry opens fresh attempt; 90% pass survives course review; retake is explicit and optional');
+    console.log('COURSE ASSESSMENT STATE BROWSER AUDIT PASS: 70% retry opens explicitly; 90% pass is permanent, question-by-question reviewable, and forged retake routes cannot reopen it');
   }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e);process.exit(1);});

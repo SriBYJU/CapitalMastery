@@ -185,7 +185,7 @@ The remaining work is no longer broad feature construction. It is production pro
 3. Require D1 `quick_check = ok`, zero foreign-key violations and record table counts.
 4. Publish the audited `main` commit to the primary GitHub Pages site and retain the exact `dist-pages/` artifact for the Cloudflare mirror.
 5. Confirm the primary frontend generation, private-artifact boundary and canonical metadata; confirm mirror security headers separately.
-6. Re-run the complete 17-suite live Chromium matrix against `https://sribyju.github.io/CapitalMastery/`.
+6. Re-run the complete 18-suite live Chromium matrix against `https://sribyju.github.io/CapitalMastery/`.
 7. Verify `sribyju.github.io` is an authorized Firebase Authentication domain and keep `capitalmastery.pages.dev` authorized for the mirror.
 8. Run final signed-out, signed-in learner, signed-in employer, role/tenant, Firm Layer, manager-review, notification/export and Admin Demo Lab production smokes.
 9. Delete disposable QA data/accounts and recheck integrity.

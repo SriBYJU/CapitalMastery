@@ -174,28 +174,30 @@
 
   function renderReadOnlyReview(pathway, part, best) {
     const route = parts();
-    if (route.root !== 'quiz' || route.pathway !== pathway || Number(route.part) !== Number(part) || route.query.get('retake') === '1') return false;
+    if (route.root !== 'quiz' || route.pathway !== pathway || Number(route.part) !== Number(part)) return false;
     const main = document.querySelector('#app main#main');
     if (!main) return false;
     const saved = loadReview(pathway, part);
     const score = Math.max(Number(best || 0), Number(saved?.score || 0));
+    const passed=score>=PASS||saved?.passed===true;
+    if(!passed&&route.query.get('retake')==='1') return false;
     const hasItems = Array.isArray(saved?.items) && saved.items.length > 0;
+    const correctCount = hasItems ? saved.items.filter(item => item.correct === true).length : null;
     if (main.querySelector('.cm-server-assessment-review')) return true;
     const current=main.querySelector('.cm-course-release-review,.cm-continuity-review');
     if(current&&Number(current.dataset.best||0)>=score) return true;
 
     main.innerHTML = `<section class="section cm-readonly-review-shell"><div class="container" style="max-width:980px">
-      <div class="card cm-assessment-review cm-course-release-review passed" data-best="${score}">
-        <div class="eyebrow">SAVED PASS · READ-ONLY REVIEW</div>
-        <div class="cm-result-score">${score}%</div>
-        <h1 class="serif">Assessment already passed.</h1>
-        <p>Your pass is preserved. Review shows your completed attempt and never creates a new attempt. Retake is separate and optional.</p>
+      <div class="card cm-assessment-review cm-course-release-review ${passed?'passed':'failed'}" data-best="${score}">
+        <div class="eyebrow">${passed?'SAVED PASS':'SAVED ATTEMPT'} · READ-ONLY REVIEW</div>
+        <div class="cm-result-score">${correctCount===null?`${score}%`:`${correctCount} / ${saved.items.length}`}</div>
+        <h1 class="serif">${passed?'Assessment already passed.':'Review before retrying.'}</h1>
+        <p><strong>${score}% · ${passed?'Passed':'Retry required'}.</strong> ${passed?'Your passed attempt is final and preserved. Review shows your completed answers and never creates another attempt.':'Your prior answers and feedback are saved below. A new attempt starts only when you explicitly choose Retry.'}</p>
         ${hasItems
           ? `<div class="cm-review-list">${saved.items.map(reviewItemHtml).join('')}</div>`
           : `<div class="cm-review-history-note"><strong>Attempt answers are not available for this older pass.</strong><span>The pass is preserved. New attempts now save a private read-only answer history in this browser so Review can show exactly what you submitted.</span></div>`}
         <div class="cm-result-actions">
-          <a class="btn btn-gold" data-cm-pass-continue href="${esc(correctContinueHref(pathway, part))}">Continue to next stage →</a>
-          <a class="btn btn-outline" data-cm-release-retake href="#/quiz/${encodeURIComponent(pathway)}/${Number(part)}?retake=1&attempt=${Date.now()}">Retake assessment (optional)</a>
+          ${passed?`<a class="btn btn-gold" data-cm-pass-continue href="${esc(correctContinueHref(pathway, part))}">Continue to next stage →</a>`:`<a class="btn btn-primary" data-cm-release-retry href="#/quiz/${encodeURIComponent(pathway)}/${Number(part)}?retake=1&attempt=${Date.now()}">Retry assessment →</a>`}
           <a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathway)}/${Number(part)}">Review learning</a>
         </div>
       </div>
@@ -227,7 +229,7 @@
     const route = parts();
     if (route.root !== 'quiz' || !route.pathway) return;
     const part = Number(route.part);
-    if (!Number.isFinite(part) || part < 1 || part > 5 || route.query.get('retake') === '1') return;
+    if (!Number.isFinite(part) || part < 1 || part > 5) return;
     const best = localBest(route.pathway, part);
     const passCard = document.querySelector('#app main#main .cm-assessment-review, #app main#main .cm-continuity-review');
     if (!passCard || best < PASS) return;
@@ -368,27 +370,32 @@
 
   function maybeRenderReview() {
     const route = parts();
-    if (route.root !== 'quiz' || !route.pathway || route.query.get('retake') === '1') return;
+    if (route.root !== 'quiz' || !route.pathway) return;
     const part = Number(route.part);
     if (!Number.isFinite(part) || part < 1 || part > 5) return;
     const best = localBest(route.pathway, part);
-    if (best < PASS) return;
+    const saved=loadReview(route.pathway,part);
+    if (best < PASS && !saved) return;
+    if(best<PASS&&route.query.get('retake')==='1') return;
     if (document.querySelector('#app main#main .cm-server-assessment-review')) return;
     renderReadOnlyReview(route.pathway, part, best);
   }
 
   function enhance() {
     if (normalizeLegacySimulationRoute()) return;
+    const route = parts();
+    // Capture the just-returned server result before any saved-review renderer
+    // can replace the result card. Otherwise an older failed score can win the
+    // mutation race and hide a newly recorded pass.
+    if (route.root === 'quiz' && route.pathway) {
+      const part = Number(route.part);
+      if (Number.isFinite(part)) enrichSecureReviewFromResult(route.pathway, part);
+    }
     repairCareerSimulationLinks();
     repairPassedLessonLinks();
     repairSavedPassContinue();
     replaceAdminPreview();
     maybeRenderReview();
-    const route = parts();
-    if (route.root === 'quiz' && route.pathway) {
-      const part = Number(route.part);
-      if (Number.isFinite(part)) enrichSecureReviewFromResult(route.pathway, part);
-    }
   }
 
   function schedule() {

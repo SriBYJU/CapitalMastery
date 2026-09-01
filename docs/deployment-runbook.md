@@ -109,7 +109,7 @@ The workflow performs this order:
 8. Require `/admin/integrity` to exist and remain protected (`401`/`403`, never `404` unauthenticated).
 9. Deploy exactly `dist-pages/` to Pages project `capitalmastery`.
 10. Require current generation markers plus `X-Frame-Options: DENY` and `Permissions-Policy` on the Cloudflare mirror.
-11. Run the 17-suite Chromium release matrix against `https://capitalmastery.pages.dev` as a secondary-host regression.
+11. Run the 18-suite Chromium release matrix against `https://capitalmastery.pages.dev` as a secondary-host regression.
 
 The UI is designed to remain backward-compatible with the previous Worker during rollout. The Worker must accept the previous UI until the Pages deployment is verified.
 

@@ -162,6 +162,24 @@
     return `#/career/${id}`;
   }
 
+  function stageIdForRoute(route=''){
+    const raw=String(route||'').replace(/^#\/?/,'');
+    const [path]=raw.split('?');
+    const parts=path.split('/').filter(Boolean);
+    const [root,,third]=parts;
+    if(root==='learn'&&third) return `part-${Number(third)}`;
+    if(root==='quiz'&&third) return `part-${Number(third)}-assessment`;
+    if(root==='official-simulation'||root==='simulation') return 'simulation';
+    if(root==='role-lab'||root==='role-lab-run') return 'role-lab';
+    if(root==='readiness') return 'readiness';
+    if(root==='final') return 'professional-final';
+    if(root==='v2-assessment'){
+      const key=decodeURIComponent(parts[1]||'');
+      return /professional-final$/i.test(key)?'professional-final':'part-2-assessment';
+    }
+    return null;
+  }
+
   function getNextCourseDestination({pathway,currentStage,track=selectedTrack(pathway),assignmentId=''}){
     const sequence=COURSE_SEQUENCE[track]||COURSE_SEQUENCE[PROFESSIONAL];
     const normalized=/^part-\d+$/.test(currentStage||'')?`${currentStage}-assessment`:currentStage;
@@ -182,7 +200,7 @@
       const itemId=itemForStage(entry.id);
       const route=routeFor(pathway,entry.id,track);
       const result=resultFor({stage:entry,pathway,careerState,itemId,authoritativeRows,v2Attempts,roleLabRuns,readinessEvidence,authenticated,qaPreview});
-      return {...entry,itemId,route,nextRoute:entry.nextStageId?routeFor(pathway,entry.nextStageId,track):(assignment?.id?`#/assigned/${encodeURIComponent(assignment.id)}`:`#/career/${encodeURIComponent(pathway)}`),reviewRoute:result.reviewAvailable?`${route}${route.includes('?')?'&':'?'}review=1`:null,retakeRoute:['assessment','final'].includes(entry.type)?`${route}${route.includes('?')?'&':'?'}retake=1`:null,...result};
+      return {...entry,itemId,route,nextRoute:entry.nextStageId?routeFor(pathway,entry.nextStageId,track):(assignment?.id?`#/assigned/${encodeURIComponent(assignment.id)}`:`#/career/${encodeURIComponent(pathway)}`),reviewRoute:result.reviewAvailable?`${route}${route.includes('?')?'&':'?'}review=1`:null,retakeRoute:result.failed&&['assessment','final'].includes(entry.type)?`${route}${route.includes('?')?'&':'?'}retake=1`:null,...result};
     });
     for(let i=0;i<stages.length;i++){
       const current=stages[i];
@@ -198,6 +216,10 @@
       }
       current.missingRequirements=current.status==='locked'&&prerequisite?[prerequisite.name]:[];
       current.lockReason=current.missingRequirements.length?`Complete ${current.missingRequirements.join(', ')} first.`:null;
+      current.canStart=current.status==='available'||current.status==='in_progress'||current.status==='failed';
+      current.canReview=current.reviewAvailable===true;
+      current.canRetry=current.failed===true&&['assessment','final'].includes(current.type);
+      current.primaryAction=current.passed?'review':current.failed?'retry':current.status==='locked'?'preview':'start';
       Object.freeze(current);
     }
     const next=stages.find(entry=>['available','in_progress','failed'].includes(entry.status));
@@ -213,5 +235,13 @@
     return stage||{status:'locked',missingRequirements:['Unknown course stage'],route:`#/career/${encodeURIComponent(pathway)}`};
   }
 
-  window.CM_COURSE_STATE=Object.freeze({PASS,CAREER_SKILLS,PROFESSIONAL,COURSE_SEQUENCE,selectedTrack,apiPathway,routeFor,getNextCourseDestination,resolveLearnerCourseState,getCourseAccessState});
+  function getResumeDestination({pathway,lastRoute='',...options}){
+    const course=resolveLearnerCourseState(pathway,options);
+    const stageId=stageIdForRoute(lastRoute);
+    const stage=course.stages.find(entry=>entry.id===stageId);
+    if(!stage||stage.status==='locked'||stage.passed) return course.nextDestination;
+    return stage.route;
+  }
+
+  window.CM_COURSE_STATE=Object.freeze({PASS,CAREER_SKILLS,PROFESSIONAL,COURSE_SEQUENCE,selectedTrack,apiPathway,routeFor,stageIdForRoute,getNextCourseDestination,getResumeDestination,resolveLearnerCourseState,getCourseAccessState});
 })();

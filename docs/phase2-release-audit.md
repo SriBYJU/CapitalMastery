@@ -10,7 +10,7 @@
 
 **Worker:** `https://capital-mastery-api.avadhanula-shriyan.workers.dev`
 
-> **September 1 current-status update:** the canonical GitHub Pages generation, 17-suite live browser matrix, failure-seeking gate, production read-only gate, provider-safety probe and full disposable Firebase account/name/fresh-device/cleanup lifecycle are green. Production D1 migrations 016–018 are applied with clean integrity. Formal closure is now held by missing Firebase rules-deployment authorization and remaining Admin-only live evidence—not by an open public learner-flow failure. See [`release-evidence/phase2-status-2026-09-01.md`](release-evidence/phase2-status-2026-09-01.md) for current SHAs, workflow runs and the exact external boundary. Historical artifact details below are retained for traceability.
+> **September 1 current-status update:** the canonical GitHub Pages generation, 18-suite live browser matrix, failure-seeking gate, production read-only gate, provider-safety probe and full disposable Firebase account/name/fresh-device/cleanup lifecycle are green. Production D1 migrations 016–018 are applied with clean integrity. Formal closure is now held by missing Firebase rules-deployment authorization and remaining Admin-only live evidence—not by an open public learner-flow failure. See [`release-evidence/phase2-status-2026-09-01.md`](release-evidence/phase2-status-2026-09-01.md) for current SHAs, workflow runs and the exact external boundary. Historical artifact details below are retained for traceability.
 
 ## 1. Authoritative corrected product gate
 
@@ -224,7 +224,7 @@ Do not interpret old-production browser failures as current-source failures; dep
 
 ## 6. GitHub Pages primary
 
-GitHub Pages is the canonical production frontend. The repository's configured branch deployment publishes accepted `main` commits, and `GitHub Pages live read-only audit` waits for the new generation, checks that internal artifacts remain private, and executes the 17-suite Chromium matrix. Cloudflare Pages remains a separately audited secondary mirror.
+GitHub Pages is the canonical production frontend. The repository's configured branch deployment publishes accepted `main` commits, and `GitHub Pages live read-only audit` waits for the new generation, checks that internal artifacts remain private, and executes the 18-suite Chromium matrix. Cloudflare Pages remains a separately audited secondary mirror.
 
 ## 7. Production promotion path
 
@@ -241,7 +241,7 @@ For Worker or secondary-mirror changes, run **Cloudflare production release** ma
 5. verifies `/health`, bad-Origin rejection, unauthenticated auth blocking and protected `/admin/integrity` existence;
 6. deploys exactly `dist-pages/` to project `capitalmastery`;
 7. verifies mirror generation markers and Cloudflare security headers; and
-8. runs the 17-suite Chromium release matrix against `capitalmastery.pages.dev`.
+8. runs the 18-suite Chromium release matrix against `capitalmastery.pages.dev`.
 
 It deliberately does **not** claim Phase 2 closure because authenticated D1/Firebase/tenant/cleanup evidence remains separate.
 

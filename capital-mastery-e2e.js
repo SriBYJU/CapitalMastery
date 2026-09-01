@@ -214,7 +214,7 @@
     if (guide.dataset.mode !== mode) {
       guide.dataset.mode = mode;
       guide.innerHTML = marked
-        ? '<span class="cm-e2e-step good">✓</span><div><strong>Learning marked complete.</strong><p>Your lesson completion is saved. Now take the official assessment and score 80% or higher. <b>After the quiz, reload once if the pathway card does not immediately update.</b></p></div>'
+        ? '<span class="cm-e2e-step good">✓</span><div><strong>Learning complete · assessment unlocked.</strong><p>Your progress is saved automatically. Pass the official assessment at 80% or higher to unlock the next stage; a passed assessment becomes permanent read-only Review.</p></div>'
         : '<span class="cm-e2e-step">1</span><div><strong>Mark the lesson complete before taking the quiz.</strong><p>Click <b>Mark Learning Complete</b> below first. This records that you finished the lesson and unlocks the official assessment.</p></div>';
     }
 

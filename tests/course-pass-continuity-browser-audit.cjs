@@ -9,7 +9,7 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
 (async()=>{
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900}});
-  let assessmentGets=0, submitCalls=0, submitScore=70, serverPass=false;
+  let assessmentGets=0, submitCalls=0, submitScore=70, serverPass=false, latestSubmittedScore=null;
   const errors=[];
   try{
     await context.addInitScript(()=>localStorage.setItem('cmCredentialNameOnboardedV3:continuity-audit-user','true'));
@@ -22,9 +22,15 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
         assessmentGets++;
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(assessmentPayload())});
       }
+      if(url.pathname==='/assessment/review/investment-banking/part-5'){
+        if(latestSubmittedScore===null) return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'No saved attempt'})});
+        const correct=Math.round(latestSubmittedScore/10);
+        return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,review:{attemptId:serverPass?'continuity-pass':'continuity-failure',pathwayId:'investment-banking',itemId:'part-5',score:latestSubmittedScore,passed:serverPass,correct,total:10,submittedAt:'2026-09-01T12:00:00Z',questions:Array.from({length:10},(_,i)=>({id:`continuity-q${i+1}`,position:i+1,prompt:`Continuity question ${i+1}`,submitted:'Correct',correct:i<correct,correctAnswer:'Correct',rationale:i<correct?'Correct application.':'Review the underlying assumption.'}))}})});
+      }
       if(url.pathname==='/assessment/submit'){
         submitCalls++;
         const score=submitScore;
+        latestSubmittedScore=score;
         if(score>=80) serverPass=true;
         return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,score,passed:score>=80,objectiveTotal:10,objectiveCorrect:Math.round(score/10),writingScore:null,issuedCredentials:[]})});
       }
@@ -57,19 +63,22 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     await page.locator('#cm-official-form button[type="submit"]').click();
     await page.waitForSelector('.cm-result.failed',{timeout:10000});
     assert(submitCalls===1,'First failed assessment should submit exactly once');
+    await page.getByRole('link',{name:/Review saved attempt/}).click();
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
+    assert(/7 \/ 10/.test(await page.locator('.cm-server-assessment-review').innerText()),'Failed attempt review did not preserve the answer count');
     const getsBeforeRetry=assessmentGets;
-    await page.getByRole('link',{name:/Try Again/}).click();
+    await page.getByRole('link',{name:/Retry assessment/}).click();
     await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
       const snapshot=await page.evaluate(()=>({href:location.href,hash:location.hash,liveRoute:typeof window.CM_LIVE_ROUTE,continuity:!!window.CM_COURSE_CONTINUITY,track:localStorage.getItem('capitalMasteryTrainingTrackV1:investment-banking'),activeUid:localStorage.getItem('capitalMasteryActiveUidV1'),state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null'),userState:JSON.parse(localStorage.getItem('capitalMasteryUserStateV1:continuity-audit-user')||'null'),main:(document.querySelector('#app main#main')?.innerText||'<main unavailable>').slice(0,2200),form:!!document.querySelector('#cm-official-form'),failed:!!document.querySelector('.cm-result.failed'),loading:!!document.querySelector('.cm-live-card')}));
       throw new Error(`Retry did not reopen secure form. assessmentGets=${assessmentGets}; submitCalls=${submitCalls}; snapshot=${JSON.stringify(snapshot)}; errors=${JSON.stringify(errors)}; cause=${error.message}`);
     });
-    assert(assessmentGets>getsBeforeRetry,`Try Again did not request a fresh secure assessment: before=${getsBeforeRetry}, after=${assessmentGets}, url=${page.url()}`);
+    assert(assessmentGets>getsBeforeRetry,`Explicit Retry did not request a fresh secure assessment: before=${getsBeforeRetry}, after=${assessmentGets}, url=${page.url()}`);
     assert(/retake=1/.test(page.url())&&/attempt=\d+/.test(page.url()),`Retry did not own a unique retake route: ${page.url()}`);
 
     submitScore=90;
     for(let i=1;i<=10;i++) await page.locator(`input[name="continuity-q${i}"]`).first().check();
     await page.locator('#cm-official-form button[type="submit"]').click();
-    await page.waitForSelector('.cm-result.passed',{timeout:10000});
+    await page.waitForSelector('.cm-result.passed,.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review',{timeout:10000});
     assert(submitCalls===2,'Passing retry should submit exactly once');
 
     const storedAfterPass=await page.evaluate(()=>JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null')?.careers?.['investment-banking']?.simulationKnowledge||0);
@@ -96,14 +105,15 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('[data-cm-review-passed]',{timeout:10000});
     await page.locator('[data-cm-review-passed]').first().click();
-    await page.waitForSelector('.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review',{timeout:10000});
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
     assert(await page.locator('#cm-official-form').count()===0,'Reviewing an already-passed assessment should not silently open a blank quiz');
-    assert(/90%/.test(await page.locator('.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review').first().innerText()),'Saved-pass review did not preserve best score');
-
-    const getsBeforeOptional=assessmentGets;
-    await page.getByRole('link',{name:/Retake assessment \(optional\)/}).click();
-    await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000});
-    assert(assessmentGets>getsBeforeOptional,'Explicit optional retake did not open a fresh secure assessment');
+    assert(/90%/.test(await page.locator('.cm-server-assessment-review').innerText()),'Saved-pass review did not preserve best score');
+    assert(await page.getByRole('link',{name:/Retake assessment/i}).count()===0,'A permanent saved pass must not expose a retake action');
+    const getsBeforeForgery=assessmentGets, submitsBeforeForgery=submitCalls;
+    await page.evaluate(()=>{location.hash='#/quiz/investment-banking/5?retake=1&attempt=forged-after-pass';});
+    await page.waitForSelector('.cm-server-assessment-review,.cm-course-release-review,.cm-continuity-review',{timeout:10000});
+    assert(await page.locator('#cm-official-form').count()===0,'A forged retake hash reopened a permanently passed assessment');
+    assert(assessmentGets===getsBeforeForgery&&submitCalls===submitsBeforeForgery,'A forged retake hash reached assessment generation or submission after pass');
 
     await page.evaluate(()=>{
       const key='capitalMasteryLocalStateV1';const s=JSON.parse(localStorage.getItem(key));
@@ -123,6 +133,6 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     assert((await careerSkillsContinue.getAttribute('href'))==='#/official-simulation/investment-banking','Career Skills Part 5 should continue to its practical capstone after the knowledge check pass');
 
     assert(errors.length===0,`Course continuity browser errors: ${[...new Set(errors)].join(' | ')}`);
-    console.log('COURSE PASS CONTINUITY BROWSER AUDIT PASS: 70% retries cleanly; 90% pass survives lesson review and repeated auth; Next skips completed quiz; server restores pass cross-device; PR/CS continuation stays track-aware');
+    console.log('COURSE PASS CONTINUITY BROWSER AUDIT PASS: 70% retries cleanly; 90% pass remains permanent through review, forged routes, and repeated auth; Next skips completed quiz; server restores pass cross-device; PR/CS continuation stays track-aware');
   } finally { await context.close(); await browser.close(); }
 })().catch(e=>{console.error(e);process.exit(1);});

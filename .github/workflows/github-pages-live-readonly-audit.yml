@@ -117,6 +117,7 @@ jobs:
           CM_AUDIT_URL="${PRIMARY}/" node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/course-assessment-state-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL="${PRIMARY}/" node tests/course-no-skip-resume-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/legacy-simulation-refusal-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/ib-workbench-navigation-guide-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/v2-assessment-review-browser-audit.cjs
@@ -131,4 +132,4 @@ jobs:
           CM_AUDIT_URL="${PRIMARY}/" node tests/employer-role-matrix-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/employer-invite-lifecycle-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY}/" node tests/visual-contrast-browser-audit.cjs
-          echo 'GitHub Pages seventeen-suite live browser matrix: PASS'
+          echo 'GitHub Pages eighteen-suite live browser matrix: PASS'

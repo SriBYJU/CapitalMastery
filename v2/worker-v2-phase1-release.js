@@ -843,6 +843,18 @@ export default {
           if(!shared.eligible) throw new HttpError(409,`Earn the assigned Career Skills prerequisites first: ${shared.missing.join(', ')}`);
         }
 
+        if(itemId!=='simulation'){
+          const passedRecord=await env.DB.prepare(`
+            SELECT best_score,completed,completed_at,updated_at
+            FROM official_progress
+            WHERE uid=? AND pathway_id=? AND item_id=? AND completed=1 AND best_score>=?
+            LIMIT 1
+          `).bind(user.sub,pathway.id,itemId,PASS_SCORE).first();
+          if(passedRecord){
+            return json({ok:true,reviewOnly:true,pathway:{id:pathway.id,title:pathway.title,role:pathway.role},itemId,itemType:ITEM_TYPES[itemId],masteryScore:PASS_SCORE,bestScore:Number(passedRecord.best_score),completedAt:passedRecord.completed_at||passedRecord.updated_at||null,questionCount:0,questions:[],writingPrompt:null,assessmentVersion:'saved-pass'},200,env);
+          }
+        }
+
         const assessment = buildAssessment(pathway, itemId);
 
         return json(
@@ -896,6 +908,15 @@ export default {
             pathway.id,
             itemId
           );
+        }
+
+        if(itemId!=='simulation'){
+          const passedRecord=await env.DB.prepare(`
+            SELECT best_score FROM official_progress
+            WHERE uid=? AND pathway_id=? AND item_id=? AND completed=1 AND best_score>=?
+            LIMIT 1
+          `).bind(user.sub,pathway.id,itemId,PASS_SCORE).first();
+          if(passedRecord) throw new HttpError(409,'This assessment is already passed. Open the saved attempt review instead.');
         }
 
         await enforceAttemptLimit(
@@ -2113,10 +2134,19 @@ export default {
       }
 
       if (request.method === "GET" && parts[0] === "enterprise" && parts[1] === "role-labs" && parts.length === 3) {
-        await requireUser(request,env); const pathway=getPathway(parts[2]);
+        const user=await requireUser(request,env); const pathway=getPathway(parts[2]);
+        const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null;
+        let assignment=null;
+        if(assignmentId){assignment=await v2RequireAssignmentAccess(env,user.sub,assignmentId,pathway.id);if(assignment.accessRole==='learner'&&!['published','completed'].includes(assignment.status)) throw new HttpError(403,'Assignment is not active');}
         const rows=await env.DB.prepare(`SELECT lab_key,version,pathway_id,title,role_title,client_name,scenario_json,pass_score FROM role_lab_definitions WHERE pathway_id=? AND status='active' ORDER BY version DESC`).bind(pathway.id).all();
         let labRows=rows.results||[]; if(!labRows.length){const dyn=v2DynamicLab(pathway);if(dyn)labRows=[dyn.definition];}
-        return json({ok:true,labs:labRows.map(r=>({labKey:r.lab_key,version:r.version,pathwayId:r.pathway_id,title:r.title,roleTitle:r.role_title,clientName:r.client_name,scenario:v2ParseJson(r.scenario_json,{}),passScore:Number(r.pass_score)}))},200,env);
+        const missing=[];
+        if(!await v2ActiveCredential(env,user.sub,pathway.id,'essentials')) missing.push('Essentials credential');
+        if(!await v2ActiveCredential(env,user.sub,pathway.id,'applied')) missing.push('Applied Skills credential');
+        if(assignmentId){const baseline=await env.DB.prepare(`SELECT id FROM diagnostic_attempts WHERE uid=? AND pathway_id=? AND assignment_id=? ORDER BY submitted_at ASC LIMIT 1`).bind(user.sub,pathway.id,assignmentId).first();if(!baseline)missing.push('assigned baseline diagnostic');}
+        const passedCredential=await v2ActiveCredential(env,user.sub,pathway.id,'role_lab');
+        const access=passedCredential?{status:'passed',missing:[],reason:'Role Lab already passed. Continue to the Professional Readiness Final.'}:missing.length?{status:'locked',missing,reason:`Complete ${missing.join(', ')} before starting the Role Lab.`}:{status:'available',missing:[],reason:'Prerequisites complete. The Role Lab is ready.'};
+        return json({ok:true,access,labs:labRows.map(r=>({labKey:r.lab_key,version:r.version,pathwayId:r.pathway_id,title:r.title,roleTitle:r.role_title,clientName:r.client_name,scenario:v2ParseJson(r.scenario_json,{}),passScore:Number(r.pass_score)}))},200,env);
       }
 
       if (request.method === "POST" && parts[0] === "enterprise" && parts[1] === "role-labs" && parts[3] === "start" && parts.length === 4) {
@@ -2129,6 +2159,7 @@ export default {
         if(!essentials) throw new HttpError(409,'Earn the Essentials Certificate before starting the Role Lab');
         const applied=await v2ActiveCredential(env,user.sub,lab.pathway_id,'applied');
         if(!applied) throw new HttpError(409,'Earn the Applied Skills Certificate before starting the Role Lab');
+        if(await v2ActiveCredential(env,user.sub,lab.pathway_id,'role_lab')) throw new HttpError(409,'This Role Lab is already passed. Continue to the Professional Readiness Final.');
         if(assignmentId){const baseline=await env.DB.prepare(`SELECT id FROM diagnostic_attempts WHERE uid=? AND pathway_id=? AND assignment_id=? ORDER BY submitted_at ASC LIMIT 1`).bind(user.sub,lab.pathway_id,assignmentId).first(); if(!baseline) throw new HttpError(409,'Complete the assigned baseline diagnostic before starting the Role Lab');}
         const existing=await env.DB.prepare(`SELECT * FROM role_lab_runs WHERE uid=? AND lab_key=? AND lab_version=? AND COALESCE(assignment_id,'public')=? AND status IN ('in_progress','revision_required','submitted') ORDER BY started_at DESC LIMIT 1`).bind(user.sub,lab.lab_key,lab.version,assignmentId||'public').first();
         if(existing) return json({ok:true,runId:existing.id,resumed:true},200,env);
@@ -2220,6 +2251,14 @@ export default {
         if(!assessment) throw new HttpError(404,'Assessment not available');
         const assignmentId=url.searchParams.get('assignmentId')?cleanId(url.searchParams.get('assignmentId')):null;
         await v2AssessmentAccess(env,user,assessment,assignmentId);
+        const passedAttempt=await env.DB.prepare(`
+          SELECT * FROM v2_assessment_attempts
+          WHERE uid=? AND assessment_key=? AND COALESCE(assignment_id,'public')=? AND passed=1
+          ORDER BY score DESC,submitted_at DESC LIMIT 1
+        `).bind(user.sub,key,assignmentId||'public').first();
+        if(passedAttempt){
+          return json({ok:true,reviewOnly:true,assessment:{key:assessment.assessment_key,version:assessment.version,pathwayId:assessment.pathway_id,stage:assessment.stage,title:assessment.title,description:assessment.description,scenario:v2ParseJson(assessment.scenario_json,{}),passScore:Number(assessment.pass_score)},questions:[],review:await v2AssessmentAttemptReview(env,passedAttempt)},200,env);
+        }
         const qres=dynamic?{results:dynamic.questions}:await env.DB.prepare(`SELECT * FROM v2_assessment_questions WHERE assessment_key=? AND assessment_version=? AND status='active' ORDER BY position`).bind(assessment.assessment_key,assessment.version).all();
         return json({ok:true,assessment:{key:assessment.assessment_key,version:assessment.version,pathwayId:assessment.pathway_id,stage:assessment.stage,title:assessment.title,description:assessment.description,scenario:v2ParseJson(assessment.scenario_json,{}),passScore:Number(assessment.pass_score)},questions:(qres.results||[]).map(v2PublicAssessmentQuestion)},200,env);
       }
@@ -2232,8 +2271,14 @@ export default {
         if(!assessment) throw new HttpError(404,'Assessment not available');
         const body=await readJson(request);
         const assignmentId=body.assignmentId?cleanId(body.assignmentId):null;
-        await v2EnforceAssessmentRate(env,user.sub,assessment.pathway_id,assessment.assessment_key,assignmentId);
         const access=await v2AssessmentAccess(env,user,assessment,assignmentId);
+        const passedAttempt=await env.DB.prepare(`
+          SELECT id FROM v2_assessment_attempts
+          WHERE uid=? AND assessment_key=? AND COALESCE(assignment_id,'public')=? AND passed=1
+          LIMIT 1
+        `).bind(user.sub,key,assignmentId||'public').first();
+        if(passedAttempt) throw new HttpError(409,'This assessment is already passed. Open the saved attempt review instead.');
+        await v2EnforceAssessmentRate(env,user.sub,assessment.pathway_id,assessment.assessment_key,assignmentId);
         const answers=body.answers&&typeof body.answers==='object'&&!Array.isArray(body.answers)?body.answers:{};
         const result=await v2GradeAssessment(env,{user,assessment,answers,assignmentId,orgId:access.orgId,cohortId:access.cohortId,curriculumVersion:access.curriculumVersion,dynamicQuestions:dynamic?.questions||null});
         const pathway=getPathway(assessment.pathway_id);

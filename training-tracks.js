@@ -117,9 +117,19 @@
     </div></div></section>`;
   }
 
-  function selectedStatusHtml(track) {
+  function courseSnapshot(careerId,track){
+    try{return window.CM_COURSE_STATE?.resolveLearnerCourseState?.(careerId,{track,authenticated:false})||null;}
+    catch(_){return null;}
+  }
+
+  function selectedStatusHtml(track,careerId) {
     const t = TRACKS[track];
     const professional = track === PROFESSIONAL;
+    const course=courseSnapshot(careerId,track);
+    const complete=Number(course?.pathwayCompletion?.completedStages||0);
+    const total=Number(course?.pathwayCompletion?.totalStages||0);
+    const next=course?.stages?.find(stage=>stage.route===course.nextDestination);
+    const percent=total?Math.round(complete/total*100):0;
     return `<div class="cm-track-status" data-cm-track-status data-cm-track-status-id="${track}">
       <div>
         <strong>${esc(t.name)}</strong>
@@ -127,6 +137,7 @@
         <p>${professional
           ? 'Complete the full pathway, Role Lab and Professional Readiness Final.'
           : 'Complete the core pathway and practical capstone to earn the Career Skills Program Completion Certificate. Your three verified milestones carry into Professional Readiness, so upgrading does not repeat completed stages.'}</p>
+        ${course?`<div class="cm-course-progress-summary"><span><b>${complete} of ${total}</b> required stages complete</span><i><b style="width:${percent}%"></b></i><small>Next required: ${esc(next?.name||'Program review')}</small></div>`:''}
       </div>
       <button type="button" class="btn btn-soft btn-sm" data-cm-switch-track="${professional?CAREER_SKILLS:PROFESSIONAL}">${professional?'View shorter option':'Upgrade to Professional Readiness'}</button>
     </div>`;
@@ -222,7 +233,7 @@
       ['03','Applied Skills','Complete Toolkit + Applied Work',`#/learn/${id}/3`],
       ['04','Career Skills Capstone','Complete the realistic server-graded job simulation and earn the program-completion certificate',`#/official-simulation/${id}`]
     ];
-    return `<section class="cm-track-sequence" data-cm-track-sequence data-cm-track-id="${trackId}"><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Three verified credentials + one completion certificate. Shorter, still practical.'}</h3></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}"><b>${n}</b><strong>${title}</strong><span>${copy}</span></a>`).join('')}</div></section>`;
+    return `<section class="cm-track-sequence" data-cm-track-sequence data-cm-track-id="${trackId}"><div class="cm-track-sequence-head"><div><div class="eyebrow">${professional?'PROFESSIONAL READINESS SEQUENCE':'CAREER SKILLS SEQUENCE'}</div><h3>${professional?'Five verified credentials. Full role-readiness evidence.':'Three verified credentials + one completion certificate. Shorter, still practical.'}</h3><p class="cm-track-lookahead"><strong>Look ahead safely:</strong> future stages may be opened as read-only previews, but their assessment or work controls stay locked until every prerequisite is complete. Use the single Continue action above to resume the correct stage.</p></div><span>${professional?'Advanced':'Shorter'}</span></div><div class="cm-track-sequence-grid">${steps.map(([n,title,copy,href])=>`<a href="${href}" aria-label="Preview ${esc(title)}; prerequisites are enforced"><b>${n}</b><strong>${title}</strong><span>${copy}</span><em>Prerequisite-checked</em></a>`).join('')}</div></section>`;
   }
 
   function shapeCareerPath(root, careerId, trackId) {
@@ -301,7 +312,7 @@
       let status=root.querySelector('[data-cm-track-status]');
       if(!status || status.dataset.cmTrackStatusId!==track){
         status?.remove();
-        pathList.insertAdjacentHTML('beforebegin', selectedStatusHtml(track));
+        pathList.insertAdjacentHTML('beforebegin', selectedStatusHtml(track,careerId));
         status=root.querySelector('[data-cm-track-status]');
       }
       const switchButton=status?.querySelector('[data-cm-switch-track]');

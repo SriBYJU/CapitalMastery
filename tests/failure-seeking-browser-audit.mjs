@@ -226,8 +226,10 @@ try {
 
   // Even with the forged flag, client prerequisite guards must still behave as learner mode.
   await gotoHash(page,'#/quiz/investment-banking/1');
-  await page.waitForTimeout(180);
-  assert((await page.evaluate(()=>location.hash)).startsWith('#/learn/investment-banking/1'),'Forged local QA flag must not bypass direct-quiz prerequisite guard');
+  await page.waitForSelector('.cm-course-locked-preview',{timeout:2500});
+  assert((await page.evaluate(()=>location.hash)).startsWith('#/quiz/investment-banking/1'),'Locked direct quiz should remain visible only as a look-ahead route');
+  assert(await page.locator('#cm-official-form,.quiz-form').count()===0,'Forged local QA flag bypassed direct-quiz answer-control guard');
+  assert(/LOOK AHEAD · READ-ONLY/i.test(await page.locator('.cm-course-locked-preview').innerText()),'Forged local QA flag did not preserve the read-only prerequisite explanation');
   await page.evaluate(()=>window.CM_TRAINING_TRACKS.setTrack('investment-banking','career-skills'));
   await gotoHash(page,'#/simulation/investment-banking');
   await page.waitForTimeout(220);

@@ -1,4 +1,4 @@
-name: Converge firm-ready courses
+name: Validate firm-ready courses
 
 on:
   push:
@@ -11,33 +11,23 @@ on:
       - 'tests/course-pass-continuity-audit.mjs'
       - 'tests/account-isolation-course-continuity-audit.mjs'
       - 'tests/course-pass-continuity-browser-audit.cjs'
+      - 'tests/course-no-skip-resume-browser-audit.cjs'
       - 'tests/legacy-simulation-refusal-browser-audit.cjs'
       - '.github/workflows/patch-course-firm-ready-final.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: firm-ready-course-convergence
   cancel-in-progress: true
 
 jobs:
-  converge:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Apply course continuity and professional workbench hardening
-        run: |
-          set -euo pipefail
-          node tools/patch-course-continuity-v2.mjs
-          node tools/patch-account-isolation-course-continuity.mjs
-          node tools/patch-secure-assessment-retry-url.mjs
-          node tools/patch-legacy-simulation-refusal.mjs
-          node tools/patch-firm-ready-course-workbenches.mjs
 
       - name: Validate course source contracts and Worker package
         run: |
@@ -79,6 +69,11 @@ jobs:
           CM_AUDIT_URL: http://127.0.0.1:4173
         run: node tests/course-pass-continuity-browser-audit.cjs
 
+      - name: Prove no-skip progression and durable resume
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: node tests/course-no-skip-resume-browser-audit.cjs
+
       - name: Prove stale MCQ simulations are refused
         env:
           CM_AUDIT_URL: http://127.0.0.1:4173
@@ -88,16 +83,3 @@ jobs:
         env:
           CM_AUDIT_URL: http://127.0.0.1:4173
         run: node tests/all-career-browser-sweep.cjs
-
-      - name: Commit firm-ready course product only
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add course-continuity.js account-isolation-early.js capital-mastery-live.js v2/worker-v2-phase1-release.js
-          if git diff --cached --quiet; then
-            echo 'No course product changes required.'
-            exit 0
-          fi
-          git commit -m 'Finish firm-ready course continuity and workbenches'
-          git push

@@ -29,13 +29,20 @@ const official=state.resolveLearnerCourseState('investment-banking',{track:'care
 const part1=official.stages.find(x=>x.id==='part-1-assessment');
 assert(part1.passed&&part1.source==='server'&&part1.score===92,'Authoritative server assessment must drive signed-in pass state');
 assert(part1.completed&&part1.bestScore===92&&part1.attempts===1&&part1.reviewAvailable,'Attempt, completion, best score, and review availability must remain separate canonical fields');
-assert(part1.nextRoute==='#/learn/investment-banking/2'&&part1.reviewRoute.includes('review=1')&&part1.retakeRoute.includes('retake=1'),'Resolved stages must own next, review, and retake routes');
+assert(part1.nextRoute==='#/learn/investment-banking/2'&&part1.reviewRoute.includes('review=1')&&part1.retakeRoute===null,'Passed stages must own next/review routes and never expose a retake route');
+assert(part1.canReview&&part1.canRetry===false&&part1.primaryAction==='review','A passed assessment must resolve to permanent read-only review');
 const locked=official.stages.find(x=>x.id==='part-3');
 assert(locked.status==='locked'&&locked.lockReason&&locked.missingRequirements.length===1,'Locked stages must provide a deterministic reason and missing requirements');
+
+const failed=state.resolveLearnerCourseState('investment-banking',{track:'career-skills',authenticated:true,authoritativeRows:[{item_id:'part-1',best_score:70,completed:0}],state:contaminated});
+const failedPart1=failed.stages.find(x=>x.id==='part-1-assessment');
+assert(failedPart1.failed&&failedPart1.canRetry&&failedPart1.retakeRoute.includes('retake=1')&&failedPart1.primaryAction==='retry','Only a failed saved attempt may expose an explicit retry route');
+const failedResume=state.getResumeDestination({pathway:'investment-banking',track:'career-skills',authenticated:true,authoritativeRows:[{item_id:'part-1',best_score:70,completed:0}],state:contaminated,lastRoute:'#/quiz/investment-banking/1'});
+assert(failedResume===failedPart1.route,'Canonical resume must return the saved failed assessment review rather than skip ahead or silently start another attempt');
 
 storage.set('capitalMasteryQaStateV2',JSON.stringify(contaminated));
 const qa=state.resolveLearnerCourseState('investment-banking',{track:'career-skills',qaPreview:true});
 assert(qa.source==='qa-preview'&&qa.stages.find(x=>x.id==='simulation').score===95,'QA preview must use only the isolated QA namespace');
-assert(qa.stages.find(x=>x.id==='part-1-assessment').reviewRoute.includes('review=1'),'Passed-assessment review and retake routes must remain explicit');
+assert(qa.stages.find(x=>x.id==='part-1-assessment').reviewRoute.includes('review=1')&&qa.stages.find(x=>x.id==='part-1-assessment').retakeRoute===null,'Passed-assessment review must remain explicit and retake must remain unavailable');
 
-console.log('COURSE STATE MACHINE AUDIT PASS: canonical sequences, track-aware routing, server provenance, explicit review/retake, and isolated QA state verified');
+console.log('COURSE STATE MACHINE AUDIT PASS: canonical sequences, track-aware routing, server provenance, permanent pass review, failed-only retry, canonical resume, and isolated QA state verified');

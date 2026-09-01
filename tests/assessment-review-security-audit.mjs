@@ -24,9 +24,12 @@ assert(!/answer|rationale|review_json/.test(publicSerializer),'Legacy assessment
 
 assert(worker.includes("parts[3] === 'review'")&&worker.includes('v2AssessmentAttemptReview(env,attempt)'),'V2 assessments need owner-scoped saved review endpoints');
 assert(worker.includes('JSON.stringify({correct,total:qs.length,competencyScores:compScores,details})'),'V2 submissions must retain graded question detail');
+assert(worker.includes('reviewOnly:true'),'Passed assessment GETs must return authoritative review-only state');
+assert(worker.includes('This assessment is already passed. Open the saved attempt review instead.'),'Assessment POSTs must reject attempts after a pass');
 assert(live.includes('/assessment/review/${encodeURIComponent(apiPathway(pathwayId))}'),'Course UI must load saved legacy attempts from the Worker');
 assert(live.includes('cm-server-assessment-review'),'Course review must be explicitly read-only');
 assert(enterprise.includes('/enterprise/assessments/${encodeURIComponent(key)}/review'),'V2 UI must load the authoritative saved attempt');
-assert(enterprise.includes('Start a new attempt'),'Review and retake must be explicit separate actions');
+assert(enterprise.includes('Retry required · Start new attempt'),'Failed review and retry must be explicit separate actions');
+assert(enterprise.includes("savedReview.passed?'':"),'Passed V2 attempts must omit the retry action');
 
-console.log('ASSESSMENT REVIEW SECURITY AUDIT PASS: owner-scoped D1 reviews, post-submit answer disclosure, deletion, read-only UI, and explicit retakes verified');
+console.log('ASSESSMENT REVIEW SECURITY AUDIT PASS: owner-scoped D1 reviews, post-submit answer disclosure, deletion, permanent pass enforcement, read-only UI, and failed-only retries verified');

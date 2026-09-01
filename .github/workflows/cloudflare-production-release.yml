@@ -60,6 +60,7 @@ jobs:
           node --check tests/adversarial-chaos-browser-audit.cjs
           node --check tests/course-assessment-state-browser-audit.cjs
           node --check tests/course-pass-continuity-browser-audit.cjs
+          node --check tests/course-no-skip-resume-browser-audit.cjs
           node --check tests/legacy-simulation-refusal-browser-audit.cjs
           node --check tests/ib-workbench-navigation-guide-browser-audit.cjs
           node --check tests/employer-invite-lifecycle-browser-audit.cjs
@@ -110,6 +111,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-assessment-state-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-no-skip-resume-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/legacy-simulation-refusal-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/ib-workbench-navigation-guide-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/v2-assessment-review-browser-audit.cjs
@@ -209,6 +211,7 @@ jobs:
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/state-resilience-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/course-assessment-state-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/course-no-skip-resume-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/legacy-simulation-refusal-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/ib-workbench-navigation-guide-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/v2-assessment-review-browser-audit.cjs
@@ -233,7 +236,7 @@ jobs:
           This proves:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
-          - exact dist-pages artifact survived seventeen hostile Chromium suites before any production mutation
+          - exact dist-pages artifact survived eighteen hostile Chromium suites before any production mutation
           - live Firebase email/password credential-name persistence passed before any D1 mutation
           - exact-artifact Firebase provider-safety probe passed before any D1 mutation
           - production D1 schema was inspected and only missing migrations 016/017/018 were conditionally applied
@@ -244,7 +247,7 @@ jobs:
           - exact production Pages allowlist deployed
           - Cloudflare-mirror Firebase provider-safety probe passed after Pages deployment
           - Cloudflare mirror generation/security headers passed
-          - seventeen Cloudflare-mirror Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, employer invitation lifecycle, visual contrast, the Admin auth-timing race, and Program Completion verification
+          - eighteen Cloudflare-mirror Chromium suites passed again after deployment, including no-skip/resume persistence, permanent pass review, non-MCQ simulation refusal, employer invitation lifecycle, visual contrast, the Admin auth-timing race, and Program Completion verification
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts

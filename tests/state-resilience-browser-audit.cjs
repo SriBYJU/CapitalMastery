@@ -125,12 +125,12 @@ async function pageSnapshot(page){
     await page.locator('#cm-experience-dock .cm-context-help').click();
     await page.waitForTimeout(250);
     assert(locationHash(await page.evaluate(()=>location.hash))==='#/learner-guide','Contextual help did not open the learner guide');
-    await page.waitForFunction(()=>!document.querySelector('#cm-experience-dock .cm-resume-activity')?.hasAttribute('hidden'),null,{timeout:3000});
-    assert((await page.locator('#cm-experience-dock .cm-resume-activity').getAttribute('href')||'').startsWith('#/career/investment-banking'),'Resume control did not preserve the last real learning activity');
     await page.goBack({waitUntil:'domcontentloaded'}).catch(()=>{});
     await page.waitForTimeout(300);
     assert(locationHash(await page.evaluate(()=>location.hash)).startsWith('#/career/investment-banking'),`Back navigation returned wrong hash: ${await page.evaluate(()=>location.hash)}`);
     assert((await page.textContent('#app')).includes('Investment Banking'),'Back navigation left stale non-career DOM');
+    await page.waitForSelector('[data-cm-primary-resume] a',{timeout:3000});
+    assert((await page.locator('[data-cm-primary-resume] a').getAttribute('href')||'')==='#/learn/investment-banking/1','Canonical resume did not preserve the exact next required learning stage');
     await page.goForward({waitUntil:'domcontentloaded'}).catch(()=>{});
     await page.waitForTimeout(300);
     assert(locationHash(await page.evaluate(()=>location.hash))==='#/learner-guide',`Forward navigation returned wrong hash: ${await page.evaluate(()=>location.hash)}`);
