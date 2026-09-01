@@ -45,7 +45,7 @@ jobs:
             curl -fsS "${PRIMARY}/certificate-name.js?sha=${GITHUB_SHA}" -o /tmp/cm-name.js || true
             if grep -q 'PROGRAM COMPLETIONS' /tmp/cm-live.js 2>/dev/null \
               && grep -q "root==='admin-preview'&&a==='simulation'" /tmp/cm-app.js 2>/dev/null \
-              && grep -q 'Drain older first-login progress writes' /tmp/cm-name.js 2>/dev/null; then
+              && grep -q 'cmCredentialIdentityGuardV1' /tmp/cm-name.js 2>/dev/null; then
               ready=true
               break
             fi

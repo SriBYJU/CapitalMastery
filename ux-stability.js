@@ -3,10 +3,13 @@
 
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
+  const LAST_ACTIVITY_KEY = 'cmLastLearningActivityV1';
   const STATEFUL_ROOTS = new Set(['career','learn','quiz','official-simulation','simulation','final','passport','credentials','credential','certificate','achievement','login']);
+  const RESUMABLE_ROOTS = new Set(['career','learn','quiz','official-simulation','final','assigned','role-lab','assessment-lab','skills']);
   let credentialRepairTimer = null;
   let credentialRepairCount = 0;
   let enhanceScheduled = false;
+  let confidenceTimer = null;
 
   function esc(v='') {
     return String(v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
@@ -36,8 +39,92 @@
           }
         } catch (_) {}
       }
-      return previous.call(this, key, value);
+      const result = previous.call(this, key, value);
+      if (this === localStorage && key === STATE_KEY) {
+        queueMicrotask(() => document.dispatchEvent(new CustomEvent('cm-local-progress-saved')));
+      }
+      return result;
     };
+  }
+
+  function readLastActivity() {
+    try {
+      const value = JSON.parse(localStorage.getItem(LAST_ACTIVITY_KEY) || 'null');
+      if (!value || typeof value.hash !== 'string' || !value.hash.startsWith('#/')) return null;
+      if (!RESUMABLE_ROOTS.has(routeParts(value.hash)[0])) return null;
+      return value;
+    } catch (_) { return null; }
+  }
+
+  function recordLastActivity() {
+    if (!window.CM_AUTH?.user) return;
+    const [root] = routeParts();
+    if (!RESUMABLE_ROOTS.has(root)) return;
+    const heading = String(document.querySelector('main#main h1')?.textContent || '').replace(/\s+/g,' ').trim();
+    localStorage.setItem(LAST_ACTIVITY_KEY, JSON.stringify({
+      hash:location.hash || '#/',
+      label:(heading || 'your last activity').slice(0,80),
+      updatedAt:new Date().toISOString()
+    }));
+  }
+
+  function dock() {
+    let node = document.getElementById('cm-experience-dock');
+    if (node) return node;
+    node = document.createElement('aside');
+    node.id = 'cm-experience-dock';
+    node.className = 'cm-experience-dock';
+    node.setAttribute('aria-label','Learning assistance');
+    node.innerHTML = `
+      <div class="cm-save-confidence" role="status" aria-live="polite" hidden><span></span><b></b></div>
+      <a class="cm-resume-activity" href="#/" hidden><span>RESUME</span><b>Last activity</b></a>
+      <button type="button" class="cm-context-help" aria-label="Open help for this page"><span aria-hidden="true">?</span><b>Help</b></button>`;
+    node.querySelector('.cm-context-help')?.addEventListener('click', () => {
+      const guide = document.querySelector('.cm-wb-guide');
+      if (guide) {
+        guide.open = true;
+        guide.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'center'});
+        guide.querySelector('summary')?.focus();
+        return;
+      }
+      const [root,orgId] = routeParts();
+      location.hash = root === 'employer' && orgId
+        ? `#/employer/${encodeURIComponent(orgId)}/guide`
+        : '#/learner-guide';
+    });
+    document.body.appendChild(node);
+    return node;
+  }
+
+  function updateResumeActivity() {
+    const link = dock().querySelector('.cm-resume-activity');
+    const currentRoot = routeParts()[0];
+    const item = readLastActivity();
+    const show = !!window.CM_AUTH?.user && !!item && !RESUMABLE_ROOTS.has(currentRoot) && currentRoot !== 'certificate';
+    link.hidden = !show;
+    if (!show) return;
+    link.href = item.hash;
+    link.querySelector('b').textContent = item.label === 'your last activity' ? 'Last activity' : item.label;
+    link.setAttribute('aria-label',`Resume ${item.label}`);
+  }
+
+  function showSaveConfidence(label, tone = 'saved', persist = false) {
+    const node = dock().querySelector('.cm-save-confidence');
+    clearTimeout(confidenceTimer);
+    node.hidden = false;
+    node.dataset.tone = tone;
+    node.querySelector('span').textContent = tone === 'attention' ? '!' : tone === 'working' ? '↻' : '✓';
+    node.querySelector('b').textContent = label;
+    if (!persist) confidenceTimer = setTimeout(() => { node.hidden = true; }, 3600);
+  }
+
+  function updateSyncConfidence(status = window.CM_SYNC?.status || '') {
+    if (!window.CM_AUTH?.user) return;
+    if (!navigator.onLine) return showSaveConfidence('Offline · drafts stay on this device','attention',true);
+    if (status === 'syncing' || status === 'loading' || status === 'starting') return showSaveConfidence('Syncing your progress…','working',true);
+    if (status === 'error') return showSaveConfidence('Saved here · account sync will retry','attention',true);
+    if (status === 'synced') return showSaveConfidence('Progress saved to your account');
+    if (status === 'ready') return showSaveConfidence('Account sync ready');
   }
 
   function profileLabel() {
@@ -200,6 +287,9 @@
     enhanceMobileMenu();
     enhanceAccountHub();
     repairCredentialRendererRace();
+    dock();
+    recordLastActivity();
+    updateResumeActivity();
   }
 
   function scheduleEnhance(delay = 0) {
@@ -221,7 +311,15 @@
   window.addEventListener('hashchange', () => scheduleEnhance(25));
   document.addEventListener('cm-auth-changed', () => scheduleEnhance(40));
   document.addEventListener('cm-certificate-name-changed', () => scheduleEnhance(40));
+  document.addEventListener('cm-local-progress-saved', () => {
+    if (window.CM_AUTH?.user) showSaveConfidence('Saved on this device','saved');
+  });
+  document.addEventListener('cm-sync-changed', event => updateSyncConfidence(event.detail?.status));
+  window.addEventListener('offline', () => {
+    if (window.CM_AUTH?.user) showSaveConfidence('Offline · drafts stay on this device','attention',true);
+  });
   window.addEventListener('online', () => {
+    if (window.CM_AUTH?.user) showSaveConfidence('Back online · syncing…','working',true);
     window.CM_SYNC?.flush?.().catch(() => {});
     scheduleEnhance(30);
   });
@@ -241,9 +339,13 @@
     .cm-profile-hub{margin-top:20px;padding:15px;border:1px solid #e0e5ea;border-radius:13px;background:#f8fafb}
     .cm-profile-hub-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.cm-profile-hub-head span:first-child{display:block;font-size:.68rem;letter-spacing:.12em;color:var(--gold);font-weight:900}.cm-profile-hub-head strong{display:block;color:var(--navy);margin-top:2px}.cm-profile-live{font-size:.75rem;color:#2e7456!important;letter-spacing:0!important}
     .cm-profile-hub-links{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.cm-profile-hub-links a{background:#fff;border:1px solid #dbe1e6;border-radius:9px;padding:8px 10px;text-decoration:none;color:var(--navy);font-size:.8rem;font-weight:800}
+    .cm-experience-dock{position:fixed;right:16px;bottom:16px;z-index:850;display:flex;align-items:stretch;gap:8px;max-width:min(560px,calc(100vw - 32px));pointer-events:none}.cm-experience-dock>*{pointer-events:auto;box-shadow:0 9px 28px rgba(7,26,51,.16)}
+    .cm-save-confidence,.cm-resume-activity,.cm-context-help{border:1px solid #cbd5df;border-radius:12px;background:#fff;color:#172d43;min-height:46px}.cm-save-confidence{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:.78rem}.cm-save-confidence[hidden]{display:none}.cm-save-confidence span{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#e4f2e9;color:#265c43;font-weight:900}.cm-save-confidence[data-tone="working"] span{background:#edf2f7;color:#315675}.cm-save-confidence[data-tone="attention"]{border-color:#dcc58c;background:#fffaf0}.cm-save-confidence[data-tone="attention"] span{background:#f5e8c6;color:#725721}
+    .cm-resume-activity{display:grid;grid-template-columns:auto minmax(0,180px);column-gap:8px;align-items:center;padding:7px 12px;text-decoration:none}.cm-resume-activity[hidden]{display:none}.cm-resume-activity span{grid-row:1/3;color:#866625;font-size:.58rem;letter-spacing:.1em;font-weight:900}.cm-resume-activity b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.76rem;color:#172d43}.cm-resume-activity:hover{border-color:var(--gold);transform:translateY(-1px)}
+    .cm-context-help{display:flex;align-items:center;gap:7px;padding:7px 11px;font:inherit;cursor:pointer}.cm-context-help span{width:25px;height:25px;border-radius:50%;display:grid;place-items:center;background:#071a33;color:#fff;font-weight:900}.cm-context-help b{font-size:.77rem}.cm-context-help:hover,.cm-context-help:focus-visible{border-color:var(--gold);outline:2px solid rgba(185,138,67,.35);outline-offset:2px}
     @media(max-width:980px){.nav-actions .cm-e2e-profile-nav{display:none!important}.cm-profile-button{display:inline-flex;margin-left:auto}.mobile-menu{margin-left:0!important}.cm-profile-text{display:none}.cm-profile-button{padding:5px;border-radius:50%;width:42px;height:42px;justify-content:center}.cm-profile-avatar{width:30px;height:30px}}
-    @media(max-width:680px){.cm-profile-button{display:inline-flex!important;flex:0 0 40px;width:40px;height:40px;min-height:40px}.cm-profile-avatar{width:29px;height:29px}.cm-profile-hub-links{display:grid}.cm-profile-hub-links a{text-align:center}}
-    @media print{.cm-profile-button{display:none!important}}
+    @media(max-width:680px){.cm-profile-button{display:inline-flex!important;flex:0 0 40px;width:40px;height:40px;min-height:40px}.cm-profile-avatar{width:29px;height:29px}.cm-profile-hub-links{display:grid}.cm-profile-hub-links a{text-align:center}.cm-experience-dock{right:10px;bottom:10px;max-width:calc(100vw - 20px)}.cm-save-confidence{max-width:210px}.cm-resume-activity{display:none!important}.cm-context-help b{display:none}.cm-context-help{padding:7px}}
+    @media print{.cm-profile-button,.cm-experience-dock{display:none!important}}
   `;
   if (!document.getElementById(style.id)) document.head.appendChild(style);
 

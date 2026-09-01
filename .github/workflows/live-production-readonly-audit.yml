@@ -33,27 +33,21 @@ jobs:
       - name: Inspect GitHub Pages primary generation
         run: |
           set -u
-          stale=0
-          if ! curl -fsSL --retry 3 --retry-all-errors "$LIVE_URL/" -o /tmp/live-index.html; then
-            echo 'LIVE_INDEX_FETCH_FAILED'
-            stale=1
-          else
-            for marker in \
-              'brand-asset-resilience.js?v=20260830-stability1' \
-              'runtime-audit-fixes.js?v=20260830-stability4' \
-              'ux-stability.js?v=20260830-stability4' \
-              'learner-guide.css?v=20260830-stability4' \
-              'training-tracks.css?v=20260830-stability4' \
-              'admin-route-guard.js?v=20260830-security1'; do
-              if ! grep -Fq "$marker" /tmp/live-index.html; then
-                echo "LIVE_GENERATION_MISMATCH: missing $marker"
-                stale=1
-              fi
-            done
-            if ! grep -Fq '<link rel="canonical" href="https://sribyju.github.io/CapitalMastery/"' /tmp/live-index.html; then
-              echo 'LIVE_CANONICAL_MISMATCH'
-              stale=1
+          stale=1
+          for attempt in {1..60}; do
+            curl -fsSL --retry 2 --retry-all-errors "$LIVE_URL/?sha=${GITHUB_SHA}&attempt=${attempt}" -o /tmp/live-index.html || true
+            if grep -Fq 'capital-mastery-live.js?v=20260831-phase2rc6' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'firebase-sync.js?v=20260831-phase2rc6' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'ux-stability.js?v=20260831-phase2rc5' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'admin-route-guard.js?v=20260830-phase2rc1' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq '<link rel="canonical" href="https://sribyju.github.io/CapitalMastery/"' /tmp/live-index.html 2>/dev/null; then
+              stale=0
+              break
             fi
+            sleep 5
+          done
+          if [ "$stale" -ne 0 ]; then
+            echo 'LIVE_GENERATION_MISMATCH: GitHub Pages did not converge to the current primary generation'
           fi
           echo "LIVE_STALE=$stale" >> "$GITHUB_ENV"
           echo "LIVE_GENERATION_MATCH=$((1-stale))"

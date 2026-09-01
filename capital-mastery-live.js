@@ -266,6 +266,8 @@
     if(!shell || shell.dataset.cmWorkbenchBound==='1') return;
     shell.dataset.cmWorkbenchBound='1';
     const buttons=[...shell.querySelectorAll('[data-cm-wb-target]')];
+    let manualTarget='';
+    let manualSelectionUntil=0;
     const setActive=button=>{
       buttons.forEach(x=>x.removeAttribute('aria-current'));
       button?.setAttribute('aria-current','step');
@@ -273,6 +275,8 @@
     buttons.forEach(button=>button.addEventListener('click',()=>{
       const target=shell.querySelector(`#${CSS.escape(button.dataset.cmWbTarget||'')}`);
       if(!target) return;
+      manualTarget=target.id;
+      manualSelectionUntil=Date.now()+800;
       setActive(button);
       const reduced=window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
       target.scrollIntoView({behavior:reduced?'auto':'smooth',block:'start'});
@@ -282,7 +286,10 @@
       const byId=new Map(buttons.map(x=>[x.dataset.cmWbTarget,x]));
       const observer=new IntersectionObserver(entries=>{
         const visible=entries.filter(x=>x.isIntersecting).sort((a,b)=>b.intersectionRatio-a.intersectionRatio)[0];
-        if(visible) setActive(byId.get(visible.target.id));
+        if(!visible) return;
+        if(Date.now()<manualSelectionUntil && visible.target.id!==manualTarget) return;
+        if(visible.target.id===manualTarget) manualSelectionUntil=0;
+        setActive(byId.get(visible.target.id));
       },{rootMargin:'-18% 0px -62% 0px',threshold:[0,.15,.45]});
       byId.forEach((_,id)=>{const target=shell.querySelector(`#${CSS.escape(id||'')}`);if(target)observer.observe(target);});
     }

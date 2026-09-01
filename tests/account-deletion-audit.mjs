@@ -11,6 +11,7 @@ for(const table of ['credential_evidence_items','credential_events','role_lab_su
 ok(worker.includes("const markerUid='deleted_user'"),'shared employer record pseudonymization marker missing');
 ok(auth.includes("fs.deleteDoc(fs.doc(db, 'users', uid, 'progress', 'state'))"),'Firestore progress deletion missing');
 ok(auth.includes("fs.deleteDoc(fs.doc(db, 'users', uid))"),'Firestore root profile deletion missing');
+ok(auth.includes('localStorage.removeItem(`cmCredentialIdentityGuardV1:${uid}`)'),'Short-lived credential identity guard must be removed during account deletion');
 ok(auth.includes('await authApi.deleteUser(user)'),'Firebase Auth deletion missing');
 ok(auth.includes("typed !== 'DELETE'"),'typed destructive confirmation missing');
 ok(auth.includes('Sole workspace owners must transfer ownership first.'),'account UI ownership warning missing');

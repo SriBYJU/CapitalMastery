@@ -17,14 +17,17 @@ assert(cert.includes("fsApi.doc(db, 'users', user.uid, 'progress', 'state')"), '
 assert(cert.includes("return 'progress-compatibility'"), 'Owner-only rolling-rules compatibility write must remain available until live rules converge');
 assert(cert.indexOf("fsApi.doc(db, 'users', user.uid)") < cert.indexOf("fsApi.doc(db, 'users', user.uid, 'progress', 'state')"), 'Root identity must be checked before legacy progress/state fallback');
 assert(!cert.includes("if (!synced) throw new Error('Could not save your credential name to your account. Please try again.');"), 'Credential identity must not fail solely because broad progress sync fails');
-assert(cert.includes('Drain older first-login progress writes'), 'Credential save must drain older hydration writes before its authoritative persistence');
-assert(cert.indexOf('await window.CM_SYNC.flush()') < cert.indexOf('await persistCredentialIdentity(user, cleaned)'), 'Credential identity must be persisted after the serialized progress queue drains');
+assert(cert.includes("const IDENTITY_GUARD_PREFIX = 'cmCredentialIdentityGuardV1:'"), 'Credential save must install a short-lived first-login identity guard');
+assert(cert.includes('expiresAt:Date.now() + 120000'), 'First-login identity guard must expire instead of overriding future cross-device edits');
+assert(cert.indexOf('await persistCredentialIdentity(user, cleaned)') < cert.indexOf('window.CM_SYNC.flush()'), 'Credential identity must not wait on the broad progress-sync queue');
 assert((cert.match(/updateLocalProfileName\(cleaned\)/g)||[]).length >= 2, 'Credential confirmation must reassert local identity after the final remote write');
 
 assert(sync.includes('base.credentialNameConfirmed = true'), 'Normal progress sync must preserve an already-confirmed root identity when local confirmation is present');
 assert(sync.includes('let syncTail = Promise.resolve(true)'), 'Cloud progress writes must use a single serialized queue');
 assert(sync.includes('return scheduleCloudSync(readLocalState())'), 'Explicit progress flushes must join the serialized queue');
 assert(sync.includes('if (sameActiveUser) return;'), 'Repeated same-user role-verification events must not start duplicate hydration');
+assert(sync.includes("const IDENTITY_GUARD_PREFIX = 'cmCredentialIdentityGuardV1:'"), 'Progress synchronization must recognize the short-lived first-login identity guard');
+assert(sync.includes('Number(guard?.expiresAt || 0) > Date.now()'), 'Progress synchronization must ignore expired identity guards');
 assert(sync.indexOf("fs.doc(db, 'users', user.uid, 'progress', 'state')") < sync.indexOf('await writeRootProfile(clean)'), 'Owner-only progress sync must not be blocked by a rolling user-root rules deployment');
 assert(sync.includes('Protected account-profile mirror will retry after rules convergence'), 'Root-profile rules rollout failure must be isolated from course progress sync');
 assert(sync.includes("await fs.setDoc(ref, base, { merge: true });"), 'User-root sync must remain merge-only so stale progress state cannot delete credential identity fields');

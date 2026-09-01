@@ -17,6 +17,8 @@ ok(live.includes('friendlyFileDescription'),'Every source file must explain what
 ok(live.includes('How to complete this step'),'Every work stage must include a beginner-friendly practical guide');
 ok(live.includes('data-cm-wb-progress-text'),'Workbench must show visible completion progress');
 ok(live.includes('data-cm-wb-target'),'Workbench navigation must use SPA-safe interactive controls');
+ok(live.includes("manualSelectionUntil=Date.now()+800"),'A clicked workbench step must remain active while smooth scrolling catches up');
+ok(live.includes("Date.now()<manualSelectionUntil && visible.target.id!==manualTarget"),'The scroll observer must not overwrite a learner\'s fresh step selection');
 ok(!live.includes('<a href="#cm-wb-inbox">'),'Workbench navigation must never replace the application hash with a fragment anchor');
 ok(live.includes('Northstar_Orion_Valuation_v03.xlsx'),'Official simulation must expose workbook-style work product');
 for(const marker of ['Transaction Model','Trading Comps & Implied Value','Precedent Transactions','DCF Valuation','Management Update','Model QA','Client / Senior-Review Takeaway']){

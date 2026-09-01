@@ -5,6 +5,7 @@
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const USER_STATE_PREFIX = 'capitalMasteryUserStateV1:';
   const ACTIVE_UID_KEY = 'capitalMasteryActiveUidV1';
+  const IDENTITY_GUARD_PREFIX = 'cmCredentialIdentityGuardV1:';
   const QA_KEY = 'capitalMasteryQaPreviewV1';
   const QA_STATE_KEY = 'capitalMasteryQaStateV2';
   const DEFAULT_NAME = 'Jordan Smith';
@@ -198,6 +199,21 @@
     copy.credentials = Array.isArray(copy.credentials) ? copy.credentials : [];
     copy.createdAt = copy.createdAt || new Date().toISOString();
     copy.updatedAt = copy.updatedAt || copy.createdAt || new Date().toISOString();
+
+    // A short-lived local identity guard protects first-time credential setup
+    // from any older hydration already in flight. It expires quickly so a later
+    // cross-device credential-name edit can still become authoritative.
+    if (uid) {
+      try {
+        const guard = JSON.parse(localStorage.getItem(`${IDENTITY_GUARD_PREFIX}${uid}`) || 'null');
+        const guardedName = String(guard?.name || '').replace(/\s+/g,' ').trim();
+        if (Number(guard?.expiresAt || 0) > Date.now() && looksLikeFullName(guardedName)) {
+          copy.profile.name = guardedName;
+          copy.profile.certificateName = guardedName;
+          copy.profile.certificateNameConfirmed = true;
+        }
+      } catch (_) {}
+    }
     return copy;
   }
 

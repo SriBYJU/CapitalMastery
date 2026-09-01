@@ -98,6 +98,11 @@ async function pageSnapshot(page){
     await waitForMain(page);
     await page.waitForSelector('[data-cm-track-chooser]',{timeout:5000});
     assert((await page.textContent('#app')).includes('Investment Banking'),'Malformed state prevented career page from rendering');
+    await page.waitForSelector('#cm-experience-dock .cm-context-help',{timeout:3000});
+    assert(await page.locator('#cm-experience-dock .cm-context-help').getAttribute('aria-label')==='Open help for this page','Contextual help must expose a clear accessible label');
+    await page.evaluate(()=>localStorage.setItem('capitalMasteryLocalStateV1',localStorage.getItem('capitalMasteryLocalStateV1')));
+    await page.waitForSelector('#cm-experience-dock .cm-save-confidence:not([hidden])',{timeout:3000});
+    assert(/Saved on this device|Progress saved to your account/.test(await page.locator('#cm-experience-dock .cm-save-confidence').innerText()),'Visible save confidence did not explain persistence');
 
     const repaired=await page.evaluate(({stateKey,userKey})=>{
       const current=JSON.parse(localStorage.getItem(stateKey));
@@ -117,9 +122,11 @@ async function pageSnapshot(page){
       for(const [key,value] of Object.entries(shape)) assert(value,`${which} state repair missing ${key}: ${JSON.stringify(shape)}`);
     }
 
-    await page.evaluate(()=>{location.hash='#/learner-guide';});
+    await page.locator('#cm-experience-dock .cm-context-help').click();
     await page.waitForTimeout(250);
-    assert(locationHash(await page.evaluate(()=>location.hash))==='#/learner-guide','Could not navigate to learner guide before history test');
+    assert(locationHash(await page.evaluate(()=>location.hash))==='#/learner-guide','Contextual help did not open the learner guide');
+    await page.waitForFunction(()=>!document.querySelector('#cm-experience-dock .cm-resume-activity')?.hasAttribute('hidden'),null,{timeout:3000});
+    assert((await page.locator('#cm-experience-dock .cm-resume-activity').getAttribute('href')||'').startsWith('#/career/investment-banking'),'Resume control did not preserve the last real learning activity');
     await page.goBack({waitUntil:'domcontentloaded'}).catch(()=>{});
     await page.waitForTimeout(300);
     assert(locationHash(await page.evaluate(()=>location.hash)).startsWith('#/career/investment-banking'),`Back navigation returned wrong hash: ${await page.evaluate(()=>location.hash)}`);
@@ -132,6 +139,9 @@ async function pageSnapshot(page){
     const beforeOffline=await pageSnapshot(page);
     offlineMode=true;
     await context.setOffline(true);
+    await page.evaluate(()=>window.dispatchEvent(new Event('offline')));
+    await page.waitForSelector('#cm-experience-dock .cm-save-confidence:not([hidden])',{timeout:3000});
+    assert((await page.locator('#cm-experience-dock .cm-save-confidence').innerText()).includes('Offline'),'Offline confidence did not remain visible');
     await page.evaluate(()=>{location.hash='#/career/private-equity';});
     await page.waitForTimeout(500);
     const offlineSnapshot=await pageSnapshot(page);
@@ -155,7 +165,7 @@ async function pageSnapshot(page){
     assert((await page.textContent('#app')).includes('Private Equity'),'Online recovery replaced the current career with stale content');
 
     assert([...new Set(severe)].length===0,`State-resilience browser audit captured failures: ${[...new Set(severe)].join(' | ')} navEvents=${JSON.stringify(navEvents.slice(-12))}`);
-    console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed state, repaired timestamps, Back/Forward, offline SPA navigation, inline logo fallback and online recovery');
+    console.log('STATE RESILIENCE BROWSER AUDIT PASS: malformed state, save confidence, contextual help/resume, Back/Forward, offline SPA navigation, inline logo fallback and online recovery');
   } finally {
     await context.close();
     await browser.close();

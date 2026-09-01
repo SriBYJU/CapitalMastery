@@ -48,6 +48,6 @@ must(liveAudit.includes('Wait for internal backend and QA artifacts to become pr
 must(/push:\s*\r?\n\s+branches:\s*\[main\]/.test(liveAudit),'Primary live audit must run automatically after main is pushed');
 must(liveAudit.includes('PRIMARY: https://sribyju.github.io/CapitalMastery'),'Primary live audit must target GitHub Pages');
 must(liveAudit.includes('GitHub Pages seventeen-suite live browser matrix: PASS'),'Primary live audit must execute the complete 17-suite matrix');
-must(liveAudit.includes('Drain older first-login progress writes'),'Primary live audit must wait for the serialized credential-sync generation');
+must(liveAudit.includes('cmCredentialIdentityGuardV1'),'Primary live audit must wait for the guarded credential-sync generation');
 
 console.log(`GITHUB PAGES PUBLISH BOUNDARY AUDIT PASS: ${excluded.length} internal paths excluded; ${refs.length} shell dependencies remain public`);

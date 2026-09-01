@@ -141,6 +141,7 @@
         await fs.deleteDoc(fs.doc(db, 'users', uid, 'progress', 'state'));
         await fs.deleteDoc(fs.doc(db, 'users', uid));
         localStorage.removeItem(`capitalMasteryUserStateV1:${uid}`);
+        localStorage.removeItem(`cmCredentialIdentityGuardV1:${uid}`);
         localStorage.removeItem('capitalMasteryActiveUidV1');
         localStorage.removeItem('capitalMasteryLocalStateV1');
         try {

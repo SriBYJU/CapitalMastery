@@ -4,6 +4,7 @@
   const SDK = '12.18.0';
   const STATE_KEY = 'capitalMasteryLocalStateV1';
   const ONBOARD_PREFIX = 'cmCredentialNameOnboardedV3:';
+  const IDENTITY_GUARD_PREFIX = 'cmCredentialIdentityGuardV1:';
   const PENDING_ROUTE_KEY = 'cmPendingLearningRouteV1';
 
   const GATED_ROOTS = new Set([
@@ -43,6 +44,7 @@
 
   function stateForWrite() { return readState() || blankState(); }
   function onboardingKey(user) { return `${ONBOARD_PREFIX}${user.uid}`; }
+  function identityGuardKey(user) { return `${IDENTITY_GUARD_PREFIX}${user.uid}`; }
 
   function localProfileConfirmation() {
     const profile = readState()?.profile || {};
@@ -122,6 +124,11 @@
 
   function updateLocalProfileName(name) {
     try {
+      const user = currentUser();
+      if (user) localStorage.setItem(identityGuardKey(user), JSON.stringify({
+        name,
+        expiresAt:Date.now() + 120000
+      }));
       const state = stateForWrite();
       state.profile ||= {};
       state.profile.name = name;
@@ -278,15 +285,6 @@
 
     if (!updateLocalProfileName(cleaned)) throw new Error('Could not create your learning profile. Please try again.');
 
-    // Drain older first-login progress writes, then make credential identity the
-    // final authoritative write. This prevents a slow hydration from rolling the
-    // just-confirmed name back while the onboarding modal is closing.
-    if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) {
-      await window.CM_SYNC.flush().catch(error => {
-        console.warn('Credential name will use its dedicated account write while progress sync retries:', error);
-      });
-    }
-
     // Name onboarding has its own durable Firestore write. Do not block this
     // identity-critical step on the whole learning-progress synchronization graph.
     await persistCredentialIdentity(user, cleaned);
@@ -295,6 +293,11 @@
 
     // Any later progress-state mirror is serialized behind this finalized local
     // state and can no longer revoke or erase the authoritative confirmation.
+    if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) {
+      Promise.resolve().then(() => window.CM_SYNC.flush()).catch(error => {
+        console.warn('Credential identity saved; progress sync will retry later:', error);
+      });
+    }
     nameChecks.set(user.uid, Promise.resolve(true));
     if (window.CM_AUTH) window.CM_AUTH.user = auth.currentUser;
     document.dispatchEvent(new CustomEvent('cm-certificate-name-changed', { detail:{ user:auth.currentUser, displayName:cleaned } }));
