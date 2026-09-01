@@ -9,6 +9,8 @@
   let authRetryTimer = null;
   let secureRouteEpoch = 0;
   let secureRouteController = null;
+  let routeInFlightKey = '';
+  let routeInFlightPromise = null;
 
   function beginSecureRoute() {
     secureRouteEpoch += 1;
@@ -643,7 +645,7 @@
     return Number.isNaN(d.getTime()) ? String(value || '') : new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',year:'numeric'}).format(d);
   }
 
-  async function route() {
+  async function runRoute() {
     beginSecureRoute();
     const p = hashParts();
     const [root, a, b] = p;
@@ -678,6 +680,23 @@
     if (root === 'verify' && a) {
       await renderVerify(decodeURIComponent(a));
     }
+  }
+
+  function route() {
+    const authState = authReady()
+      ? (window.CM_AUTH?.user?.uid ? `user:${window.CM_AUTH.user.uid}` : 'signed-out')
+      : 'pending';
+    const routeKey = `${location.hash || '#/'}|${authState}`;
+    // Firebase can announce the same resolved identity more than once during
+    // startup. Reuse the active render instead of aborting its assessment fetch
+    // and leaving a deep-linked workbench on an empty app shell.
+    if (routeInFlightPromise && routeInFlightKey === routeKey) return routeInFlightPromise;
+    routeInFlightKey = routeKey;
+    const task = runRoute().finally(() => {
+      if (routeInFlightPromise === task) routeInFlightPromise = null;
+    });
+    routeInFlightPromise = task;
+    return task;
   }
 
   function injectStyles() {

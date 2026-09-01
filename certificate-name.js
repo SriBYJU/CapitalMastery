@@ -143,10 +143,20 @@
   async function waitForSync(timeoutMs = 7000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) return true;
+      if (window.CM_SYNC?.ready && !['loading','syncing','starting'].includes(window.CM_SYNC.status)) return true;
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     return false;
+  }
+
+  async function settleProgressAfterIdentity(timeoutMs = 7000) {
+    if (!window.CM_SYNC?.ready || !window.CM_SYNC?.flush) return false;
+    let settled = false;
+    await Promise.race([
+      Promise.resolve(window.CM_SYNC.flush()).then(() => { settled = true; }).catch(() => {}),
+      new Promise(resolve => setTimeout(resolve, timeoutMs))
+    ]);
+    return settled;
   }
 
   async function remoteNameConfirmation(user) {
@@ -286,18 +296,23 @@
     if (!updateLocalProfileName(cleaned)) throw new Error('Could not create your learning profile. Please try again.');
 
     // Name onboarding has its own durable Firestore write. Do not block this
-    // identity-critical step on the whole learning-progress synchronization graph.
+    // identity-critical step on a new broad flush. Let any hydration/write that
+    // was already active settle for a bounded period, then reassert the guarded
+    // local identity before the final direct owner write so an older payload
+    // cannot finish after it and roll confirmation back.
+    await waitForSync();
+    if (!updateLocalProfileName(cleaned)) throw new Error('Could not finalize your local learning profile. Please try again.');
     await persistCredentialIdentity(user, cleaned);
+    // Fence every older progress write behind a guarded current-state flush, then
+    // make the owner-only identity write last. This prevents an earlier payload
+    // from completing after onboarding and stripping its confirmation marker.
+    await settleProgressAfterIdentity();
     if (!updateLocalProfileName(cleaned)) throw new Error('Could not finalize your learning profile. Please try again.');
+    await persistCredentialIdentity(user, cleaned);
     setLocalOnboarded(user, true);
 
     // Any later progress-state mirror is serialized behind this finalized local
     // state and can no longer revoke or erase the authoritative confirmation.
-    if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) {
-      Promise.resolve().then(() => window.CM_SYNC.flush()).catch(error => {
-        console.warn('Credential identity saved; progress sync will retry later:', error);
-      });
-    }
     nameChecks.set(user.uid, Promise.resolve(true));
     if (window.CM_AUTH) window.CM_AUTH.user = auth.currentUser;
     document.dispatchEvent(new CustomEvent('cm-certificate-name-changed', { detail:{ user:auth.currentUser, displayName:cleaned } }));

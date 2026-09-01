@@ -6,6 +6,7 @@
   const QA_KEY = 'capitalMasteryQaPreviewV1';
   const DIRTY_KEY = 'cmOfficialResultDirtyV2';
   const DRAFT_PREFIX = 'cmOfficialDraftV4:';
+  const DRAFT_TTL_MS = 7 * 24 * 60 * 60 * 1000;
   const PAGE_TOKEN = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const PASS = 80;
   const CONTACT_EMAIL = 'avadhanula.shriyan@gmail.com';
@@ -265,15 +266,38 @@
   }
 
   function saveDraft(form) {
-    const answers = {};
-    form.querySelectorAll('input[name]').forEach(input => {
-      if (input.type === 'radio') {
-        if (input.checked) answers[input.name] = input.value;
+    const fields = {};
+    form.querySelectorAll('input[name], textarea[name], select[name]').forEach(control => {
+      if (control.type === 'radio') {
+        if (control.checked) fields[control.name] = control.value;
       } else {
-        answers[input.name] = input.value;
+        fields[control.name] = control.value;
       }
     });
-    sessionStorage.setItem(draftKey(), JSON.stringify({answers, writing: form.querySelector('textarea[name="writing"]')?.value || ''}));
+    const savedAt=Date.now();
+    const payload=JSON.stringify({version:2,fields,savedAt,expiresAt:savedAt+DRAFT_TTL_MS});
+    try { localStorage.setItem(draftKey(),payload); }
+    catch (_) { sessionStorage.setItem(draftKey(),payload); }
+    const status=form.querySelector('[data-cm-draft-status]');
+    if(status) status.textContent='✓ Draft saved on this device';
+  }
+
+  function readDraft() {
+    const key=draftKey();
+    let raw=localStorage.getItem(key)||sessionStorage.getItem(key);
+    if(!raw) return null;
+    try {
+      const saved=JSON.parse(raw);
+      if(Number(saved?.expiresAt||0)>0 && Number(saved.expiresAt)<Date.now()) {
+        localStorage.removeItem(key); sessionStorage.removeItem(key); return null;
+      }
+      return saved;
+    } catch (_) { localStorage.removeItem(key); sessionStorage.removeItem(key); return null; }
+  }
+
+  function clearDraft() {
+    localStorage.removeItem(draftKey());
+    sessionStorage.removeItem(draftKey());
   }
 
   function enhanceOfficialForm() {
@@ -281,17 +305,14 @@
     if (!form || form.dataset.cmE2eReady === '1') return;
     form.dataset.cmE2eReady = '1';
 
-    let saved = null;
-    try { saved = JSON.parse(sessionStorage.getItem(draftKey()) || 'null'); } catch (_) {}
-    if (saved?.answers) {
-      form.querySelectorAll('input[name]').forEach(input => {
-        if (!(input.name in saved.answers)) return;
-        if (input.type === 'radio') input.checked = saved.answers[input.name] === input.value;
-        else input.value = saved.answers[input.name];
-      });
-    }
-    const writing = form.querySelector('textarea[name="writing"]');
-    if (writing && saved?.writing) writing.value = saved.writing;
+    const saved = readDraft();
+    const savedFields=saved?.fields||saved?.answers||{};
+    if(saved?.writing && !savedFields.writing) savedFields.writing=saved.writing;
+    form.querySelectorAll('input[name], textarea[name], select[name]').forEach(control => {
+      if (!(control.name in savedFields)) return;
+      if (control.type === 'radio') control.checked = savedFields[control.name] === control.value;
+      else control.value = savedFields[control.name];
+    });
     form.addEventListener('change', () => saveDraft(form));
     form.addEventListener('input', () => saveDraft(form));
 
@@ -299,7 +320,7 @@
     if (security && !document.querySelector('.cm-e2e-save-note')) {
       const note = document.createElement('div');
       note.className = 'cm-e2e-save-note';
-      note.innerHTML = '<strong>Your work is protected:</strong> answers are kept in this tab while you work. After you submit, the official score is saved to your account.';
+      note.innerHTML = `<strong>Your work is protected:</strong> this signed-in draft is saved on this device for seven days, including structured workbench writing. It is removed after submission; the official result is saved to your account.<div class="cm-e2e-autosave-status" data-cm-draft-status>${saved?'✓ Draft recovered from this device':'Draft ready to save as you work'}</div>`;
       security.insertAdjacentElement('afterend', note);
     }
   }
@@ -322,7 +343,7 @@
     result.dataset.cmE2eReady = '1';
     normalizePartFiveAfterResult();
     setDirty();
-    sessionStorage.removeItem(draftKey());
+    clearDraft();
 
     const note = document.createElement('div');
     note.className = 'cm-e2e-result-note';

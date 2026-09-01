@@ -33,6 +33,7 @@ ok(!live.includes("data.simulationProfile?.kind === 'ib-deal-workbench-v2') {\n 
 
 // The secure official workbench is now the learner route for every career, including IB.
 ok(app.includes("if(!adminPreview && !qaMode()){ location.hash=`#/official-simulation/${c.id}`; return; }"),'Normal learner simulation traffic must redirect to the secure official workbench');
+ok(app.includes("render('', 'learning');"),'Direct official-simulation links must render the shared shell before the secure workbench paints');
 ok(!app.includes("if(c.id==='investment-banking' && !adminPreview && !qaMode())"),'IB must not be a one-off exception now that all career simulations use the secure workbench');
 ok(app.includes('const adminPreview = forceAdminPreview && qaMode();'),'Only an explicit protected Admin preview invocation may bypass the secure learner redirect');
 ok(app.includes("root==='admin-preview'&&a==='simulation'")&&app.includes('simulationPage(c,true)'),'Admin IB preview must live in the protected Admin namespace and explicitly invoke the local preview renderer');

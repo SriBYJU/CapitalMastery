@@ -365,6 +365,10 @@
 
   async function hydrateFromCloud(firebaseUser, { forceReload = false } = {}) {
     if (!db || !fs || !firebaseUser || qaMode()) return;
+    // Preserve the identity state observed when hydration began. A newly-created
+    // Firebase user has no full display name yet; its one-time credential setup
+    // must finish before any account-switch hydration is allowed to reload.
+    const identityIncompleteAtStart = !looksLikeFullName(firebaseUser.displayName);
     try {
       setStatus('loading');
       const ref = fs.doc(db, 'users', firebaseUser.uid, 'progress', 'state');
@@ -388,7 +392,12 @@
       // changes or cloud hydration materially changes state, so another account's
       // in-memory profile/progress cannot remain on screen.
       const hydrationKey = `cmCloudHydrated:${firebaseUser.uid}`;
-      if ((forceReload || changed) && sessionStorage.getItem(hydrationKey) !== '1') {
+      let identitySetupBusy = identityIncompleteAtStart || !!document.getElementById('cm-full-name-onboarding');
+      try {
+        const guard = JSON.parse(localStorage.getItem(`${IDENTITY_GUARD_PREFIX}${firebaseUser.uid}`) || 'null');
+        identitySetupBusy ||= Number(guard?.expiresAt || 0) > Date.now();
+      } catch (_) {}
+      if ((forceReload || changed) && !identitySetupBusy && sessionStorage.getItem(hydrationKey) !== '1') {
         sessionStorage.setItem(hydrationKey, '1');
         location.reload();
       }

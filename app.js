@@ -753,6 +753,9 @@
         }
         // The secure assessment router owns this route for normal learners. Do not
         // render Home first; that created a visible Home -> loading -> simulation flicker.
+        // A direct deep link still needs the shared header/main/footer shell because
+        // the secure router deliberately paints into #app main#main.
+        render('', 'learning');
         return;
       }
       if(root==='simulation'){const c=careerById(a);return c?simulationPage(c):home();}

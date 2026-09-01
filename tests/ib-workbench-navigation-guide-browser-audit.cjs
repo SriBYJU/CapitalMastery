@@ -82,9 +82,19 @@ const payload={
 
     const firstInput=page.locator('#cm-official-form input[required]').first();
     await firstInput.fill('850');
-    assert((await page.locator('[data-cm-wb-progress-text]').innerText()).startsWith('1 of '),'Interactive completion progress did not update');
+    await page.locator('#cm-official-form textarea[name="writingDecision"]').fill('Continue diligence subject to the valuation and quality-control findings.');
+    assert(/^2 of /.test(await page.locator('[data-cm-wb-progress-text]').innerText()),'Interactive completion progress did not count numeric and structured writing fields');
+    await page.reload({waitUntil:'domcontentloaded',timeout:30000});
+    try { await page.waitForSelector('.cm-wb-shell #cm-official-form',{timeout:15000}); }
+    catch (error) {
+      const diagnostic=await page.evaluate(()=>({href:location.href,hash:location.hash,authReady:window.CM_AUTH?.ready,user:window.CM_AUTH?.user?.uid||null,body:(document.body?.innerText||'').slice(0,1200)}));
+      throw new Error(`Workbench did not return after draft-recovery reload. diagnostics=${JSON.stringify(diagnostic)} errors=${JSON.stringify(errors)}`);
+    }
+    assert(await page.locator('#cm-official-form input[required]').first().inputValue()==='850','Numeric workbench draft did not recover after reload');
+    assert((await page.locator('#cm-official-form textarea[name="writingDecision"]').inputValue()).startsWith('Continue diligence'),'Structured Associate handoff draft did not recover after reload');
+    assert((await page.locator('[data-cm-draft-status]').innerText()).includes('Draft recovered'),'Recovered workbench draft was not explained to the learner');
     assert(errors.length===0,`Browser errors: ${[...new Set(errors)].join(' | ')}`);
-    console.log('IB WORKBENCH NAVIGATION + GUIDANCE BROWSER AUDIT PASS: SPA-safe ten-step navigation, openable explained files, guides, roadmap, and live progress verified');
+    console.log('IB WORKBENCH NAVIGATION + GUIDANCE BROWSER AUDIT PASS: SPA-safe ten-step navigation, openable explained files, guides, roadmap, live progress and seven-day draft recovery verified');
   } finally {
     await context.close();
     await browser.close();
