@@ -21,6 +21,7 @@ The exact deployed frontend source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`
 
 ## Verified release results
 
+- Independent exact-head revalidation after Firebase domain parity: evidence head `52dfbaac13ceb3e3bbf82d1b67720977d0c97208` (runtime sources unchanged) passed **85 / 85** local static audits, eight critical syntax checks and the production Pages bundle audit. GitHub Pages deployment `33553757003`, live production read-only audit `33554225394`, GitHub Pages 18-suite live browser audit `33554223124`, and failure-seeking/adversarial audit `33554227826` all completed **SUCCESS**.
 - Dependency-free source regressions: **85 / 85 PASS**.
 - Exact local release browser matrix: **18 / 18 PASS**.
 - Failure-seeking / adversarial gate: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551277551`.

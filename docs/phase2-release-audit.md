@@ -226,6 +226,8 @@ Do not interpret old-production browser failures as current-source failures; dep
 
 GitHub Pages is the canonical production frontend. The repository's configured branch deployment publishes accepted `main` commits, and `GitHub Pages live read-only audit` waits for the new generation, checks that internal artifacts remain private, and executes the 18-suite Chromium matrix. Cloudflare Pages remains a separately audited secondary mirror.
 
+After Firebase domain parity was closed, evidence head `52dfbaac13ceb3e3bbf82d1b67720977d0c97208` was independently revalidated without runtime-source changes. Pages deployment `33553757003`, live production read-only audit `33554225394`, the GitHub Pages 18-suite live browser audit `33554223124`, and failure-seeking/adversarial audit `33554227826` all completed successfully. The same head also passed 85 local static audit files, eight critical syntax checks and the production bundle audit.
+
 ## 7. Production promotion path
 
 A permanent guarded workflow now exists at:
