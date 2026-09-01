@@ -101,11 +101,49 @@
     return Number(row.best_score || 0);
   }
 
+  function mirrorAuthoritativePass(pathway,itemId,best) {
+    if (Number(best) < PASS) return;
+    const state = readState();
+    if (!state) return;
+    state.careers ||= {};
+    state.careers[pathway] ||= {learningComplete:[],completedParts:[],quizScores:{},simulationKnowledge:null,simulationScore:null,finalScore:null,applied:{},simResponses:{},readiness:null};
+    const cs = state.careers[pathway];
+    cs.learningComplete = Array.isArray(cs.learningComplete) ? cs.learningComplete : [];
+    cs.completedParts = Array.isArray(cs.completedParts) ? cs.completedParts : [];
+    cs.quizScores ||= {};
+    const partMatch = /^part-(\d+)$/.exec(itemId || '');
+    if (partMatch) {
+      const part = Number(partMatch[1]);
+      if (!cs.learningComplete.includes(part)) cs.learningComplete.push(part);
+      if (part <= 4) {
+        cs.quizScores[part] = Math.max(Number(cs.quizScores[part] || 0), Number(best));
+        if (!cs.completedParts.includes(part)) cs.completedParts.push(part);
+      } else if (part === 5) {
+        cs.simulationKnowledge = Math.max(Number(cs.simulationKnowledge || 0), Number(best));
+      }
+    } else if (itemId === 'simulation') {
+      cs.simulationScore = Math.max(Number(cs.simulationScore || 0), Number(best));
+      if (!cs.completedParts.includes(5)) cs.completedParts.push(5);
+    } else if (itemId === 'final') {
+      cs.finalScore = Math.max(Number(cs.finalScore || 0), Number(best));
+    }
+    localStorage.setItem(STATE_KEY,JSON.stringify(state));
+    const uid = window.CM_AUTH?.user?.uid;
+    if (uid) {
+      state.profile ||= {};
+      state.profile.accountUid = uid;
+      localStorage.setItem(`capitalMasteryUserStateV1:${uid}`,JSON.stringify(state));
+    }
+    window.CM?.refreshLocalState?.();
+  }
+
   async function authoritativeBest(pathway,itemId,{force=false}={}) {
     const local = localBest(pathway,itemId);
     if (local >= PASS) return local;
     const rows = await progressRows(pathway,force);
-    return Math.max(local,rowBest(rows,itemId));
+    const best = Math.max(local,rowBest(rows,itemId));
+    if (best >= PASS) mirrorAuthoritativePass(pathway,itemId,best);
+    return best;
   }
 
   function retakeHref(pathway,part) {
