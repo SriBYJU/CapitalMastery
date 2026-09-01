@@ -31,7 +31,7 @@ The exact deployed frontend source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`
 - GitHub Pages deployment: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551276331`.
 - GitHub Pages live browser matrix at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`: **18 / 18 PASS**, run `33551277604`.
 - Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33523908643`.
-- Firebase authorized-domain configuration, observed directly through the public project configuration: `sribyju.github.io` **present**; `capitalmastery.pages.dev` **absent**. The canonical primary therefore exposes Google sign-in; the mirror fails closed by withholding Google and retaining email/password sign-in.
+- Firebase authorized-domain configuration, re-observed directly through the public project configuration after the owner update: `sribyju.github.io` **present** and `capitalmastery.pages.dev` **present**. Browser-origin probes opened the Google provider successfully from both the canonical primary and the secondary mirror without `auth/unauthorized-domain`.
 - Direct live-primary disposable account lifecycle: **PASS** — create, one-time full-name save, intentional reload, fresh-browser Firestore recovery, data deletion and Firebase account cleanup.
 - Cloudflare mirror browser matrix: **18 / 18 PASS** against `https://capitalmastery.pages.dev/`, including provider fail-safe behavior.
 - Production D1 migrations 016–018: **already present and validated**; `quick_check = ok`; foreign-key violations `0`; before/after counts preserved across 11 audited tables. No migration ran during this release.
@@ -81,7 +81,7 @@ Required one-time authorization: either sign the Firebase CLI into an account th
 
 No application-level permission can substitute for this Google/Firebase account authorization, and no secret should be committed to the repository.
 
-For complete Google-provider parity on the secondary mirror, a Firebase owner must also add `capitalmastery.pages.dev` in Authentication → Settings → Authorized domains. Until then, the mirror remains usable through email/password authentication and deliberately does not expose a Google button that would fail.
+Google-provider domain parity is now closed: the owner added `capitalmastery.pages.dev`, the public Firebase project configuration reports both production hosts, and live browser-origin probes opened the Google provider from each host. GitHub Pages remains the canonical primary; this configuration change only removes the secondary mirror's provider limitation.
 
 ## Additional privileged evidence boundary
 

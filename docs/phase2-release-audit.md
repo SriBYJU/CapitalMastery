@@ -254,13 +254,13 @@ It deliberately does **not** claim Phase 2 closure because authenticated D1/Fire
 - D1 migrations 016–018 applied with clean integrity and preserved counts.
 - GitHub Pages selected as the canonical primary and configured for direct `main` publication.
 
-### Firebase authorized-domain verification
+### Firebase authorized-domain verification — COMPLETE
 
-In Firebase Authentication → Settings → Authorized domains, verify that:
+Firebase Authentication → Settings → Authorized domains now includes:
 
-`sribyju.github.io`
+`sribyju.github.io` and `capitalmastery.pages.dev`
 
-is authorized. Keep `capitalmastery.pages.dev` authorized while the secondary mirror remains available. Provider-safety and disposable email/password lifecycle audits cover the live primary; direct console verification remains required for Google sign-in configuration.
+Direct public-project configuration re-observation and browser-origin probes verified Google provider launch from both hosts without `auth/unauthorized-domain`. Keep both domains authorized while their production surfaces remain available. GitHub Pages remains the canonical primary and Cloudflare Pages remains the secondary mirror.
 
 ### Final authenticated canonical-production closure
 

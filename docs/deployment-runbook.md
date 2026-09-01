@@ -149,7 +149,7 @@ Before Phase 2 closure, Firebase Authentication → Settings → Authorized doma
 
 This must be observed directly. Do not infer it solely because email/password auth works; Google OAuth on the primary host is the important configuration check.
 
-For complete Google-provider parity on the secondary mirror, `capitalmastery.pages.dev` must also be present. If it is absent, the frontend must fail closed by hiding Google sign-in on that host while retaining email/password authentication. The September 1 evidence observed exactly that safe fallback state: the canonical GitHub Pages domain is authorized and the Cloudflare mirror domain is not yet authorized.
+For complete Google-provider parity on the secondary mirror, `capitalmastery.pages.dev` must also be present. If it is absent, the frontend must fail closed by hiding Google sign-in on that host while retaining email/password authentication. On September 1, the owner added the mirror domain; direct public-project configuration and browser-origin probes subsequently verified both `sribyju.github.io` and `capitalmastery.pages.dev`. GitHub Pages remains the canonical primary.
 
 ## Authenticated post-deploy closure
 
