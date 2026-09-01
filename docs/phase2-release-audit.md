@@ -2,7 +2,7 @@
 
 **Audit date:** August 31, 2026
 
-**Status:** PRODUCTION RELEASED · FINAL AUTHENTICATED BLACK-BOX CLOSURE REMAINS
+**Status:** PRODUCTION RELEASED · PUBLIC + DISPOSABLE AUTH GATES GREEN · PRIVILEGED FIREBASE/ADMIN CLOSURE BLOCKED
 
 **Canonical frontend:** `https://sribyju.github.io/CapitalMastery/`
 
@@ -10,7 +10,7 @@
 
 **Worker:** `https://capital-mastery-api.avadhanula-shriyan.workers.dev`
 
-> The frontend, Worker and production D1 migrations are deployed. Phase 2 must not be marked complete until the remaining authenticated learner/employer/tenant and cleanup evidence below is verified.
+> **September 1 current-status update:** the canonical GitHub Pages generation, 17-suite live browser matrix, failure-seeking gate, production read-only gate, provider-safety probe and full disposable Firebase account/name/fresh-device/cleanup lifecycle are green. Production D1 migrations 016–018 are applied with clean integrity. Formal closure is now held by missing Firebase rules-deployment authorization and remaining Admin-only live evidence—not by an open public learner-flow failure. See [`release-evidence/phase2-status-2026-09-01.md`](release-evidence/phase2-status-2026-09-01.md) for current SHAs, workflow runs and the exact external boundary. Historical artifact details below are retained for traceability.
 
 ## 1. Authoritative corrected product gate
 
