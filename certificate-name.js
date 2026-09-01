@@ -237,7 +237,26 @@
       return {stringValue:String(input)};
     };
     const document = input => ({fields:Object.fromEntries(Object.entries(input).map(([key,item])=>[key,value(item)]))});
-    const write = (url,input) => fetch(url,{method:'PATCH',headers,body:JSON.stringify(document(input))});
+    const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
+    const retryable = status => status === 429 || status >= 500;
+    const readFields = async url => {
+      try {
+        const response = await fetch(url,{headers:{Authorization:`Bearer ${token}`}});
+        if(!response.ok) return null;
+        return (await response.json()).fields||null;
+      } catch (_) { return null; }
+    };
+    const write = async (url,input,verify) => {
+      let response=null;
+      for(const delay of [0,300,900,1800]){
+        if(delay) await pause(delay);
+        response=await fetch(url,{method:'PATCH',headers,body:JSON.stringify(document(input))});
+        if(response.ok) return response;
+        if(!retryable(response.status)) return response;
+        if(await verify()) return {ok:true,status:200,verifiedAfterAmbiguousWrite:true};
+      }
+      return response||{ok:false,status:0};
+    };
 
     // Persist the owner-only compatibility mirror first. The direct authenticated
     // REST write is independent of any pending Firestore SDK queue.
@@ -249,7 +268,8 @@
     state.profile.accountUid = user.uid;
     state.updatedAt = new Date().toISOString();
     const now = new Date().toISOString();
-    const progressWrite = await write(`${rootUrl}/progress/state`, {
+    const progressUrl=`${rootUrl}/progress/state`;
+    const progressWrite = await write(progressUrl, {
       version:1,
       profile:state.profile,
       careers:state.careers || {},
@@ -258,6 +278,10 @@
       updatedAt:state.updatedAt,
       syncVersion:1,
       serverUpdatedAt:timestamp(now)
+    },async()=>{
+      const fields=await readFields(progressUrl);
+      const profile=fields?.profile?.mapValue?.fields||{};
+      return profile.certificateName?.stringValue===name&&profile.certificateNameConfirmed?.booleanValue===true;
     });
     if(!progressWrite.ok) throw new Error(`Could not save your credential identity (${progressWrite.status}).`);
 
@@ -269,6 +293,9 @@
       displayName:name,
       email:user.email || null,
       lastSeenAt:timestamp(now)
+    },async()=>{
+      const fields=await readFields(rootUrl);
+      return fields?.credentialName?.stringValue===name&&fields?.credentialNameConfirmed?.booleanValue===true;
     });
     if (rootWrite.ok) {
       return 'user-root';

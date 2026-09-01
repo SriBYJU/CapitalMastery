@@ -14,6 +14,8 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+
 (async () => {
   const browser = await chromium.launch({ headless:true });
   const context = await browser.newContext();
@@ -42,9 +44,19 @@ function assert(condition, message) {
     if (!token) return;
     const root = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/users/${encodeURIComponent(uid)}`;
     for (const url of [`${root}/progress/state`, root]) {
-      const response = await api.delete(url, { headers:{Authorization:`Bearer ${token}`} });
-      if (![200,404].includes(response.status())) {
-        throw new Error(`Firestore cleanup failed (${response.status()}) for ${url}: ${(await response.text()).slice(0,500)}`);
+      let lastStatus=0,lastBody='';
+      for(const delay of [0,300,900,1800]){
+        if(delay) await pause(delay);
+        const response = await api.delete(url, { headers:{Authorization:`Bearer ${token}`} });
+        lastStatus=response.status();
+        lastBody=(await response.text()).slice(0,500);
+        if ([200,404].includes(lastStatus)) break;
+        if(lastStatus!==429&&lastStatus<500) break;
+        const verify=await api.get(url,{headers:{Authorization:`Bearer ${token}`}});
+        if(verify.status()===404){lastStatus=404;break;}
+      }
+      if (![200,404].includes(lastStatus)) {
+        throw new Error(`Firestore cleanup failed (${lastStatus}) for ${url}: ${lastBody}`);
       }
     }
   }

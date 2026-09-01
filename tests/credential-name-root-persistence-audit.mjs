@@ -12,6 +12,8 @@ assert(cert.includes("fsApi.doc(db, 'users', user.uid)"), 'Credential-name save 
 assert(/credentialNameConfirmed\s*:\s*true/.test(cert), 'Credential-name save must persist an explicit durable confirmation marker');
 assert(cert.includes('credentialNameUpdatedAt:timestamp(now)'), 'Credential-name save must timestamp the durable identity record');
 assert(cert.includes("Authorization:`Bearer ${token}`")&&cert.includes("method:'PATCH'"), 'Credential-name writes must use the signed-in owner token');
+assert(cert.includes('verifiedAfterAmbiguousWrite')&&cert.includes('retryable(response.status)'), 'Credential-name writes must verify or retry ambiguous Firestore 5xx responses');
+assert(cert.includes('profile.certificateName?.stringValue===name')&&cert.includes('profile.certificateNameConfirmed?.booleanValue===true'), 'Ambiguous progress writes must verify the exact persisted identity before succeeding');
 assert(cert.includes('Credential identity is authoritative on the protected user-root document.'), 'Remote credential-name lookup must prefer the durable root identity');
 assert(cert.includes("fsApi.doc(db, 'users', user.uid, 'progress', 'state')"), 'Legacy progress/state confirmation read fallback must remain available');
 assert(cert.includes("return 'progress-compatibility'"), 'Owner-only rolling-rules compatibility write must remain available until live rules converge');
