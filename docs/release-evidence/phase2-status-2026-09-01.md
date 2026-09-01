@@ -31,6 +31,7 @@ The exact deployed frontend source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`
 - GitHub Pages deployment: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551276331`.
 - GitHub Pages live browser matrix at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`: **18 / 18 PASS**, run `33551277604`.
 - Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33523908643`.
+- Firebase authorized-domain configuration, observed directly through the public project configuration: `sribyju.github.io` **present**; `capitalmastery.pages.dev` **absent**. The canonical primary therefore exposes Google sign-in; the mirror fails closed by withholding Google and retaining email/password sign-in.
 - Direct live-primary disposable account lifecycle: **PASS** — create, one-time full-name save, intentional reload, fresh-browser Firestore recovery, data deletion and Firebase account cleanup.
 - Cloudflare mirror browser matrix: **18 / 18 PASS** against `https://capitalmastery.pages.dev/`, including provider fail-safe behavior.
 - Production D1 migrations 016–018: **already present and validated**; `quick_check = ok`; foreign-key violations `0`; before/after counts preserved across 11 audited tables. No migration ran during this release.
@@ -64,7 +65,9 @@ The intended Firestore rules are correct in source and compile in the release wo
 
 An additional disposable live rules probe on September 1 directly exercised both paths. The compatibility progress write passed, while the protected `users/{uid}` identity write returned `403 PERMISSION_DENIED`. The hardened verifier additionally proved progress cross-account isolation, anonymous denial, progress schema enforcement and successful removal of the disposable documents and both Firebase identities. User-root negative checks were denied as expected but remain independently uncertifiable until the owner-positive user-root write passes. This is explicit evidence that the checked-in protected-root rule has not yet been promoted to the live Firestore project; it is not an application-flow inference.
 
-The exact checked-in rules compiled successfully in the GitHub Java 21 Firestore emulator, run `33529328549`. The fail-closed workflow then stopped at `Require Firebase deployment credential`, before any production mutation. A fresh authorization audit confirmed: Firebase CLI has no authorized accounts; the GitHub repository has no secrets; the GitHub `production` environment has no secrets; and the Cloudflare Worker retains an opaque `ADMIN_UID` secret binding whose value is correctly not readable through the deployment surface.
+The exact checked-in rules compiled successfully in the GitHub Java 21 Firestore emulator, run `33529328549`. The fail-closed workflow then stopped at `Require Firebase deployment credential`, before any production mutation. A fresh authorization audit confirmed: Firebase CLI has no authorized accounts; Google Cloud CLI is not installed; Application Default Credentials are absent; no Firebase/Google credential environment variable is set; the GitHub repository has no secrets; the GitHub `production` environment has no secrets; and the Cloudflare Worker retains an opaque `ADMIN_UID` secret binding whose value is correctly not readable through the deployment surface.
+
+The active Composio Firebase connector was also inspected. It exposes Firebase client-authentication operations only: public configuration lookup and user sign-in/token exchange when the caller already supplies provider, password, custom-token or refresh-token credentials. It exposes no Firestore-rules deployment or authorized-domain management operation and cannot manufacture the protected Admin identity. Its public-config call was independently replaced with a direct successful public project-config check after the connector request returned `403` for lacking established API consumer identity.
 
 Formal evidence still requires a rules deployment/probe performed with a Firebase-authorized operator so the protected user-root fields can be certified independently of the compatibility path.
 
@@ -77,6 +80,8 @@ The rules release cannot be completed from the present machine or GitHub configu
 Required one-time authorization: either sign the Firebase CLI into an account that can deploy rules to `capital-mastery26`, or add `FIREBASE_SERVICE_ACCOUNT_CAPITAL_MASTERY26` (preferred) / `FIREBASE_TOKEN` to the GitHub production environment. Then run **Firebase Firestore rules release** and require `tests/live-firestore-rules-probe.cjs` plus the disposable live Firebase lifecycle to pass.
 
 No application-level permission can substitute for this Google/Firebase account authorization, and no secret should be committed to the repository.
+
+For complete Google-provider parity on the secondary mirror, a Firebase owner must also add `capitalmastery.pages.dev` in Authentication → Settings → Authorized domains. Until then, the mirror remains usable through email/password authentication and deliberately does not expose a Google button that would fail.
 
 ## Additional privileged evidence boundary
 
