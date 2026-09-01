@@ -278,18 +278,23 @@
 
     if (!updateLocalProfileName(cleaned)) throw new Error('Could not create your learning profile. Please try again.');
 
+    // Drain older first-login progress writes, then make credential identity the
+    // final authoritative write. This prevents a slow hydration from rolling the
+    // just-confirmed name back while the onboarding modal is closing.
+    if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) {
+      await window.CM_SYNC.flush().catch(error => {
+        console.warn('Credential name will use its dedicated account write while progress sync retries:', error);
+      });
+    }
+
     // Name onboarding has its own durable Firestore write. Do not block this
     // identity-critical step on the whole learning-progress synchronization graph.
     await persistCredentialIdentity(user, cleaned);
+    if (!updateLocalProfileName(cleaned)) throw new Error('Could not finalize your learning profile. Please try again.');
     setLocalOnboarded(user, true);
 
-    // Progress sync remains useful as a compatibility mirror, but it is best-effort
-    // and can no longer revoke or erase the authoritative root confirmation.
-    if (window.CM_SYNC?.ready && window.CM_SYNC?.flush) {
-      Promise.resolve().then(() => window.CM_SYNC.flush()).catch(error => {
-        console.warn('Credential name saved; progress-state mirror will retry later:', error);
-      });
-    }
+    // Any later progress-state mirror is serialized behind this finalized local
+    // state and can no longer revoke or erase the authoritative confirmation.
     nameChecks.set(user.uid, Promise.resolve(true));
     if (window.CM_AUTH) window.CM_AUTH.user = auth.currentUser;
     document.dispatchEvent(new CustomEvent('cm-certificate-name-changed', { detail:{ user:auth.currentUser, displayName:cleaned } }));

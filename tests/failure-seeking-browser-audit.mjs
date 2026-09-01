@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 const { chromium } = createRequire(import.meta.url)('playwright');
 
-const BASE = process.env.CM_AUDIT_URL || 'http://127.0.0.1:4173';
+const BASE = (process.env.CM_AUDIT_URL || 'http://127.0.0.1:4173').replace(/\/+$/, '');
 const WORKER = 'https://capital-mastery-api.avadhanula-shriyan.workers.dev';
 const QA_KEY = 'capitalMasteryQaPreviewV1';
 const STATE_KEY = 'capitalMasteryLocalStateV1';
@@ -144,7 +144,19 @@ try {
   contexts.push(signedOut.context);
   const publicPage=signedOut.page;
   await gotoHash(publicPage,'#/career/investment-banking');
-  await publicPage.waitForSelector('#cm-learning-gate',{timeout:3000});
+  try { await publicPage.waitForSelector('#cm-learning-gate',{timeout:3000}); }
+  catch (error) {
+    const diagnostic=await publicPage.evaluate(() => ({
+      href:location.href,
+      authReady:window.CM_AUTH?.ready,
+      authUser:window.CM_AUTH?.user?.uid || null,
+      certApi:typeof window.CM_CERT_NAME,
+      pending:sessionStorage.getItem('cmPendingLearningRouteV1'),
+      gate:!!document.getElementById('cm-learning-gate'),
+      body:(document.body?.innerText || '').slice(0,1200)
+    }));
+    throw new Error(`Signed-out learning gate did not open. diagnostics=${JSON.stringify(diagnostic)} capturedErrors=${JSON.stringify(errors)}`);
+  }
   await publicPage.waitForFunction(()=>location.hash==='#/');
   const gateText=await publicPage.locator('#cm-learning-gate').innerText();
   assert(gateText.includes('Sign in to save your progress and earn credentials.'),'Account gate must explain the reason for signing in');

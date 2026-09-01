@@ -13,6 +13,7 @@
   let fs = null;
   let user = null;
   let debounceTimer = null;
+  let syncTail = Promise.resolve(true);
   let suppressLocalHook = false;
   let initialized = false;
   let rootProfileInitializedForUid = null;
@@ -24,7 +25,7 @@
     error: null,
     async flush() {
       if (!user) return false;
-      return syncLocalToCloud(readLocalState());
+      return scheduleCloudSync(readLocalState());
     }
   };
 
@@ -336,6 +337,16 @@
     }
   }
 
+  function scheduleCloudSync(state) {
+    // Serialize cloud writes so an older first-login hydration can never finish
+    // after a newer credential/profile write and silently roll it back.
+    const snapshot = state ? JSON.parse(JSON.stringify(state)) : state;
+    const run = () => syncLocalToCloud(snapshot);
+    const task = syncTail.then(run, run);
+    syncTail = task.catch(() => false);
+    return task;
+  }
+
   async function hydrateFromCloud(firebaseUser, { forceReload = false } = {}) {
     if (!db || !fs || !firebaseUser || qaMode()) return;
     try {
@@ -355,7 +366,7 @@
       directWriteState({ ...merged, credentials: currentCredentials });
       localStorage.setItem(userStateKey(firebaseUser.uid), JSON.stringify({ ...merged, credentials: currentCredentials }));
 
-      await syncLocalToCloud({ ...merged, credentials: [] });
+      await scheduleCloudSync({ ...merged, credentials: [] });
 
       // app.js keeps state inside its closure. Reload whenever the active account
       // changes or cloud hydration materially changes state, so another account's
@@ -374,7 +385,7 @@
   function queueSync(state) {
     if (!user || qaMode() || suppressLocalHook) return;
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => syncLocalToCloud(state || readLocalState()), 700);
+    debounceTimer = setTimeout(() => scheduleCloudSync(state || readLocalState()), 700);
   }
 
   function installLocalStorageHook() {
@@ -430,6 +441,7 @@
   document.addEventListener('cm-auth-changed', async event => {
     const previousUid = user?.uid || localStorage.getItem(ACTIVE_UID_KEY) || null;
     const nextUser = event.detail?.user || null;
+    const sameActiveUser = !!nextUser && user?.uid === nextUser.uid && localStorage.getItem(ACTIVE_UID_KEY) === nextUser.uid;
 
     if (previousUid && (!nextUser || previousUid !== nextUser.uid)) snapshotUserState(previousUid);
     user = nextUser;
@@ -442,6 +454,10 @@
       setStatus('signed-out');
       return;
     }
+
+    // Worker role verification emits a second auth event for the same Firebase
+    // user. Do not start a duplicate hydration that can race first-time setup.
+    if (sameActiveUser) return;
 
     const switched = activateUserState(user);
     await hydrateFromCloud(user, { forceReload: switched });

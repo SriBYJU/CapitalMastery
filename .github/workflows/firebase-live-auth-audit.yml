@@ -62,7 +62,7 @@ jobs:
           ready=false
           for i in {1..30}; do
             if curl -fsS https://sribyju.github.io/CapitalMastery/certificate-name.js -o /tmp/live-certificate-name.js \
-              && grep -Fq 'Credential identity is authoritative on the protected user-root document' /tmp/live-certificate-name.js; then
+              && grep -Fq 'Drain older first-login progress writes' /tmp/live-certificate-name.js; then
               ready=true
               break
             fi
