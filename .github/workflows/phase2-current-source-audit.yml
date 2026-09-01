@@ -23,6 +23,8 @@ jobs:
           node --check capital-mastery-live.js
           node --check public-certificate-verify.js
           node --check v2/worker-v2-phase1-release.js
+          node --check tests/live-firestore-rules-probe.cjs
+          node --check tests/live-admin-closure-probe.cjs
       - name: D1 integrity route contract
         run: node tests/d1-integrity-endpoint-audit.mjs
       - name: Validate Cloudflare Worker package without deploying

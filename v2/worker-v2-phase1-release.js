@@ -771,14 +771,14 @@ export default {
       if (request.method === "GET" && url.pathname === "/enterprise/admin/demo") {
         const admin=await requireAdmin(request,env);
         const rows=await env.DB.prepare(`SELECT o.id,o.name,o.created_at,COUNT(DISTINCT cm.uid) AS learners,COUNT(DISTINCT a.id) AS assignments FROM organizations o LEFT JOIN cohort_members cm ON cm.org_id=o.id LEFT JOIN program_assignments a ON a.org_id=o.id WHERE o.id LIKE 'demo_org_%' GROUP BY o.id,o.name,o.created_at ORDER BY o.created_at DESC`).all();
-        return json({ok:true,synthetic:true,demos:rows.results||[],presets:DEMO_PRESETS},200,env);
+        return json({ok:true,synthetic:true,demos:rows.results||[],presets:DEMO_PRESETS,cleanup:{targeted:true,resetAll:true}},200,env);
       }
       if (request.method === "POST" && url.pathname === "/enterprise/admin/demo/create") {
         const admin=await requireAdmin(request,env); const body=await readJson(request); const demo=await createEnterpriseDemo(env,admin,body);
         return json({ok:true,demo},201,env);
       }
       if (request.method === "POST" && url.pathname === "/enterprise/admin/demo/reset") {
-        const admin=await requireAdmin(request,env); const result=await resetEnterpriseDemos(env,admin);
+        const admin=await requireAdmin(request,env); const body=await readJson(request); const result=await resetEnterpriseDemos(env,admin,body);
         return json({ok:true,synthetic:true,...result},200,env);
       }
       if (request.method === "GET" && parts[0]==='enterprise' && parts[1]==='admin' && parts[2]==='demo' && parts[3] && parts[4]==='learners' && parts.length===5) {
@@ -2703,10 +2703,19 @@ async function createEnterpriseDemo(env, admin, body={}) {
   const preset=DEMO_PRESETS.includes(body.preset)?body.preset:'mixed_cohort';
   const size=Math.max(3,Math.min(30,Number(body.size||12)));
   const pathway=getPathway(body.pathwayId||'investment-banking');
-  const stamp=crypto.randomUUID().replace(/-/g,'').slice(0,10);
+  const probeKey=body.probeKey?cleanId(body.probeKey):'';
+  if(probeKey&&!/^closure_[A-Za-z0-9_-]{8,80}$/.test(probeKey)) throw new HttpError(400,'Invalid closure probe key');
+  const stamp=probeKey?(await sha256Hex(`${admin.sub}:${probeKey}`)).slice(0,10):crypto.randomUUID().replace(/-/g,'').slice(0,10);
   const orgId=`demo_org_${stamp}`, cohortId=`demo_cohort_${stamp}`, assignmentId=`demo_assignment_${stamp}`;
   const due = new Date(Date.now() + (preset==='overdue_cohort'?-3:30)*86400000).toISOString();
   const orgName=`[DEMO] ${pathway.title} · ${preset.replace(/_/g,' ')}`;
+  if(probeKey){
+    const existing=await env.DB.prepare(`SELECT o.id AS org_id,o.name,c.id AS cohort_id,a.id AS assignment_id,c.pathway_id,(SELECT COUNT(*) FROM cohort_members cm WHERE cm.org_id=o.id) AS learner_count FROM organizations o JOIN cohorts c ON c.org_id=o.id JOIN program_assignments a ON a.org_id=o.id AND a.cohort_id=c.id WHERE o.id=? AND o.created_by_uid=? LIMIT 1`).bind(orgId,admin.sub).first();
+    if(existing){
+      const existingPathway=getPathway(existing.pathway_id);
+      return {orgId:existing.org_id,cohortId:existing.cohort_id,assignmentId:existing.assignment_id,preset,size:Number(existing.learner_count||0),pathway:{id:existingPathway.id,title:existingPathway.title},name:existing.name,synthetic:true,reused:true};
+    }
+  }
   const statements=[
     env.DB.prepare(`INSERT INTO organizations (id,slug,name,status,created_by_uid) VALUES (?,?,?,'active',?)`).bind(orgId,`demo-${stamp}`,orgName,admin.sub),
     env.DB.prepare(`INSERT INTO organization_members (org_id,uid,role,status) VALUES (?,?,'owner','active')`).bind(orgId,admin.sub),
@@ -2733,31 +2742,37 @@ async function createEnterpriseDemo(env, admin, body={}) {
   return {orgId,cohortId,assignmentId,preset,size,pathway:{id:pathway.id,title:pathway.title},name:orgName,synthetic:true};
 }
 
-async function resetEnterpriseDemos(env, admin) {
-  const orgs=(await env.DB.prepare(`SELECT id FROM organizations WHERE id LIKE 'demo_org_%'`).all()).results||[];
-  if(!orgs.length) return {deletedOrganizations:0};
+async function resetEnterpriseDemos(env, admin, body={}) {
+  const requestedOrgId=body.orgId?cleanId(body.orgId):'';
+  if(requestedOrgId&&!requestedOrgId.startsWith('demo_org_')) throw new HttpError(400,'Only synthetic demo organizations can be reset');
+  const scoped=sql=>{
+    const statement=env.DB.prepare(sql.replaceAll('__DEMO_SCOPE__',requestedOrgId?'= ?':"LIKE 'demo_org_%'"));
+    return requestedOrgId?statement.bind(requestedOrgId):statement;
+  };
+  const orgs=(await scoped(`SELECT id FROM organizations WHERE id __DEMO_SCOPE__`).all()).results||[];
+  if(!orgs.length) return {deletedOrganizations:0,targeted:Boolean(requestedOrgId)};
   await env.DB.batch([
-    env.DB.prepare(`DELETE FROM credential_evidence_items WHERE credential_id IN (SELECT credential_id FROM credentials WHERE org_id LIKE 'demo_org_%')`),
-    env.DB.prepare(`DELETE FROM credential_events WHERE credential_id IN (SELECT credential_id FROM credentials WHERE org_id LIKE 'demo_org_%')`),
-    env.DB.prepare(`DELETE FROM credentials WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM role_lab_submissions WHERE run_id IN (SELECT id FROM role_lab_runs WHERE org_id LIKE 'demo_org_%')`),
-    env.DB.prepare(`DELETE FROM role_lab_runs WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM v2_assessment_attempts WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM diagnostic_attempts WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM competency_evidence WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM readiness_snapshots WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM standard_content_preferences WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM firm_content_versions WHERE content_id IN (SELECT id FROM firm_content WHERE org_id LIKE 'demo_org_%')`),
-    env.DB.prepare(`DELETE FROM firm_content WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM organization_invites WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM cohort_members WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM program_assignments WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM cohorts WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM enterprise_audit_events WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM organization_members WHERE org_id LIKE 'demo_org_%'`),
-    env.DB.prepare(`DELETE FROM organizations WHERE id LIKE 'demo_org_%'`)
+    scoped(`DELETE FROM credential_evidence_items WHERE credential_id IN (SELECT credential_id FROM credentials WHERE org_id __DEMO_SCOPE__)`),
+    scoped(`DELETE FROM credential_events WHERE credential_id IN (SELECT credential_id FROM credentials WHERE org_id __DEMO_SCOPE__)`),
+    scoped(`DELETE FROM credentials WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM role_lab_submissions WHERE run_id IN (SELECT id FROM role_lab_runs WHERE org_id __DEMO_SCOPE__)`),
+    scoped(`DELETE FROM role_lab_runs WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM v2_assessment_attempts WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM diagnostic_attempts WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM competency_evidence WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM readiness_snapshots WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM standard_content_preferences WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM firm_content_versions WHERE content_id IN (SELECT id FROM firm_content WHERE org_id __DEMO_SCOPE__)`),
+    scoped(`DELETE FROM firm_content WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM organization_invites WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM cohort_members WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM program_assignments WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM cohorts WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM enterprise_audit_events WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM organization_members WHERE org_id __DEMO_SCOPE__`),
+    scoped(`DELETE FROM organizations WHERE id __DEMO_SCOPE__`)
   ]);
-  return {deletedOrganizations:orgs.length};
+  return {deletedOrganizations:orgs.length,targeted:Boolean(requestedOrgId)};
 }
 
 async function requireAdmin(request, env) {

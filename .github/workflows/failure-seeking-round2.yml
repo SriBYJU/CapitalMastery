@@ -72,6 +72,8 @@ jobs:
           node --check tests/state-resilience-browser-audit.cjs
           node --check tests/course-pass-continuity-browser-audit.cjs
           node --check tests/course-no-skip-resume-browser-audit.cjs
+          node --check tests/live-firestore-rules-probe.cjs
+          node --check tests/live-admin-closure-probe.cjs
 
       - name: Failure-seeking static audits
         run: |
