@@ -7,35 +7,41 @@
 
 ## Exact generations
 
-- `8a38575` — promoted GitHub Pages to the canonical origin.
-- `1f86e88` — added experience confidence controls, contextual help/resume behavior, onboarding resilience and the final usability pass.
-- `d034541` — repaired direct simulation deep links, workbench draft recovery and first-login credential persistence.
-- `a10e00f` — added the learner/employer video campaigns and made the live Firebase audit wait for the exact deployed generation.
+- `08d0781` — enforced canonical no-skip progression, locked read-only look-ahead, permanent passed assessments, saved failed-attempt review, exact resume and Role Lab/final prerequisites.
+- `2295dcd` — made server-authoritative passes monotonically restore the signed-in local/user-scoped state.
+- `51de102` / `fd6ddbd` — removed assessment-review hydration races, prevented count-to-percent corruption and made continuity stable under repeated auth/router/CDN timing.
+- `669a1b1` — added idempotent retry plus remote verification for ambiguous Firestore identity writes and retry-safe disposable cleanup.
+- `1999bfa` — updated the live release sentinels to the exact current production assets.
 
-The latest repository and Pages deployment generation is `a10e00f8f54b6a1ca9ff46373ede22c9424f742c`. The deployable application source is unchanged from `d0345415498a0bf030a6a502a8a519150153d80f`; the later commit adds non-public ad assets and release-workflow reliability only.
+The latest repository generation is `1999bfafcb1a5329291a5eeee9f8c0fc947d4609`. The exact deployable application/Worker source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`; the later commit changes release sentinels only.
 
 ## Verified release results
 
 - Dependency-free source regressions: **84 / 84 PASS**.
-- Local release browser matrix: **17 / 17 PASS**.
-- GitHub Pages live browser matrix: **17 / 17 PASS**, run `33465800181`.
-- Failure-seeking / adversarial gate: **PASS**, run `33465800207`.
-- Live production read-only gate: **PASS**, run `33465800257`.
-- Audited Pages package: **PASS**, run `33465800163`.
-- GitHub Pages deployment for `d034541`: **PASS**, run `33465799462`.
-- GitHub Pages deployment for `a10e00f`: **PASS**, run `33466327914`.
-- Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33466328477`.
+- Exact local release browser matrix: **18 / 18 PASS**.
+- GitHub Pages live browser matrix: **18 / 18 PASS**, run `33522858871`.
+- Failure-seeking / adversarial gate: **PASS**, run `33522858887`.
+- Live production read-only gate: **PASS**, run `33523908480`.
+- Audited Pages package: **PASS**, run `33522858804`.
+- GitHub Pages deployment: **PASS**, run `33523904201`.
+- Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33523908643`.
 - Direct live-primary disposable account lifecycle: **PASS** — create, one-time full-name save, intentional reload, fresh-browser Firestore recovery, data deletion and Firebase account cleanup.
-- Production D1 migrations 016–018: **applied**; `quick_check = ok`; foreign-key violations `0`; before/after counts preserved. See `d1-production-preflight-2026-08-31.json`.
-- Production Worker boundary: healthy; approved origin accepted, unapproved origin rejected, unauthenticated protected access rejected.
+- Cloudflare mirror browser matrix: **18 / 18 PASS** against `https://capitalmastery.pages.dev/`, including provider fail-safe behavior.
+- Production D1 migrations 016–018: **already present and validated**; `quick_check = ok`; foreign-key violations `0`; before/after counts preserved across 11 audited tables. No migration ran during this release.
+- Production Worker version `17ae7406-dcb5-43c9-8b8b-b1c2ff1378fc`: health `200`; unapproved origin `403`; unauthenticated auth check `401`; protected integrity route `401`.
+- Cloudflare Pages deployment: exact allowlisted 56-file artifact; deployment `9b11735f.capitalmastery.pages.dev`; production alias/header verification PASS (`X-Frame-Options: DENY`, Permissions Policy present).
 - Repository: clean after final push.
 
-The browser matrix covers course progression, assessment review/retake separation, pass continuity, direct-link and refresh recovery, modern no-MCQ simulations, all 16 careers across both tracks, employer role UI boundaries, invite lifecycle, Admin route isolation, program-completion verification, mobile learner guidance, state corruption/offline recovery, and contrast at responsive widths.
+The browser matrix covers explicit locked/current/completed/retry states, direct-route no-skip enforcement, exact reload-safe resume, question-by-question permanent pass/failure review, forged-retake resistance, cross-device authoritative pass recovery, modern no-MCQ simulations, all 16 careers across both programs, employer role/invite boundaries, Admin isolation, program-completion verification, mobile guidance, corruption/offline recovery, and contrast across responsive widths.
 
 ## Final experience and campaign pass
 
 The final usability pass adds:
 
+- one exact “Continue where you left off” action backed by the canonical state machine;
+- read-only look-ahead with controls withheld until prerequisites pass;
+- permanent passed assessments with count, percentage, submitted answer, correct answer and rationale review;
+- saved failed attempts with review first and an explicit retry action;
 - visible local/sync/offline save confidence;
 - contextual learner, workbench and employer guidance;
 - safe last-activity resume behavior;
@@ -46,9 +52,11 @@ The final usability pass adds:
 
 The ad kit now contains three vertical H.264 masters, including dedicated 18.6-second learner and employer cuts assembled from real product UI. The campaign explicitly avoids customer/endorsement claims and labels synthetic case data.
 
-## External production closure blocker
+## Remaining external production closure boundary
 
-The intended Firestore rules are correct in source and compile in the release workflow, but the current live project still rejects the new protected user-root credential fields with `403 PERMISSION_DENIED`. The owner-only `users/{uid}/progress/state` compatibility path works, and the complete live signup/name/reload/fresh-device lifecycle passes. This is therefore a deployment/configuration blocker, not an active learner-facing failure.
+The intended Firestore rules are correct in source and compile in the release workflow. The owner-only `users/{uid}/progress/state` compatibility path works, and the complete live signup/name/reload/fresh-device lifecycle passes. The save path now also retries idempotently and verifies an already-committed document after ambiguous Firestore 5xx responses, closing the learner-facing failure observed during this release.
+
+Formal evidence still requires a rules deployment/probe performed with a Firebase-authorized operator so the protected user-root fields can be certified independently of the compatibility path.
 
 The rules release cannot be completed from the present machine or GitHub configuration because all three authorization paths are absent:
 
@@ -64,4 +72,4 @@ No application-level permission can substitute for this Google/Firebase account 
 
 The underlying production D1 database has already passed the audited integrity preflight. A final authenticated call to the administrator-only `/admin/integrity` route and a disposable production Admin Demo/tenant cleanup exercise require an authorized production Admin identity. These actions cannot be fabricated with a normal disposable learner account; the Worker correctly rejects that escalation.
 
-Phase 2 production behavior and public release gates are green. Formal closure remains withheld until the live Firestore rules release and the remaining privileged verification are performed with real authorized credentials.
+Phase 2 production behavior, course integrity, both public mirrors and disposable-account release gates are green. Formal closure remains withheld until the live Firestore rules probe and the remaining privileged administrator verification are performed with real authorized credentials.
