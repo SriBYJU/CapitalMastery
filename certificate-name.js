@@ -382,7 +382,9 @@
           <div class="cm-full-name-message" hidden></div>
           <button class="btn btn-primary btn-block" type="submit">${forceEdit ? 'Save name' : 'Save name & continue →'}</button>
         </form>
-        ${forceEdit ? '<button class="cm-name-cancel" type="button" data-cm-name-cancel>Cancel</button>' : ''}
+        ${forceEdit
+          ? '<button class="cm-name-cancel" type="button" data-cm-name-cancel>Cancel</button>'
+          : '<button class="cm-name-cancel" type="button" data-cm-name-switch-account>Sign out and use another account</button>'}
         <p class="small muted" style="margin-top:14px">This setup is saved to your account, so you will not be asked again when signing in on another device. You can edit the name later from Profile.</p>
       </div>`;
 
@@ -411,6 +413,23 @@
     });
 
     d.querySelector('[data-cm-name-cancel]')?.addEventListener('click', closeNameModal);
+    const switchAccount = d.querySelector('[data-cm-name-switch-account]');
+    switchAccount?.addEventListener('click', async () => {
+      const label = 'Sign out and use another account';
+      try {
+        switchAccount.disabled = true;
+        switchAccount.textContent = 'Signing out…';
+        if (typeof window.CM_AUTH?.signOut !== 'function') throw new Error('Account switching is not ready yet. Please try again.');
+        clearPendingRoute();
+        await window.CM_AUTH.signOut();
+        closeNameModal();
+        if (location.hash !== '#/login') location.hash = '#/login';
+      } catch (error) {
+        showError(error.message || 'Could not sign out. Please try again.');
+        switchAccount.disabled = false;
+        switchAccount.textContent = label;
+      }
+    });
     setTimeout(() => { input?.focus(); if (!suggested) input?.select(); }, 50);
   }
 
@@ -473,7 +492,7 @@
     if (document.getElementById('cm-account-gate-styles')) return;
     const style = document.createElement('style');
     style.id = 'cm-account-gate-styles';
-    style.textContent = `.cm-learning-gate-modal,.cm-full-name-modal{max-width:620px}.cm-learning-gate-modal h2,.cm-full-name-modal h2{color:var(--navy);font-family:Georgia,"Times New Roman",serif;font-size:2rem;line-height:1.12;margin:8px 0 12px}.cm-gate-lead{font-size:1rem;line-height:1.6}.cm-gate-icon{width:48px;height:48px;border-radius:14px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:900;letter-spacing:.04em;margin-bottom:14px}.cm-gate-benefits{display:grid;gap:10px;margin:20px 0}.cm-gate-benefits>div{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;padding:12px 13px;border:1px solid #e1e6eb;border-radius:12px;background:#f8fafb}.cm-gate-benefits>div>span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#e9f5ed;color:#245b43;font-weight:900}.cm-gate-benefits p{margin:0}.cm-full-name-modal form{display:grid;gap:10px;margin-top:18px}.cm-full-name-modal label{font-weight:800;color:var(--navy)}.cm-full-name-modal input{width:100%;border:1px solid #cbd2da;border-radius:11px;padding:13px 14px;font-size:1rem;outline:none}.cm-full-name-modal input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}.cm-full-name-message{padding:10px 12px;border-radius:10px}.cm-full-name-message.bad{background:#fff0f0;color:#8b3232}.cm-name-cancel{border:0;background:transparent;color:var(--navy-3);text-decoration:underline;cursor:pointer;margin-top:10px}.cm-cert-name-link{display:inline-block;margin-top:8px;border:0;background:transparent;padding:0;color:var(--navy-3);text-decoration:underline;cursor:pointer;font-size:.78rem;font-weight:750}.cm-signup-name-note{padding:11px 12px;border-radius:10px;background:#f4f7fa;border:1px solid #e1e6eb;color:#4e5b68;font-size:.86rem;line-height:1.45;margin-bottom:2px}`;
+    style.textContent = `.cm-learning-gate-modal,.cm-full-name-modal{max-width:620px}.cm-learning-gate-modal h2,.cm-full-name-modal h2{color:var(--navy);font-family:Georgia,"Times New Roman",serif;font-size:2rem;line-height:1.12;margin:8px 0 12px}.cm-gate-lead{font-size:1rem;line-height:1.6}.cm-gate-icon{width:48px;height:48px;border-radius:14px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:900;letter-spacing:.04em;margin-bottom:14px}.cm-gate-benefits{display:grid;gap:10px;margin:20px 0}.cm-gate-benefits>div{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:start;padding:12px 13px;border:1px solid #e1e6eb;border-radius:12px;background:#f8fafb}.cm-gate-benefits>div>span{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#e9f5ed;color:#245b43;font-weight:900}.cm-gate-benefits p{margin:0}.cm-full-name-modal form{display:grid;gap:10px;margin-top:18px}.cm-full-name-modal label{font-weight:800;color:var(--navy)}.cm-full-name-modal input{width:100%;border:1px solid #cbd2da;border-radius:11px;padding:13px 14px;font-size:1rem;outline:none}.cm-full-name-modal input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}.cm-full-name-message{padding:10px 12px;border-radius:10px}.cm-full-name-message.bad{background:#fff0f0;color:#8b3232}.cm-name-cancel{border:0;background:transparent;color:var(--navy-3);text-decoration:underline;cursor:pointer;margin-top:10px}.cm-name-cancel:disabled{cursor:wait;opacity:.62}.cm-cert-name-link{display:inline-block;margin-top:8px;border:0;background:transparent;padding:0;color:var(--navy-3);text-decoration:underline;cursor:pointer;font-size:.78rem;font-weight:750}.cm-signup-name-note{padding:11px 12px;border-radius:10px;background:#f4f7fa;border:1px solid #e1e6eb;color:#4e5b68;font-size:.86rem;line-height:1.45;margin-bottom:2px}`;
     document.head.appendChild(style);
   }
 

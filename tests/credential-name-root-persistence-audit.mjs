@@ -27,6 +27,9 @@ assert(cert.indexOf('await persistCredentialIdentity(user, cleaned)') < cert.ind
 assert((cert.match(/await persistCredentialIdentity\(user, cleaned\)/g)||[]).length === 2, 'Credential identity must be reasserted after the progress-settlement fence');
 assert(cert.includes('Promise.race([')&&cert.includes('settleProgressAfterIdentity'),'Progress settlement must be bounded so onboarding cannot hang indefinitely');
 assert((cert.match(/updateLocalProfileName\(cleaned\)/g)||[]).length >= 2, 'Credential confirmation must reassert local identity after the final remote write');
+assert(cert.includes('data-cm-name-switch-account')&&cert.includes('Sign out and use another account'), 'Required-name onboarding must expose a clear wrong-account escape');
+assert(cert.includes('await window.CM_AUTH.signOut()'), 'Wrong-account escape must use the real Firebase sign-out flow');
+assert(cert.includes('clearPendingRoute();')&&cert.includes("location.hash = '#/login'"), 'Wrong-account escape must discard gated resume intent and return to login');
 
 assert(sync.includes('base.credentialNameConfirmed = true'), 'Normal progress sync must preserve an already-confirmed root identity when local confirmation is present');
 assert(sync.includes('let syncTail = Promise.resolve(true)'), 'Cloud progress writes must use a single serialized queue');

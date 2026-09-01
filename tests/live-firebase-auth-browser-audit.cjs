@@ -138,6 +138,17 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     ({uid,lastToken} = await page.evaluate(async () => ({uid:window.CM_AUTH.user.uid,lastToken:await window.CM_AUTH.getIdToken()})));
 
     await page.locator('#cm-full-name-onboarding').waitFor({state:'visible',timeout:20000});
+    const switchAccount = page.locator('[data-cm-name-switch-account]');
+    assert(await switchAccount.isVisible(), 'Required-name onboarding does not provide a wrong-account escape');
+    await switchAccount.click();
+    await page.waitForFunction(() => window.CM_AUTH?.user === null, null, {timeout:15000});
+    await page.locator('#cm-full-name-onboarding').waitFor({state:'detached',timeout:10000});
+    await authFormsReady();
+    await page.locator('#cm-signin-form input[name="email"]').fill(email);
+    await page.locator('#cm-signin-form input[name="password"]').fill(password);
+    await page.locator('#cm-signin-form button[type="submit"]').click();
+    await page.waitForFunction(expected => window.CM_AUTH?.user?.email === expected, email, {timeout:30000});
+    await page.locator('#cm-full-name-onboarding').waitFor({state:'visible',timeout:20000});
     await page.locator('#cm-full-name-input').fill(fullName);
     const postSaveReload = page.waitForEvent('domcontentloaded', {timeout:30000});
     await page.locator('#cm-full-name-form button[type="submit"]').click();
@@ -209,7 +220,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     await deleteFirestoreDocs();
     await deleteIdentity();
-    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> one-time full-name save -> intentional reload -> fresh-state Firestore recovery -> REST cleanup');
+    console.log('LIVE FIREBASE AUTH BROWSER AUDIT PASS: real create -> wrong-account escape -> sign back in -> one-time full-name save -> intentional reload -> fresh-state Firestore recovery -> REST cleanup');
   } finally {
     try {
       if (created) {
