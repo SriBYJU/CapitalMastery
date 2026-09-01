@@ -1,11 +1,12 @@
-name: Validate completed quiz review
+name: Validate permanent quiz review
 
 on:
   push:
     branches: [main]
     paths:
       - 'tools/patch-completed-quiz-review.mjs'
-      - 'tests/completed-quiz-review-audit.mjs'
+      - 'tests/course-pass-continuity-audit.mjs'
+      - 'tests/course-assessment-state-audit.mjs'
       - '.github/workflows/patch-completed-quiz-review.yml'
   workflow_dispatch:
 
@@ -22,7 +23,8 @@ jobs:
         run: |
           set -euo pipefail
           node --check app.js
-          node tests/completed-quiz-review-audit.mjs
+          node tests/course-pass-continuity-audit.mjs
+          node tests/course-assessment-state-audit.mjs
           node tests/state-resilience-audit.mjs
           node tests/training-track-architecture-audit.mjs
           node tests/pages-production-bundle-audit.mjs
