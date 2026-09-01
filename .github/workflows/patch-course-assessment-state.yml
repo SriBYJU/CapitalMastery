@@ -1,4 +1,4 @@
-name: Patch course assessment state
+name: Validate course assessment state
 
 on:
   push:
@@ -13,20 +13,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Apply guarded course assessment state repair
-        run: |
-          node tools/patch-course-assessment-state.mjs
-          node tools/patch-course-retry-navigation.mjs
 
       - name: Validate syntax and static state contract
         run: |
@@ -52,16 +45,3 @@ jobs:
             sleep 1
           done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-assessment-state-browser-audit.cjs
-
-      - name: Commit product repair only
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- app.js capital-mastery-live.js; then
-            echo 'No product changes were required.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js capital-mastery-live.js
-          git commit -m 'Fix course assessment retry and review state'
-          git push

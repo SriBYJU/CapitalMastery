@@ -1,4 +1,4 @@
-name: Patch completed quiz review
+name: Validate completed quiz review
 
 on:
   push:
@@ -10,20 +10,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Apply guarded quiz review repair
-        run: node tools/patch-completed-quiz-review.mjs
-
-      - name: Validate repaired contract
+      - name: Validate completed-review contract
         run: |
           set -euo pipefail
           node --check app.js
@@ -31,16 +26,3 @@ jobs:
           node tests/state-resilience-audit.mjs
           node tests/training-track-architecture-audit.mjs
           node tests/pages-production-bundle-audit.mjs
-
-      - name: Commit product repair only
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- app.js; then
-            echo 'No app.js change was required.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app.js
-          git commit -m 'Preserve completed quiz review state'
-          git push

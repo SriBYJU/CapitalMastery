@@ -1,4 +1,4 @@
-name: Patch IB workbench syntax
+name: Validate IB workbench syntax
 
 on:
   push:
@@ -9,32 +9,16 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Repair IB simulation syntax
-        run: node tools/patch-ib-workbench-syntax.mjs
       - name: Validate Worker packaging
         run: |
           set -euo pipefail
           node --check v2/worker-v2-phase1-release.js
           node tests/official-simulation-job-realism-audit.mjs
           npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
-      - name: Commit Worker repair only
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- v2/worker-v2-phase1-release.js; then
-            echo 'No Worker syntax change was required.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add v2/worker-v2-phase1-release.js
-          git commit -m 'Repair IB professional workbench syntax'
-          git push

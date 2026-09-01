@@ -1,4 +1,4 @@
-name: Patch firm-ready course workbenches
+name: Validate firm-ready course workbenches
 
 on:
   push:
@@ -11,18 +11,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  patch:
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Apply firm-ready workbench hardening
-        run: node tools/patch-firm-ready-course-workbenches.mjs
 
       - name: Validate course and simulation contract
         run: |
@@ -34,16 +29,3 @@ jobs:
           node tests/training-track-architecture-audit.mjs
           node tests/pages-production-bundle-audit.mjs
           npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
-
-      - name: Commit product hardening only
-        run: |
-          set -euo pipefail
-          if git diff --quiet -- capital-mastery-live.js v2/worker-v2-phase1-release.js; then
-            echo 'No product changes were required.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add capital-mastery-live.js v2/worker-v2-phase1-release.js
-          git commit -m 'Harden career simulations into real workdays'
-          git push
