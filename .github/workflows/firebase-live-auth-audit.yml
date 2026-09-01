@@ -60,16 +60,21 @@ jobs:
         run: |
           set -euo pipefail
           ready=false
-          for i in {1..30}; do
-            if curl -fsS https://sribyju.github.io/CapitalMastery/certificate-name.js -o /tmp/live-certificate-name.js \
-              && grep -Fq 'cmCredentialIdentityGuardV1' /tmp/live-certificate-name.js; then
+          for i in {1..60}; do
+            curl -fsS "https://sribyju.github.io/CapitalMastery/?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-index.html || true
+            curl -fsS "https://sribyju.github.io/CapitalMastery/certificate-name.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-certificate-name.js || true
+            curl -fsS "https://sribyju.github.io/CapitalMastery/firebase-sync.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-firebase-sync.js || true
+            if grep -Fq 'certificate-name.js?v=20260831-phase2rc8' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'firebase-sync.js?v=20260831-phase2rc7' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'settleProgressAfterIdentity' /tmp/live-certificate-name.js 2>/dev/null \
+              && grep -Fq 'identityIncompleteAtStart' /tmp/live-firebase-sync.js 2>/dev/null; then
               ready=true
               break
             fi
             sleep 5
           done
-          [ "$ready" = true ] || { echo 'GitHub Pages primary did not publish the credential-identity repair in time'; exit 1; }
-          echo 'GitHub Pages repaired credential-identity generation: PASS'
+          [ "$ready" = true ] || { echo 'GitHub Pages primary did not converge to the current credential-identity generation'; exit 1; }
+          echo 'GitHub Pages current credential-identity generation: PASS'
 
       - name: Install Chromium
         run: |
