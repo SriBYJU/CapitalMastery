@@ -14,24 +14,27 @@
 - `1999bfa` — updated the live release sentinels to the exact current production assets.
 - `3c836a9` — recorded the completed course-integrity production evidence and the remaining privileged closure boundary.
 - `51298de` — hardened the disposable live Firestore verifier with cross-account isolation, anonymous denial, schema rejection and asserted document/identity cleanup.
+- `a180818` — added exact-target Admin Demo cleanup, idempotent synthetic-tenant creation and the authenticated Admin closure probe; this Worker generation is deployed.
+- `7a258ae` — made the Admin closure probe deterministic and interruption-safe even when the first create response is ambiguous.
 
-The exact deployable application/Worker source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`. Commit `1999bfafcb1a5329291a5eeee9f8c0fc947d4609` changes release sentinels only; later commits update release evidence without changing the deployable application.
+The exact deployed frontend source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`; the exact deployed Worker source is `a18081853d0f0a1915a697a2f87ef6d8848d8994`. Commit `1999bfafcb1a5329291a5eeee9f8c0fc947d4609` changes frontend release sentinels only. Commit `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a` changes the privileged verifier only, not the deployed runtime.
 
 ## Verified release results
 
-- Dependency-free source regressions: **84 / 84 PASS**.
+- Dependency-free source regressions: **85 / 85 PASS**.
 - Exact local release browser matrix: **18 / 18 PASS**.
-- GitHub Pages live browser matrix: **18 / 18 PASS**, run `33522858871`.
-- Failure-seeking / adversarial gate: **PASS**, including verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`, run `33529309643`.
-- Live production read-only gate: **PASS**, including verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`, run `33529309731`.
+- Failure-seeking / adversarial gate: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551277551`.
+- Live production read-only gate: **PASS** against the promoted Worker at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551277570`.
+- Phase 2 current-source audit: **PASS** for Worker generation `a18081853d0f0a1915a697a2f87ef6d8848d8994`, run `33550631569`.
+- Audited Worker package: **PASS** for Worker generation `a18081853d0f0a1915a697a2f87ef6d8848d8994`, run `33550631574`.
 - Audited Pages package: **PASS**, run `33522858804`.
-- GitHub Pages deployment: **PASS**, including verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`, run `33529308471`.
-- GitHub Pages live browser matrix at verifier-only head `51298dec13402dbdf62eceda5c1fd97d8bbc01b0`: **18 / 18 PASS**, run `33529309668`.
+- GitHub Pages deployment: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551276331`.
+- GitHub Pages live browser matrix at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`: **18 / 18 PASS**, run `33551277604`.
 - Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33523908643`.
 - Direct live-primary disposable account lifecycle: **PASS** — create, one-time full-name save, intentional reload, fresh-browser Firestore recovery, data deletion and Firebase account cleanup.
 - Cloudflare mirror browser matrix: **18 / 18 PASS** against `https://capitalmastery.pages.dev/`, including provider fail-safe behavior.
 - Production D1 migrations 016–018: **already present and validated**; `quick_check = ok`; foreign-key violations `0`; before/after counts preserved across 11 audited tables. No migration ran during this release.
-- Production Worker version `17ae7406-dcb5-43c9-8b8b-b1c2ff1378fc`: health `200`; unapproved origin `403`; unauthenticated auth check `401`; protected integrity route `401`.
+- Production Worker version `f77c74da-d85e-49a0-9d95-389c74efbbbb`: health `200`; unapproved origin `403`; unauthenticated auth check `401`; protected integrity route `401`; Admin Demo discovery/reset `401` without authentication. The opaque `ADMIN_UID` binding remained present. Post-deploy D1 `quick_check = ok`, foreign-key violations `0`, rows written `0`.
 - Cloudflare Pages deployment: exact allowlisted 56-file artifact; deployment `9b11735f.capitalmastery.pages.dev`; production alias/header verification PASS (`X-Frame-Options: DENY`, Permissions Policy present).
 - Repository: clean after final push.
 
@@ -77,6 +80,8 @@ No application-level permission can substitute for this Google/Firebase account 
 
 ## Additional privileged evidence boundary
 
-The underlying production D1 database has already passed the audited integrity preflight. A final authenticated call to the administrator-only `/admin/integrity` route and a disposable production Admin Demo/tenant cleanup exercise require an authorized production Admin identity. These actions cannot be fabricated with a normal disposable learner account; the Worker correctly rejects that escalation.
+The underlying production D1 database has already passed the audited integrity preflight. The deployed Worker now advertises exact-target synthetic cleanup, rejects every non-`demo_org_` cleanup target, and supports idempotent closure-probe creation. `tests/live-admin-closure-probe.cjs` verifies the protected identity, pre/during/post D1 integrity, a deterministic three-learner tenant, retry reuse, learner-state transition, permission evidence, exact cleanup and preservation of every pre-existing demo tenant. It refuses to create data unless the targeted-cleanup capability is present and computes the deterministic cleanup target before its first create request.
+
+Executing that probe still requires a fresh Firebase ID token whose UID matches the opaque production `ADMIN_UID`. That identity is not available on the present machine and cannot be fabricated with a normal learner account; the deployed Worker correctly rejects that escalation.
 
 Phase 2 production behavior, course integrity, both public mirrors and disposable-account release gates are green. Formal closure remains withheld until the live Firestore rules probe and the remaining privileged administrator verification are performed with real authorized credentials.

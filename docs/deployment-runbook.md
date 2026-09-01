@@ -166,6 +166,10 @@ The automated workflows deliberately do **not** claim the authenticated release 
 - disposable QA account/data cleanup;
 - post-cleanup integrity verification.
 
+The Admin integrity and Demo/Test Lab portion is automated by `tests/live-admin-closure-probe.cjs`. Set a fresh Firebase ID token for the configured production Admin only in the process environment as `CM_ADMIN_ID_TOKEN`, then run the probe from the repository root. Do not commit, print, paste into a workflow input or retain the token in a file.
+
+The probe will not create data until the Worker advertises exact-target cleanup. It then verifies the protected Admin identity, D1 integrity, an idempotent three-learner synthetic tenant, learner-state and permission evidence, exact tenant cleanup, preservation of every pre-existing demo tenant and post-cleanup D1 integrity. Its deterministic closure key lets an ambiguous create response be retried without producing a second tenant, and its cleanup target is known before the first create request.
+
 ## Rollback rules
 
 If the Worker deploy fails its boundary checks, stop before Pages promotion. Restore the previous known-good Worker deployment through Cloudflare or redeploy the previous reviewed Worker source before continuing.
