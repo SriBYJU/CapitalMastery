@@ -107,7 +107,8 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     await page.locator('[data-cm-review-passed]').first().click();
     await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
     assert(await page.locator('#cm-official-form').count()===0,'Reviewing an already-passed assessment should not silently open a blank quiz');
-    assert(/90%/.test(await page.locator('.cm-server-assessment-review').innerText()),'Saved-pass review did not preserve best score');
+    const savedPassReviewText=await page.locator('.cm-server-assessment-review').innerText();
+    assert(/90%/.test(savedPassReviewText),`Saved-pass review did not preserve best score: ${JSON.stringify(savedPassReviewText.slice(0,800))}`);
     assert(await page.getByRole('link',{name:/Retake assessment/i}).count()===0,'A permanent saved pass must not expose a retake action');
     const getsBeforeForgery=assessmentGets, submitsBeforeForgery=submitCalls;
     await page.evaluate(()=>{location.hash='#/quiz/investment-banking/5?retake=1&attempt=forged-after-pass';});

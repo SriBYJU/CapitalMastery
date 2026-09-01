@@ -11,6 +11,8 @@
   let secureRouteController = null;
   let routeInFlightKey = '';
   let routeInFlightPromise = null;
+  let savedReviewSequence = 0;
+  const savedReviewCache = new Map();
 
   function beginSecureRoute() {
     secureRouteEpoch += 1;
@@ -378,6 +380,7 @@
       try {
         button.disabled = true;
         button.textContent = itemId === 'simulation' ? 'Sending to Associate review…' : 'Grading securely…';
+        savedReviewCache.delete(savedReviewCacheKey(pathwayId,itemId));
         const result = await apiFetch('/assessment/submit', { method:'POST', body:JSON.stringify({ pathwayId:apiPathway(pathwayId), itemId, answers, writing, assignmentId:assignmentId||null }) });
         mirrorOfficialResult(pathwayId, itemId, result.score, result.passed);
         renderResult(pathwayId, itemId, result, assignmentId);
@@ -612,28 +615,41 @@
     return `<article class="cm-review-item ${status}"><div class="cm-review-qhead"><span>${index+1}</span><div><strong>${esc(item.prompt||`Question ${index+1}`)}</strong><small>${item.correct===true?'Correct':'Needs review'}</small></div></div><div class="cm-review-answer"><small>Your submitted answer</small><p>${esc(submitted)}</p></div>${item.correctAnswer!==null&&item.correctAnswer!==undefined&&item.correctAnswer!==''?`<p class="cm-review-correct"><strong>Correct answer:</strong> ${esc(item.correctAnswer)}</p>`:''}${item.rationale?`<p class="cm-review-explain">${esc(item.rationale)}</p>`:''}</article>`;
   }
 
+  function savedReviewCacheKey(pathwayId,itemId){
+    return `${window.CM_AUTH?.user?.uid||'signed-out'}:${apiPathway(pathwayId)}:${itemId}`;
+  }
+
   async function renderSavedAssessmentReview(pathwayId,itemId,best,providedReview=null){
     const el=main(); if(!el) return;
+    if(el.querySelector('.cm-server-assessment-review')) return;
+    const reviewHash=location.hash;
+    const cacheKey=savedReviewCacheKey(pathwayId,itemId);
     const part=/^part-(\d+)$/.exec(itemId);
     const n=part?Number(part[1]):null;
     const label=itemId==='final'?'Professional Readiness Final':n===5?'Job Simulation Knowledge Check':`Part ${n} Assessment`;
-    el.innerHTML=`<section class="section cm-server-assessment-review"><div class="container" style="max-width:980px"><div class="card cm-live-card"><div class="eyebrow">SAVED PASS · LOADING READ-ONLY REVIEW</div><h1 class="serif">${esc(label)}</h1><p>Loading your submitted attempt from the authoritative record…</p></div></div></section>`;
-    let review=providedReview;
+    let review=providedReview||savedReviewCache.get(cacheKey)||null;
     if(!review){
+      const reviewToken=String(++savedReviewSequence);
+      el.innerHTML=`<section class="section cm-server-assessment-review" data-cm-review-token="${reviewToken}"><div class="container" style="max-width:980px"><div class="card cm-live-card"><div class="eyebrow">SAVED PASS · LOADING READ-ONLY REVIEW</div><h1 class="serif">${esc(label)}</h1><p>Loading your submitted attempt from the authoritative record…</p></div></div></section>`;
       try{
         const data=await apiFetch(`/assessment/review/${encodeURIComponent(apiPathway(pathwayId))}/${encodeURIComponent(itemId)}`);
         review=data.review||null;
       }catch(error){
         if(!/not found|available/i.test(String(error?.message||''))) console.warn('Assessment review unavailable:',error);
       }
+      if(review) savedReviewCache.set(cacheKey,review);
+      if(!el.isConnected||location.hash!==reviewHash||!el.querySelector(`[data-cm-review-token="${reviewToken}"]`)) return;
+    }else{
+      savedReviewCache.set(cacheKey,review);
+      if(!el.isConnected||location.hash!==reviewHash) return;
     }
     const expectedRoot=itemId==='final'?'final':'quiz';
-    if(!el.isConnected||!location.hash.startsWith(`#/${expectedRoot}/${pathwayId}`)) return;
+    if(!location.hash.startsWith(`#/${expectedRoot}/${pathwayId}`)) return;
     const questions=Array.isArray(review?.questions)?review.questions:[];
     const score=Math.max(Number(best||0),Number(review?.score||0));
     const correct=questions.filter(item=>item.correct===true).length;
     const passed=review?.passed===true||score>=PASS;
-    el.innerHTML=`<section class="section cm-server-assessment-review"><div class="container" style="max-width:980px"><div class="card cm-result ${passed?'passed':'failed'} cm-assessment-review"><div class="eyebrow">${passed?'SAVED PASS':'SAVED ATTEMPT'} · READ-ONLY REVIEW</div><div class="cm-result-score">${questions.length?`${correct} / ${questions.length}`:`${score}%`}</div><h1 class="serif">${passed?`${esc(label)} already passed.`:'Review before retrying.'}</h1><p><strong>${score}% · ${passed?'Passed':'Retry required'}.</strong> ${passed?'This passed attempt is final. It is read from your authoritative record, creates no new attempt, and cannot be reopened as a blank assessment.':'Your submitted answers and feedback are saved. Review every question below; a new attempt begins only when you explicitly choose Retry.'}</p>${questions.length?`<div class="cm-review-list">${questions.map(reviewQuestionHtml).join('')}</div>`:`<div class="cm-review-history-note"><strong>${passed?'This pass predates saved-answer review.':'Answer details are unavailable for this older attempt.'}</strong><span>${passed?'The official score remains valid. Future submissions preserve the submitted answers, correctness, correct answer, rationale, score, and completion time for private review.':'Your score remains saved. You can review the learning before starting another attempt.'}</span></div>`}${review?.submittedAt?`<p class="small muted">Completed ${esc(formatDate(review.submittedAt))} · Attempt ${esc(review.attemptId||'')}</p>`:''}<div class="cm-result-actions">${passed?`<a class="btn btn-gold" data-cm-pass-continue href="${nextHref(pathwayId,itemId,true)}">Continue to next stage →</a>`:`<a class="btn btn-primary" href="${retryHref(pathwayId,itemId)}">Retry assessment →</a>`}<a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathwayId)}/${n||5}">Review learning</a></div></div></div></section>`;
+    el.innerHTML=`<section class="section cm-server-assessment-review"><div class="container" style="max-width:980px"><div class="card cm-result ${passed?'passed':'failed'} cm-assessment-review" data-score="${score}"><div class="eyebrow">${passed?'SAVED PASS':'SAVED ATTEMPT'} · READ-ONLY REVIEW</div><div class="cm-result-score">${questions.length?`${correct} / ${questions.length}`:`${score}%`}</div><h1 class="serif">${passed?`${esc(label)} already passed.`:'Review before retrying.'}</h1><p><strong>${score}% · ${passed?'Passed':'Retry required'}.</strong> ${passed?'This passed attempt is final. It is read from your authoritative record, creates no new attempt, and cannot be reopened as a blank assessment.':'Your submitted answers and feedback are saved. Review every question below; a new attempt begins only when you explicitly choose Retry.'}</p>${questions.length?`<div class="cm-review-list">${questions.map(reviewQuestionHtml).join('')}</div>`:`<div class="cm-review-history-note"><strong>${passed?'This pass predates saved-answer review.':'Answer details are unavailable for this older attempt.'}</strong><span>${passed?'The official score remains valid. Future submissions preserve the submitted answers, correctness, correct answer, rationale, score, and completion time for private review.':'Your score remains saved. You can review the learning before starting another attempt.'}</span></div>`}${review?.submittedAt?`<p class="small muted">Completed ${esc(formatDate(review.submittedAt))} · Attempt ${esc(review.attemptId||'')}</p>`:''}<div class="cm-result-actions">${passed?`<a class="btn btn-gold" data-cm-pass-continue href="${nextHref(pathwayId,itemId,true)}">Continue to next stage →</a>`:`<a class="btn btn-primary" href="${retryHref(pathwayId,itemId)}">Retry assessment →</a>`}<a class="btn btn-soft" href="#/learn/${encodeURIComponent(pathwayId)}/${n||5}">Review learning</a></div></div></div></section>`;
   }
 
   function nextHref(pathwayId, itemId, passed, assignmentId='') {
@@ -661,7 +677,7 @@
     const resultHref=result.passed
       ? nextHref(pathwayId,itemId,true,assignmentId)
       : itemId==='simulation'?retryHref(pathwayId,itemId,assignmentId):attemptReviewHref(pathwayId,itemId);
-    el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-result ${result.passed ? 'passed' : 'failed'}"><div class="eyebrow">SERVER-GRADED RESULT</div><div class="cm-result-score">${Number(result.score)}%</div><h1 class="serif">${result.passed ? 'Official pass recorded.' : 'Not yet.'}</h1><p>${result.passed ? 'Your result has been stored in the authoritative D1 progress record.' : `You need ${PASS}% and every professional quality floor to pass. Your attempt is saved; review every answer before starting another attempt.`}</p>${result.objectiveTotal ? `<p class="muted">${itemId === 'simulation' ? 'Work products accepted' : 'Objective questions'}: ${result.objectiveCorrect}/${result.objectiveTotal}${result.writingScore !== null && result.writingScore !== undefined ? ` · Writing: ${result.writingScore}/30` : ''}</p>` : ''}${qualityHtml}${issued.length ? `<div class="cm-issued"><strong>Verified credential${issued.length > 1 ? 's' : ''} automatically issued:</strong>${issued.map(c => `<a href="#/verify/${encodeURIComponent(c.publicToken)}">${esc(c.title)} →</a>`).join('')}</div>` : ''}${completion ? `<div class="cm-issued cm-program-issued"><strong>Career Skills Program Completion Certificate issued:</strong><a href="#/verify/${encodeURIComponent(completion.publicToken)}">${esc(completion.title)} →</a><small>This completion certificate is separate from the five-level Standard 2.0 credential ladder.</small></div>` : ''}<div class="cm-result-actions"><a class="btn ${result.passed ? 'btn-gold' : 'btn-primary'}" href="${resultHref}">${result.passed ? (itemId === 'final' ? 'View Verified Credentials' : 'Continue') : (itemId === 'simulation' ? 'Revise and resubmit' : 'Review saved attempt')} →</a><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
+    el.innerHTML = `<section class="section"><div class="container" style="max-width:900px"><div class="card cm-result ${result.passed ? 'passed' : 'failed'}" data-score="${Number(result.score)}"><div class="eyebrow">SERVER-GRADED RESULT</div><div class="cm-result-score">${Number(result.score)}%</div><h1 class="serif">${result.passed ? 'Official pass recorded.' : 'Not yet.'}</h1><p>${result.passed ? 'Your result has been stored in the authoritative D1 progress record.' : `You need ${PASS}% and every professional quality floor to pass. Your attempt is saved; review every answer before starting another attempt.`}</p>${result.objectiveTotal ? `<p class="muted">${itemId === 'simulation' ? 'Work products accepted' : 'Objective questions'}: ${result.objectiveCorrect}/${result.objectiveTotal}${result.writingScore !== null && result.writingScore !== undefined ? ` · Writing: ${result.writingScore}/30` : ''}</p>` : ''}${qualityHtml}${issued.length ? `<div class="cm-issued"><strong>Verified credential${issued.length > 1 ? 's' : ''} automatically issued:</strong>${issued.map(c => `<a href="#/verify/${encodeURIComponent(c.publicToken)}">${esc(c.title)} →</a>`).join('')}</div>` : ''}${completion ? `<div class="cm-issued cm-program-issued"><strong>Career Skills Program Completion Certificate issued:</strong><a href="#/verify/${encodeURIComponent(completion.publicToken)}">${esc(completion.title)} →</a><small>This completion certificate is separate from the five-level Standard 2.0 credential ladder.</small></div>` : ''}<div class="cm-result-actions"><a class="btn ${result.passed ? 'btn-gold' : 'btn-primary'}" href="${resultHref}">${result.passed ? (itemId === 'final' ? 'View Verified Credentials' : 'Continue') : (itemId === 'simulation' ? 'Revise and resubmit' : 'Review saved attempt')} →</a><a class="btn btn-outline" href="#/career/${encodeURIComponent(pathwayId)}">Pathway</a></div></div></div></section>`;
   }
 
   async function renderCredentials() {
@@ -807,7 +823,7 @@
   window.CM_LIVE_ROUTE = route;
   window.CM_LIVE_WORKBENCH_BIND = bindWorkbenchInteractions;
   window.addEventListener('hashchange', () => setTimeout(route, 0));
-  document.addEventListener('cm-auth-changed', () => setTimeout(route, 0));
+  document.addEventListener('cm-auth-changed', () => { savedReviewCache.clear(); setTimeout(route, 0); });
   injectStyles();
   setTimeout(route, 0);
 })();

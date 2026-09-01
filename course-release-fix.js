@@ -150,8 +150,10 @@
 
   function enrichSecureReviewFromResult(pathway, part) {
     const result = document.querySelector('#app main#main .cm-result');
-    if (!result) return;
-    const score = Number((result.querySelector('.cm-result-score')?.textContent || '').replace(/[^\d.]/g, ''));
+    if (!result || result.closest('.cm-server-assessment-review,.cm-readonly-review-shell')) return;
+    const explicit = Number(result.dataset.score);
+    const percent = (result.textContent || '').match(/(\d+(?:\.\d+)?)\s*%/);
+    const score = Number.isFinite(explicit) ? explicit : Number(percent?.[1]);
     if (!Number.isFinite(score)) return;
     saveReview(pathway, part, { score, passed:score >= PASS });
   }
