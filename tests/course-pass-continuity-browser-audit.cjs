@@ -123,8 +123,10 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
       location.hash='#/learn/investment-banking/5';
     });
     await page.waitForSelector('.lesson-actions',{timeout:10000});
-    await page.getByRole('link',{name:/^Continue — assessment already passed/}).waitFor({state:'visible',timeout:10000});
-    assert(/90%/.test(await page.locator('.lesson-actions').innerText()),'Authoritative server progress did not restore a pass after local score was cleared');
+    await page.waitForFunction(()=>[...document.querySelectorAll('.lesson-actions')].some(actions=>/Continue — assessment already passed/.test(actions.innerText||'')&&/90%/.test(actions.innerText||'')),null,{timeout:10000}).catch(async error=>{
+      const snapshot=await page.evaluate(()=>({href:location.href,actions:[...document.querySelectorAll('.lesson-actions')].map(x=>x.innerText),state:JSON.parse(localStorage.getItem('capitalMasteryLocalStateV1')||'null')}));
+      throw new Error(`Authoritative server progress did not restore a stable pass after local score was cleared. snapshot=${JSON.stringify(snapshot)}; cause=${error.message}`);
+    });
 
     await page.evaluate(()=>{localStorage.setItem('capitalMasteryTrainingTrackV1:investment-banking','career-skills');location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.lesson-actions',{timeout:10000});

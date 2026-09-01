@@ -569,6 +569,7 @@
       state.updatedAt = new Date().toISOString();
       localStorage.setItem(STATE_KEY, JSON.stringify(state));
       window.CM?.refreshLocalState?.();
+      document.dispatchEvent(new CustomEvent('cm-progress-updated',{detail:{pathwayId,itemId,score:Number(score||0),passed:!!passed}}));
       window.CM_SYNC?.flush?.().catch(() => {});
     } catch (error) {
       console.warn('Could not mirror official result into learner UI state:', error);
