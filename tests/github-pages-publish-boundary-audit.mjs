@@ -36,14 +36,17 @@ for(const required of ['index.html','404.html','manifest.webmanifest','robots.tx
   must(!set.has(required),`GitHub Pages exclude list must not block required public surface ${required}`);
 }
 
-// The Cloudflare build remains the stronger allowlist; the fallback denylist must
-// at minimum protect every backend/database/QA class that the live audit attacks.
+// The Cloudflare mirror build remains the stronger allowlist; the primary GitHub
+// Pages denylist must protect every backend/database/QA class the live audit attacks.
 const liveAudit=fs.readFileSync('.github/workflows/github-pages-live-readonly-audit.yml','utf8');
 for(const marker of [
   'v2/worker-v2-phase1-release.js','migrations/017_phase2_program_completion_records.sql','migrations/018_assessment_attempt_reviews.sql',
   'tests/program-completion-public-verification-audit.mjs','tools/prepare-production-d1.mjs',
   'wrangler.jsonc','auth-test.html','firestore.rules','firebase-config.example.js'
-]) must(liveAudit.includes(marker),`Live fallback audit must attack ${marker}`);
+]) must(liveAudit.includes(marker),`Live primary audit must attack ${marker}`);
 must(liveAudit.includes('Wait for internal backend and QA artifacts to become private'),'Live audit must be propagation-aware before declaring privacy');
+must(/push:\s*\r?\n\s+branches:\s*\[main\]/.test(liveAudit),'Primary live audit must run automatically after main is pushed');
+must(liveAudit.includes('PRIMARY: https://sribyju.github.io/CapitalMastery'),'Primary live audit must target GitHub Pages');
+must(liveAudit.includes('GitHub Pages seventeen-suite live browser matrix: PASS'),'Primary live audit must execute the complete 17-suite matrix');
 
 console.log(`GITHUB PAGES PUBLISH BOUNDARY AUDIT PASS: ${excluded.length} internal paths excluded; ${refs.length} shell dependencies remain public`);

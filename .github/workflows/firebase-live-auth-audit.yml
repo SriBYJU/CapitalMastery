@@ -37,10 +37,10 @@ jobs:
       - name: Probe canonical provider configuration and fail-safe UI
         run: |
           set -euo pipefail
-          CM_CANONICAL_URL=https://capitalmastery.pages.dev/ node tests/firebase-authorized-domain-browser-audit.cjs
+          CM_CANONICAL_URL=https://sribyju.github.io/CapitalMastery/ node tests/firebase-authorized-domain-browser-audit.cjs
 
-  fallback-email-password:
-    name: fallback-email-password
+  primary-email-password:
+    name: primary-email-password
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
@@ -68,7 +68,7 @@ jobs:
             fi
             sleep 5
           done
-          [ "$ready" = true ] || { echo 'GitHub Pages fallback did not publish the credential-identity repair in time'; exit 1; }
+          [ "$ready" = true ] || { echo 'GitHub Pages primary did not publish the credential-identity repair in time'; exit 1; }
           echo 'GitHub Pages repaired credential-identity generation: PASS'
 
       - name: Install Chromium
@@ -76,7 +76,7 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Disposable real Firebase email/password lifecycle on live fallback
+      - name: Disposable real Firebase email/password lifecycle on live primary
         run: |
           set -euo pipefail
           CM_AUDIT_URL=https://sribyju.github.io/CapitalMastery/ node tests/live-firebase-auth-browser-audit.cjs

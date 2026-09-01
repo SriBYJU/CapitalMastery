@@ -158,7 +158,7 @@ Source-level release controls now include:
 - state/offline/history resilience browser testing
 - admin-only read-only D1 integrity endpoint using `quick_check`, `foreign_key_check` and table counts
 
-The current audited source release passes **59 static regression files plus six Chromium release suites**. See [`phase2-release-audit.md`](phase2-release-audit.md) for exact evidence.
+The current audited source release passes the complete static regression collection plus **17 Chromium release suites**. See [`phase2-release-audit.md`](phase2-release-audit.md) for exact evidence.
 
 ## 8. Employer / pilot package — IMPLEMENTED, FINAL PRODUCTION PROOF PENDING
 
@@ -183,14 +183,14 @@ The remaining work is no longer broad feature construction. It is production pro
 1. Promote the audited Worker while preserving existing Cloudflare secrets/bindings/settings.
 2. Confirm `/admin/integrity` exists in production and run it with an authenticated Capital Mastery administrator.
 3. Require D1 `quick_check = ok`, zero foreign-key violations and record table counts.
-4. Deploy the exact audited `dist-pages/` artifact to the canonical Cloudflare Pages project.
-5. Confirm current frontend generation and production security headers.
-6. Re-run the complete live Chromium matrix against `capitalmastery.pages.dev`.
-7. Verify `capitalmastery.pages.dev` is an authorized Firebase Authentication domain.
+4. Publish the audited `main` commit to the primary GitHub Pages site and retain the exact `dist-pages/` artifact for the Cloudflare mirror.
+5. Confirm the primary frontend generation, private-artifact boundary and canonical metadata; confirm mirror security headers separately.
+6. Re-run the complete 17-suite live Chromium matrix against `https://sribyju.github.io/CapitalMastery/`.
+7. Verify `sribyju.github.io` is an authorized Firebase Authentication domain and keep `capitalmastery.pages.dev` authorized for the mirror.
 8. Run final signed-out, signed-in learner, signed-in employer, role/tenant, Firm Layer, manager-review, notification/export and Admin Demo Lab production smokes.
 9. Delete disposable QA data/accounts and recheck integrity.
-10. Only after every blocker is closed, perform final release sign-off and then submit the Cloudflare URL to Search Console.
+10. Only after every blocker is closed, perform final release sign-off and then submit the GitHub Pages primary URL to Search Console.
 
 ## Phase 2 release gate
 
-Phase 2 is **not complete** merely because source/CI is green. Completion requires the audited Worker and Pages builds to be the live canonical production generation and the final authenticated black-box audit to pass without unresolved blockers.
+Phase 2 is **not complete** merely because source/CI is green. Completion requires the audited Worker and GitHub Pages primary to be current and the final authenticated black-box audit to pass without unresolved blockers.

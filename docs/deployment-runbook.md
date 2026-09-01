@@ -1,8 +1,9 @@
 # Production deployment runbook
 
-Capital Mastery uses two separately deployed surfaces:
+Capital Mastery uses three separately deployed surfaces:
 
-- Cloudflare Pages serves the public browser application from a frontend-only artifact.
+- GitHub Pages serves the canonical public browser application directly from protected `main`.
+- Cloudflare Pages serves a secondary frontend-only mirror with Cloudflare response headers.
 - The Cloudflare Worker serves authenticated API routes and uses D1 for authoritative assessment, evidence, credential, and employer records.
 
 Keeping those deploys separate is a security boundary. Never deploy the repository root to Pages: it contains Worker implementation, tests, migrations, and operational documentation that are not browser assets.
@@ -37,20 +38,19 @@ The permanent release workflows are:
 - `Package audited Pages release` — rebuilds `dist-pages/`, reruns the production-bundle audit, and uploads the exact audited Pages directory as a release artifact.
 - `Package audited Worker release` — packages the reviewed Worker source after Worker/security/credential-boundary checks.
 - `Cloudflare deploy readiness` — non-deploying preflight that proves the Pages artifact builds and checks whether Cloudflare Actions credentials are present without printing them.
-- `Cloudflare production release` — guarded manual production promotion. It requires the workflow input `RELEASE`, reruns source/bundle gates, deploys Worker first, verifies public/security boundaries, deploys Pages second, verifies canonical generation/security headers, and runs all six Chromium suites against `capitalmastery.pages.dev`.
-- `Live production readonly audit` — non-mutating production diagnostic.
+- `GitHub Pages live read-only audit` — waits for branch-based publication, checks that backend/QA artifacts remain private, and runs all 17 Chromium suites against the primary site.
+- `Cloudflare production release` — guarded manual Worker and secondary-mirror promotion. It requires the workflow input `RELEASE`, reruns source/bundle gates, verifies public/security boundaries, and audits the mirror.
+- `Live production readonly audit` — non-mutating primary-production diagnostic.
 
 Do not continue if the source/adversarial gates are red. Browser-only Playwright audits are intentionally run after Playwright/Chromium installation; do not treat them as ordinary dependency-free static tests.
 
-## Current Phase 2 deployment blocker
+## Current production topology
 
-The August 30, 2026 deployment-preflight run `33294066702` rebuilt and audited the 53-file Pages candidate successfully, then reported:
+- Primary: `https://sribyju.github.io/CapitalMastery/`
+- Secondary mirror: `https://capitalmastery.pages.dev/`
+- API: `https://capital-mastery-api.avadhanula-shriyan.workers.dev/`
 
-- `CLOUDFLARE_API_TOKEN_PRESENT=false`
-- `CLOUDFLARE_ACCOUNT_ID_PRESENT=false`
-- `CLOUDFLARE_DEPLOY_READY=false`
-
-Therefore canonical production promotion cannot run from GitHub Actions until both secrets are configured (or an equivalent authorized Cloudflare deployment connection is provided). This is a deployment-access blocker, not a source-build failure.
+Every accepted push to `main` is published through the repository's configured branch-based GitHub Pages deployment. The live read-only workflow waits for the new generation and audits it. Cloudflare credentials are needed only for the Worker and secondary mirror, not to publish the primary frontend.
 
 See `docs/phase2-release-audit.md` for the exact current artifact IDs, digests, release-gate SHA and live blockers.
 
@@ -78,9 +78,16 @@ node tests/pages-production-bundle-audit.mjs
 
 The build recreates `dist-pages/` from the explicit frontend allowlist. It adds production security headers and intentionally excludes Worker code, tests, migrations, Firebase diagnostics, repository documentation, `auth-test.html`, Wrangler configuration, and other backend/internal artifacts.
 
-For a release candidate, prefer the artifact produced by `Package audited Pages release`. Its artifact name contains the exact commit SHA so the bytes uploaded to Cloudflare can be traced back to audited source. Do not add files to `dist-pages/` after its bundle audit.
+For a release candidate, retain the artifact produced by `Package audited Pages release`. Its artifact name contains the exact commit SHA so the secondary Cloudflare deployment can be traced back to audited source. Do not add files to `dist-pages/` after its bundle audit.
 
-## Preferred production promotion
+## Primary frontend promotion
+
+1. Merge or push the audited commit to `main`.
+2. Wait for GitHub Pages to publish the commit.
+3. Require `GitHub Pages live read-only audit` to pass the generation/privacy boundary and all 17 browser suites.
+4. Confirm the canonical metadata, sitemap and Firebase authorized-domain check point to `https://sribyju.github.io/CapitalMastery/`.
+
+## Worker and secondary-mirror promotion
 
 Once both Cloudflare Actions secrets exist:
 
@@ -96,13 +103,13 @@ The workflow performs this order:
 2. Re-run Worker/frontend syntax, security, credential-boundary and static regression gates.
 3. Rebuild and audit `dist-pages/`.
 4. Deploy the Worker with `wrangler.jsonc`.
-5. Require Worker `/health = 200` from the canonical Origin.
+5. Require Worker `/health = 200` from the primary Origin.
 6. Require a deliberately unapproved Origin to return `403`.
 7. Require unauthenticated `/auth-check` to return `401`.
 8. Require `/admin/integrity` to exist and remain protected (`401`/`403`, never `404` unauthenticated).
 9. Deploy exactly `dist-pages/` to Pages project `capitalmastery`.
-10. Require current generation markers plus `X-Frame-Options: DENY` and `Permissions-Policy` on the canonical host.
-11. Run all six Chromium release suites against `https://capitalmastery.pages.dev`.
+10. Require current generation markers plus `X-Frame-Options: DENY` and `Permissions-Policy` on the Cloudflare mirror.
+11. Run the 17-suite Chromium release matrix against `https://capitalmastery.pages.dev` as a secondary-host regression.
 
 The UI is designed to remain backward-compatible with the previous Worker during rollout. The Worker must accept the previous UI until the Pages deployment is verified.
 
@@ -117,8 +124,8 @@ If GitHub Actions cannot be used but an authorized Cloudflare environment is ava
 5. With an authenticated Capital Mastery administrator, call read-only `GET /admin/integrity`. Require `quick_check = ok`, no foreign-key violations, and record table counts.
 6. Build/audit `dist-pages/` or use the exact audited Pages artifact.
 7. Deploy only `dist-pages/` to the `capitalmastery` Pages project.
-8. Verify canonical generation markers and production security headers.
-9. Run the canonical browser matrix.
+8. Verify mirror generation markers and production security headers.
+9. Run the secondary-mirror browser matrix.
 
 Never guess Cloudflare account IDs, tokens, project names, Worker bindings, secrets, or Firebase configuration.
 
@@ -138,13 +145,13 @@ Never guess Cloudflare account IDs, tokens, project names, Worker bindings, secr
 
 Before Phase 2 closure, Firebase Authentication → Settings → Authorized domains must include:
 
-`capitalmastery.pages.dev`
+`sribyju.github.io`
 
-This must be observed directly. Do not infer it solely because email/password auth works; Google OAuth on the canonical host is the important configuration check.
+This must be observed directly. Do not infer it solely because email/password auth works; Google OAuth on the primary host is the important configuration check. Keep `capitalmastery.pages.dev` authorized while the mirror remains available.
 
 ## Authenticated post-deploy closure
 
-The automated Cloudflare production workflow deliberately does **not** claim the authenticated release is complete. After automated canonical checks pass, perform:
+The automated workflows deliberately do **not** claim the authenticated release is complete. After automated primary and API checks pass, perform:
 
 - signed-in learner assessment/progress smoke;
 - Career Skills practical-capstone/program-certificate smoke;
@@ -165,7 +172,7 @@ If the Worker deploy fails its boundary checks, stop before Pages promotion. Res
 
 If the Worker is healthy but Pages verification fails, keep/revert Pages to the previous known-good deployment. Do not make unreviewed frontend edits directly in Cloudflare to “fix” production.
 
-If canonical browser tests fail after both promotions, treat production as blocked. Preserve logs/evidence, roll back the failing surface when needed, fix source in GitHub, rerun source/adversarial gates, package a new candidate, and promote again.
+If primary browser tests fail after publication, treat production as blocked. Preserve logs/evidence, fix source in GitHub, rerun source/adversarial gates, and publish a corrected commit. A mirror failure does not redirect the canonical URL but must still be repaired before relying on the mirror.
 
 Never resolve a release failure by disabling origin checks, weakening authentication/RBAC, exposing answer keys, bypassing D1 authority, or removing production security headers.
 
@@ -179,7 +186,7 @@ Record all of the following before calling the release complete:
 - D1 integrity result and table counts;
 - Pages artifact name/digest and Cloudflare deployment identifier/time;
 - live response-header/generation result;
-- six canonical Chromium results;
+- 17 primary Chromium results;
 - signed-out public smoke;
 - signed-in learner smoke;
 - signed-in employer/admin/second-tenant smoke;

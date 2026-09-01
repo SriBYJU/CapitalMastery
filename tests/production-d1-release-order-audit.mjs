@@ -14,9 +14,11 @@ must(firebaseStep>artifactAttackStep,'Live Firebase readiness must be checked on
 must(d1Step>firebaseStep,'Firebase email/password and canonical provider safety must pass before any production D1 mutation');
 must(workerStep>d1Step,'D1 compatibility/migration must finish before Worker deployment');
 must(pagesStep>workerStep,'Pages must deploy only after the compatible Worker is live');
-must(release.includes('CM_AUDIT_URL="${FALLBACK_URL}/" node tests/live-firebase-auth-browser-audit.cjs'),'Production release must prove real Firebase email/password + durable credential-name persistence before D1 mutation');
+must(release.includes('PRIMARY_URL: https://sribyju.github.io/CapitalMastery'),'Production release must recognize GitHub Pages as the primary origin');
+must(release.includes('CLOUDFLARE_MIRROR_URL: https://capitalmastery.pages.dev'),'Production release must identify Cloudflare Pages as the secondary mirror');
+must(release.includes('CM_AUDIT_URL="${PRIMARY_URL}/" node tests/live-firebase-auth-browser-audit.cjs'),'Production release must prove real Firebase email/password + durable credential-name persistence on the primary before D1 mutation');
 must(release.includes('CM_CANONICAL_URL=http://127.0.0.1:4173/ node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must prove the exact Pages artifact has a safe Firebase provider surface before D1 mutation');
-must(release.includes('CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must re-prove Firebase provider safety on canonical Pages after deployment');
+must(release.includes('CM_CANONICAL_URL="${CLOUDFLARE_MIRROR_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs'),'Production release must re-prove Firebase provider safety on the Cloudflare mirror after deployment');
 must(release.includes('node tools/prepare-production-d1.mjs'),'Production release must execute the schema-aware D1 preparation tool');
 must(release.includes('tests/admin-simulation-route-stability-browser-audit.cjs'),'Canonical release matrix must include the delayed-auth Admin simulation race');
 must(release.includes('tests/program-completion-public-browser-audit.cjs'),'Canonical release matrix must include Program Completion verification');

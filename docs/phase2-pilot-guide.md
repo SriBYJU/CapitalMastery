@@ -136,7 +136,7 @@ Before a real pilot:
 3. verify the planned Firm Layer material and protected-standard boundaries;
 4. preview reports, attention signals and evidence exports;
 5. confirm the current production release passes the live release audit;
-6. confirm the canonical Cloudflare host is the current generation;
-7. verify the canonical hostname is authorized in Firebase Authentication.
+6. confirm the primary GitHub Pages host is the current generation and the Cloudflare mirror is healthy;
+7. verify the primary hostname is authorized in Firebase Authentication.
 
 The current production-release status is tracked in [`phase2-release-audit.md`](phase2-release-audit.md). Do not invite a real pilot cohort while that audit still lists an open production blocker.

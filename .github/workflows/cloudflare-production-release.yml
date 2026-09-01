@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirmation:
-        description: 'Type RELEASE to promote the audited D1 schema, Worker and Pages bundle to canonical production'
+        description: 'Type RELEASE to promote the audited D1 schema, Worker and secondary Cloudflare Pages mirror'
         required: true
         type: string
 
@@ -24,8 +24,9 @@ jobs:
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CANONICAL_URL: https://capitalmastery.pages.dev
-      FALLBACK_URL: https://sribyju.github.io/CapitalMastery
+      PRIMARY_URL: https://sribyju.github.io/CapitalMastery
+      PRIMARY_ORIGIN: https://sribyju.github.io
+      CLOUDFLARE_MIRROR_URL: https://capitalmastery.pages.dev
       WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
     steps:
       - uses: actions/checkout@v4
@@ -128,7 +129,7 @@ jobs:
       - name: Require live Firebase readiness before any D1 mutation
         run: |
           set -euo pipefail
-          CM_AUDIT_URL="${FALLBACK_URL}/" node tests/live-firebase-auth-browser-audit.cjs
+          CM_AUDIT_URL="${PRIMARY_URL}/" node tests/live-firebase-auth-browser-audit.cjs
           echo 'Firebase email/password persistence + exact-artifact provider-safety gate: PASS'
 
       - name: Prepare and verify production D1 schema before Worker
@@ -147,7 +148,7 @@ jobs:
         run: |
           set -euo pipefail
           for i in {1..24}; do
-            code=$(curl -sS -o /tmp/cm-health -w '%{http_code}' -H "Origin: ${CANONICAL_URL}" "${WORKER_URL}/health" || true)
+            code=$(curl -sS -o /tmp/cm-health -w '%{http_code}' -H "Origin: ${PRIMARY_ORIGIN}" "${WORKER_URL}/health" || true)
             if [ "$code" = "200" ]; then break; fi
             sleep 5
           done
@@ -156,10 +157,10 @@ jobs:
           bad_origin=$(curl -sS -o /tmp/cm-bad-origin -w '%{http_code}' -H 'Origin: https://not-capital-mastery.invalid' "${WORKER_URL}/health" || true)
           [ "$bad_origin" = "403" ] || { echo "Bad-origin boundary expected 403, got $bad_origin"; exit 1; }
 
-          auth_check=$(curl -sS -o /tmp/cm-auth-check -w '%{http_code}' -X POST -H "Origin: ${CANONICAL_URL}" -H 'Content-Type: application/json' -d '{}' "${WORKER_URL}/auth-check" || true)
+          auth_check=$(curl -sS -o /tmp/cm-auth-check -w '%{http_code}' -X POST -H "Origin: ${PRIMARY_ORIGIN}" -H 'Content-Type: application/json' -d '{}' "${WORKER_URL}/auth-check" || true)
           [ "$auth_check" = "401" ] || { echo "Unauthenticated auth-check expected 401, got $auth_check"; exit 1; }
 
-          integrity=$(curl -sS -o /tmp/cm-integrity -w '%{http_code}' -H "Origin: ${CANONICAL_URL}" "${WORKER_URL}/admin/integrity" || true)
+          integrity=$(curl -sS -o /tmp/cm-integrity -w '%{http_code}' -H "Origin: ${PRIMARY_ORIGIN}" "${WORKER_URL}/admin/integrity" || true)
           if [ "$integrity" = "404" ]; then
             echo 'D1 integrity route is still absent after Worker deploy'
             exit 1
@@ -174,12 +175,12 @@ jobs:
           set -euo pipefail
           npx --yes wrangler@4 pages deploy dist-pages --project-name=capitalmastery --branch=main
 
-      - name: Verify canonical generation and security headers
+      - name: Verify Cloudflare mirror generation and security headers
         run: |
           set -euo pipefail
           ready=false
           for i in {1..30}; do
-            curl -fsS -D /tmp/cm-headers "${CANONICAL_URL}/" -o /tmp/cm-index || true
+            curl -fsS -D /tmp/cm-headers "${CLOUDFLARE_MIRROR_URL}/" -o /tmp/cm-index || true
             if grep -q 'accessibility-fixes.css' /tmp/cm-index 2>/dev/null && grep -qi '^x-frame-options: *DENY' /tmp/cm-headers 2>/dev/null && grep -qi '^permissions-policy:' /tmp/cm-headers 2>/dev/null; then
               ready=true
               break
@@ -187,7 +188,7 @@ jobs:
             sleep 5
           done
           [ "$ready" = true ] || {
-            echo 'Canonical Pages generation/header verification failed'
+            echo 'Cloudflare mirror generation/header verification failed'
             echo '--- headers ---'
             cat /tmp/cm-headers || true
             echo '--- index markers ---'
@@ -200,34 +201,34 @@ jobs:
           grep -q 'learner-guide.js' /tmp/cm-index
           grep -q 'enterprise-v2.js' /tmp/cm-index
           grep -q 'admin-route-guard.js' /tmp/cm-index
-          echo 'Canonical generation and production headers: PASS'
+          echo 'Cloudflare mirror generation and production headers: PASS'
 
-      - name: Run canonical Chromium release matrix
+      - name: Run Cloudflare mirror Chromium release matrix
         run: |
           set -euo pipefail
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/state-resilience-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/course-assessment-state-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/course-pass-continuity-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/legacy-simulation-refusal-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/ib-workbench-navigation-guide-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/v2-assessment-review-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/failure-seeking-browser-audit.mjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/adversarial-chaos-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/admin-simulation-route-stability-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/program-completion-public-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/learner-guide-mobile-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/all-career-browser-sweep.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-public-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-role-matrix-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/employer-invite-lifecycle-browser-audit.cjs
-          CM_AUDIT_URL="${CANONICAL_URL}" node tests/visual-contrast-browser-audit.cjs
-          CM_CANONICAL_URL="${CANONICAL_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/state-resilience-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/course-assessment-state-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/course-pass-continuity-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/legacy-simulation-refusal-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/ib-workbench-navigation-guide-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/v2-assessment-review-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/failure-seeking-browser-audit.mjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/adversarial-chaos-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/admin-simulation-route-stability-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/program-completion-public-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/learner-guide-mobile-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/all-career-browser-sweep.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/employer-public-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/employer-role-matrix-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/employer-invite-lifecycle-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/visual-contrast-browser-audit.cjs
+          CM_CANONICAL_URL="${CLOUDFLARE_MIRROR_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Release boundary summary
         run: |
           cat <<'EOF'
-          CANONICAL CLOUDFLARE PROMOTION GATE: PASS
+          CLOUDFLARE MIRROR PROMOTION GATE: PASS
 
           This proves:
           - current source/static regression gate passed
@@ -241,9 +242,9 @@ jobs:
           - Worker public/auth/origin boundaries passed
           - protected /admin/integrity route exists
           - exact production Pages allowlist deployed
-          - canonical Firebase provider-safety probe passed after Pages deployment
-          - canonical generation/security headers passed
-          - sixteen canonical Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, employer invitation lifecycle, visual contrast, the Admin auth-timing race, and Program Completion verification
+          - Cloudflare-mirror Firebase provider-safety probe passed after Pages deployment
+          - Cloudflare mirror generation/security headers passed
+          - seventeen Cloudflare-mirror Chromium suites passed again after deployment, including course continuity, review/retake separation, non-MCQ simulation refusal, employer invitation lifecycle, visual contrast, the Admin auth-timing race, and Program Completion verification
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts

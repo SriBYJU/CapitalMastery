@@ -111,9 +111,9 @@ The integrity route is a release-verification tool, not a public diagnostics end
 
 ## Frontend release boundary
 
-Cloudflare Pages is built from an explicit frontend allowlist. The production artifact intentionally excludes Worker source, tests, migrations and internal operational documentation.
+GitHub Pages is the canonical frontend and uses `_config.yml` to exclude Worker source, tests, migrations and internal operational documentation. Cloudflare Pages is built from a stricter explicit frontend allowlist as a secondary mirror.
 
-The Pages bundle audit checks the allowlist and baseline production security headers before release. The live-production audit separately verifies the canonical host after deployment because a correct repository artifact does not prove that Cloudflare is serving the newest generation.
+The Pages bundle audit checks the mirror allowlist and baseline Cloudflare security headers. The live-production audit separately verifies primary generation and private-artifact boundaries because a correct repository build does not prove that GitHub Pages is serving the newest commit.
 
 ## Accessibility and reliability
 

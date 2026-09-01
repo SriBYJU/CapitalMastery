@@ -1,6 +1,6 @@
 const { chromium } = require('playwright');
 
-const BASE = process.env.CM_CANONICAL_URL || 'https://capitalmastery.pages.dev/';
+const BASE = process.env.CM_CANONICAL_URL || 'https://sribyju.github.io/CapitalMastery/';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);

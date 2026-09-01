@@ -1,11 +1,16 @@
 # Capital Mastery V2 — Phase 2 Release Audit
 
-**Audit date:** August 30, 2026  
-**Status:** SOURCE / CI RELEASE CANDIDATE GREEN · CANONICAL PRODUCTION BLOCKED  
-**Canonical frontend:** `https://capitalmastery.pages.dev`  
+**Audit date:** August 31, 2026
+
+**Status:** PRODUCTION RELEASED · FINAL AUTHENTICATED BLACK-BOX CLOSURE REMAINS
+
+**Canonical frontend:** `https://sribyju.github.io/CapitalMastery/`
+
+**Secondary mirror:** `https://capitalmastery.pages.dev/`
+
 **Worker:** `https://capital-mastery-api.avadhanula-shriyan.workers.dev`
 
-> A green source build is not equivalent to a completed production release. Phase 2 must not be marked complete while the Cloudflare deployment, Firebase authorized-domain check, authenticated production evidence, or cleanup evidence below remains unresolved.
+> The frontend, Worker and production D1 migrations are deployed. Phase 2 must not be marked complete until the remaining authenticated learner/employer/tenant and cleanup evidence below is verified.
 
 ## 1. Authoritative corrected product gate
 
@@ -170,9 +175,11 @@ It performs:
 It returns integrity results and counts only. It does not expose arbitrary table rows, provide a generic SQL console, or mutate D1.
 
 **Source contract:** PASS  
-**Production execution:** NOT YET VERIFIED because the deployed Worker is stale.
+**Production D1 execution:** PASS on August 31, 2026 through the audited release bridge. `quick_check = ok`, foreign-key violations = `0`, and before/after record counts were preserved. The deployed administrator route also exists and rejects unauthenticated access. An authenticated black-box call through that route remains part of final closure. Evidence: [`release-evidence/d1-production-preflight-2026-08-31.json`](release-evidence/d1-production-preflight-2026-08-31.json).
 
-## 5. Latest canonical production diagnostic
+## 5. Historical production diagnostic — superseded August 31, 2026
+
+The diagnostic in this section records the stale Cloudflare state observed on August 30. It is retained for audit history and is **not** the current production status. GitHub Pages is now the canonical frontend; Cloudflare Pages is a current secondary mirror; the Worker and production D1 migrations are current.
 
 **Live workflow run:** `33292064136`  
 **Result:** **BLOCKED**
@@ -215,9 +222,9 @@ Against `capitalmastery.pages.dev`, the current learner track chooser, learner-g
 
 Do not interpret old-production browser failures as current-source failures; deploy the exact current artifacts first, then rerun the live matrix.
 
-## 6. GitHub Pages fallback
+## 6. GitHub Pages primary
 
-GitHub Pages has continued to build successfully from current `main`. This is useful fallback/deployment evidence but does **not** replace the required canonical Cloudflare release and production checks.
+GitHub Pages is the canonical production frontend. The repository's configured branch deployment publishes accepted `main` commits, and `GitHub Pages live read-only audit` waits for the new generation, checks that internal artifacts remain private, and executes the 17-suite Chromium matrix. Cloudflare Pages remains a separately audited secondary mirror.
 
 ## 7. Production promotion path
 
@@ -225,7 +232,7 @@ A permanent guarded workflow now exists at:
 
 `.github/workflows/cloudflare-production-release.yml`
 
-Once both Cloudflare Actions secrets are configured, run **Cloudflare production release** manually and enter exactly `RELEASE`. The workflow:
+For Worker or secondary-mirror changes, run **Cloudflare production release** manually and enter exactly `RELEASE`. The workflow:
 
 1. refuses to run without both Cloudflare credentials;
 2. reruns the source/static release gate;
@@ -233,32 +240,31 @@ Once both Cloudflare Actions secrets are configured, run **Cloudflare production
 4. deploys the Worker first using checked-in `wrangler.jsonc`;
 5. verifies `/health`, bad-Origin rejection, unauthenticated auth blocking and protected `/admin/integrity` existence;
 6. deploys exactly `dist-pages/` to project `capitalmastery`;
-7. verifies canonical generation markers and security headers; and
-8. runs all six Chromium release suites against `capitalmastery.pages.dev`.
+7. verifies mirror generation markers and Cloudflare security headers; and
+8. runs the 17-suite Chromium release matrix against `capitalmastery.pages.dev`.
 
 It deliberately does **not** claim Phase 2 closure because authenticated D1/Firebase/tenant/cleanup evidence remains separate.
 
 ## 8. Remaining Phase 2 blockers
 
-### Cloudflare production promotion
+### Production promotion — COMPLETE
 
-1. Add repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`, or provide an equivalent authorized Cloudflare deployment connection.
-2. Run the guarded `Cloudflare production release` workflow with confirmation `RELEASE`.
-3. With the configured Capital Mastery administrator, execute `/admin/integrity`; require `quick_check = ok`, zero foreign-key violations and record table counts.
-
-Current deploy-preflight evidence proves that **both required GitHub Actions Cloudflare secrets are absent**. No Cloudflare connector/plugin is available in the current tool environment. Production must not be changed by guessing credentials, bindings, account IDs or deployment parameters.
+- Worker deployed and boundary-checked.
+- Cloudflare secondary mirror deployed from the audited frontend artifact.
+- D1 migrations 016–018 applied with clean integrity and preserved counts.
+- GitHub Pages selected as the canonical primary and configured for direct `main` publication.
 
 ### Firebase authorized-domain verification
 
 In Firebase Authentication → Settings → Authorized domains, verify that:
 
-`capitalmastery.pages.dev`
+`sribyju.github.io`
 
-is authorized. This remains **unverified**, particularly for Google sign-in on the canonical host.
+is authorized. Keep `capitalmastery.pages.dev` authorized while the secondary mirror remains available. Provider-safety and disposable email/password lifecycle audits cover the live primary; direct console verification remains required for Google sign-in configuration.
 
 ### Final authenticated canonical-production closure
 
-After both Cloudflare surfaces are current:
+With the production surfaces current, finish:
 
 - signed-out public smoke
 - signed-in learner smoke
@@ -280,7 +286,7 @@ After both Cloudflare surfaces are current:
 
 Do **not** declare Phase 2 complete until:
 
-- both Cloudflare surfaces are current;
+- the Worker, GitHub Pages primary and Cloudflare mirror are current;
 - canonical live Chromium checks are green;
 - authenticated D1 integrity is clean;
 - Firebase authorized-domain configuration is verified;

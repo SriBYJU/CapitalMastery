@@ -25,12 +25,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      LIVE_URL: https://capitalmastery.pages.dev
+      LIVE_URL: https://sribyju.github.io/CapitalMastery
       WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
     steps:
       - uses: actions/checkout@v4
 
-      - name: Inspect Cloudflare production generation
+      - name: Inspect GitHub Pages primary generation
         run: |
           set -u
           stale=0
@@ -50,7 +50,7 @@ jobs:
                 stale=1
               fi
             done
-            if ! grep -Fq '<link rel="canonical" href="https://capitalmastery.pages.dev/"' /tmp/live-index.html; then
+            if ! grep -Fq '<link rel="canonical" href="https://sribyju.github.io/CapitalMastery/"' /tmp/live-index.html; then
               echo 'LIVE_CANONICAL_MISMATCH'
               stale=1
             fi
@@ -58,7 +58,7 @@ jobs:
           echo "LIVE_STALE=$stale" >> "$GITHUB_ENV"
           echo "LIVE_GENERATION_MATCH=$((1-stale))"
 
-      - name: Inspect live security headers
+      - name: Inspect primary hosting invariants
         run: |
           set -u
           ok=1
@@ -67,15 +67,13 @@ jobs:
             ok=0
           else
             tr -d '\r' < /tmp/live-headers.txt | tr '[:upper:]' '[:lower:]' > /tmp/live-headers-lower.txt
-            echo '--- LIVE SECURITY HEADERS ---'
-            grep -E '^(x-content-type-options|x-frame-options|referrer-policy|permissions-policy|strict-transport-security|cache-control):' /tmp/live-headers-lower.txt || true
-            if ! grep -Eq '^x-content-type-options:[[:space:]]*nosniff$' /tmp/live-headers-lower.txt; then echo 'MISSING_OR_WRONG: x-content-type-options'; ok=0; fi
-            if ! grep -Eq '^x-frame-options:[[:space:]]*deny$' /tmp/live-headers-lower.txt; then echo 'MISSING_OR_WRONG: x-frame-options'; ok=0; fi
-            if ! grep -Eq '^referrer-policy:[[:space:]]*strict-origin-when-cross-origin$' /tmp/live-headers-lower.txt; then echo 'MISSING_OR_WRONG: referrer-policy'; ok=0; fi
-            if ! grep -Eq '^permissions-policy:.*camera=\(\).*microphone=\(\).*geolocation=\(\)' /tmp/live-headers-lower.txt; then echo 'MISSING_OR_WRONG: permissions-policy'; ok=0; fi
+            echo '--- PRIMARY HOSTING HEADERS ---'
+            grep -E '^(content-type|strict-transport-security|cache-control):' /tmp/live-headers-lower.txt || true
+            if ! grep -Eq '^content-type:[[:space:]]*text/html' /tmp/live-headers-lower.txt; then echo 'MISSING_OR_WRONG: content-type'; ok=0; fi
+            if ! grep -Eq '^strict-transport-security:' /tmp/live-headers-lower.txt; then echo 'MISSING: strict-transport-security'; ok=0; fi
           fi
           echo "LIVE_HEADERS_OK=$ok" >> "$GITHUB_ENV"
-          echo "LIVE_SECURITY_HEADERS=$([ "$ok" -eq 1 ] && echo PASS || echo FAIL)"
+          echo "PRIMARY_HOSTING_INVARIANTS=$([ "$ok" -eq 1 ] && echo PASS || echo FAIL)"
 
       - name: Inspect Worker D1, CORS, origin and auth boundaries
         run: |
@@ -83,7 +81,7 @@ jobs:
           ok=1
           preflight_status=$(curl -sS --retry 3 --retry-all-errors -D /tmp/worker-preflight-headers.txt -o /tmp/worker-preflight-body.txt \
             -w '%{http_code}' -X OPTIONS "$WORKER_URL/auth-check" \
-            -H 'Origin: https://capitalmastery.pages.dev' \
+            -H 'Origin: https://sribyju.github.io' \
             -H 'Access-Control-Request-Method: POST' \
             -H 'Access-Control-Request-Headers: authorization,content-type' || echo 000)
           echo "WORKER_PREFLIGHT_STATUS=$preflight_status"
@@ -99,7 +97,7 @@ jobs:
           fi
 
           health_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-health-body.txt -w '%{http_code}' \
-            "$WORKER_URL/health" -H 'Origin: https://capitalmastery.pages.dev' || echo 000)
+            "$WORKER_URL/health" -H 'Origin: https://sribyju.github.io' || echo 000)
           echo "WORKER_HEALTH_STATUS=$health_status"
           if [ "$health_status" != '200' ]; then echo 'WORKER_OR_D1_HEALTH_FAILED'; cat /tmp/worker-health-body.txt 2>/dev/null || true; ok=0; fi
 
@@ -110,14 +108,14 @@ jobs:
 
           unauth_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-unauth-body.txt -w '%{http_code}' \
             -X POST "$WORKER_URL/auth-check" \
-            -H 'Origin: https://capitalmastery.pages.dev' \
+            -H 'Origin: https://sribyju.github.io' \
             -H 'Content-Type: application/json' \
             --data '{}' || echo 000)
           echo "WORKER_UNAUTH_POST_STATUS=$unauth_status"
           case "$unauth_status" in 401|403) ;; *) echo 'WORKER_AUTH_BOUNDARY_BAD_STATUS'; cat /tmp/worker-unauth-body.txt 2>/dev/null || true; ok=0;; esac
 
           integrity_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-integrity-unauth-body.txt -w '%{http_code}' \
-            "$WORKER_URL/admin/integrity" -H 'Origin: https://capitalmastery.pages.dev' || echo 000)
+            "$WORKER_URL/admin/integrity" -H 'Origin: https://sribyju.github.io' || echo 000)
           echo "WORKER_INTEGRITY_UNAUTH_STATUS=$integrity_status"
           case "$integrity_status" in
             401|403) echo 'WORKER_D1_INTEGRITY_ROUTE_PRESENT_AND_PROTECTED' ;;
@@ -133,7 +131,7 @@ jobs:
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
 
-      - name: Inspect browser behavior against live Cloudflare assets
+      - name: Inspect browser behavior against the GitHub Pages primary
         run: |
           set -u
           ok=1

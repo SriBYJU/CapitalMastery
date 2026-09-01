@@ -1,0 +1,33 @@
+{
+  "database": "capital-mastery-prod",
+  "applied016": true,
+  "applied017": true,
+  "applied018": true,
+  "quickCheck": "ok",
+  "foreignKeyViolations": 0,
+  "beforeCounts": {
+    "organizations": 5,
+    "organization_members": 10,
+    "cohorts": 4,
+    "cohort_members": 1,
+    "program_assignments": 4,
+    "firm_content": 6,
+    "credentials": 6,
+    "official_progress": 11,
+    "assessment_attempts": 15
+  },
+  "afterCounts": {
+    "organizations": 5,
+    "organization_members": 10,
+    "cohorts": 4,
+    "cohort_members": 1,
+    "program_assignments": 4,
+    "firm_content": 6,
+    "credentials": 6,
+    "official_progress": 11,
+    "program_completion_records": 0,
+    "assessment_attempts": 15,
+    "assessment_attempt_reviews": 0
+  },
+  "checkedAt": "2026-08-31T23:15:45.588Z"
+}

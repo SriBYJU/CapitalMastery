@@ -1,6 +1,5 @@
-# GitHub Pages fallback publish boundary.
-# Canonical Cloudflare Pages is built from dist-pages/. The branch-based GitHub
-# Pages fallback must never publish backend, database, QA, deployment, or repo
+# GitHub Pages primary publish boundary.
+# The branch-based GitHub Pages site must never publish backend, database, QA, deployment, or repo
 # documentation artifacts alongside the browser application.
 exclude:
   - .github

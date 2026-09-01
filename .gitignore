@@ -1,4 +1,5 @@
 dist-pages/
 node_modules/
 .wrangler/
+d1-production-preflight.json
 
