@@ -491,7 +491,12 @@
   }
   function assessmentContinuePath(c,n,final=false){
     if(final) return `achievement/${c.id}/career`;
-    if(n===5) return `official-simulation/${c.id}`;
+    if(n===5){
+      const track=localStorage.getItem(`capitalMasteryTrainingTrackV1:${c.id}`);
+      if(track==='career-skills') return `official-simulation/${c.id}`;
+      const roleLabId=c.id==='quant-finance'?'quantitative-finance':['fpa','fp-a','fp&a'].includes(c.id)?'fp-and-a':c.id;
+      return `role-lab/${roleLabId}`;
+    }
     if(n===2) return `achievement/${c.id}/foundations`;
     if(n===4) return `achievement/${c.id}/applied`;
     return `learn/${c.id}/${Math.min(5,n+1)}`;

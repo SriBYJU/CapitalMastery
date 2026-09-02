@@ -10,7 +10,7 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
   const browser=await chromium.launch({headless:true});
   const context=await browser.newContext({viewport:{width:1280,height:900}});
   let assessmentGets=0, submitCalls=0, submitScore=70, serverPass=false, latestSubmittedScore=null;
-  const errors=[];
+  const errors=[],continuityResponses=[];
   try{
     await context.addInitScript(()=>localStorage.setItem('cmCredentialNameOnboardedV3:continuity-audit-user','true'));
     await context.route(/\/firebase-auth\.js(?:\?.*)?$/,r=>r.fulfill({status:200,contentType:'application/javascript',body:authStub()}));
@@ -42,6 +42,7 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     const page=await context.newPage();
     page.on('pageerror',e=>errors.push(`pageerror:${e.message}`));
     page.on('console',m=>{if(m.type()==='error'&&!/favicon/i.test(m.text()))errors.push(`console:${m.text()}`);});
+    page.on('response',response=>{if(/course-continuity\.js/i.test(response.url()))continuityResponses.push({status:response.status(),url:response.url(),fromServiceWorker:response.fromServiceWorker()});});
     await page.goto(`${BASE}/#/`,{waitUntil:'domcontentloaded',timeout:30000});
     await page.waitForSelector('#app main#main',{timeout:15000});
     await page.evaluate(()=>{
@@ -97,7 +98,8 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
       throw new Error(`Reviewed lesson never stabilized into saved-pass Continue CTA. snapshot=${JSON.stringify(snapshot)}; cause=${error.message}`);
     });
     assert(/90%/.test(await passCta.textContent()),'Saved-pass lesson CTA did not show best score');
-    assert((await passCta.getAttribute('href'))==='#/role-lab/investment-banking','Professional Readiness Part 5 should continue directly to the Role Lab, not retake the quiz');
+    const passHref=await passCta.getAttribute('href');
+    assert(passHref==='#/role-lab/investment-banking',`Professional Readiness Part 5 should continue directly to the Role Lab, not retake the quiz; actual=${passHref}; track=${await page.evaluate(()=>localStorage.getItem('capitalMasteryTrainingTrackV1:investment-banking'))}; continuity=${await page.evaluate(()=>typeof window.CM_COURSE_CONTINUITY)}; courseState=${await page.evaluate(()=>typeof window.CM_COURSE_STATE)}; responses=${JSON.stringify(continuityResponses)}; errors=${JSON.stringify(errors)}; actions=${await page.locator('.lesson-actions').innerHTML()}`);
     await passCta.click();
     await page.waitForFunction(()=>location.hash==='#/role-lab/investment-banking',null,{timeout:10000});
     assert(assessmentGets===getsAfterPass,'Clicking Next/Continue after reviewing a passed lesson must not reopen the quiz');
