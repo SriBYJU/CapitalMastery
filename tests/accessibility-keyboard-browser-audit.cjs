@@ -99,6 +99,7 @@ function signedOutAuthStub() {
       await learningOpener.click();
       const learningGate = guestPage.locator('#cm-learning-gate [role="dialog"]');
       await learningGate.waitFor({ state:'visible', timeout:3000 });
+      await guestPage.waitForFunction(() => document.querySelector('#cm-learning-gate [role="dialog"]')?.contains(document.activeElement), null, { timeout:3000 });
       const gateState = await guestPage.evaluate(() => {
         const dialog = document.querySelector('#cm-learning-gate [role="dialog"]');
         const labelledBy = dialog?.getAttribute('aria-labelledby');

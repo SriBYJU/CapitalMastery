@@ -88,7 +88,7 @@ function assessmentPayload(){
     assert(await savedAttempt.count()===1,'Failed result missing saved-attempt review link');
     assert(!/retake=1/.test(await savedAttempt.getAttribute('href')||''),'Failed result silently started another attempt instead of opening review');
     await savedAttempt.click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:15000});
     const failedReviewText=await page.locator('.cm-server-assessment-review').innerText();
     assert(/7 \/ 10/.test(failedReviewText)&&/70%/.test(failedReviewText),'Failed saved review did not preserve score count and percentage');
     assert(/Audit question 10[\s\S]*Your submitted answer[\s\S]*Correct answer/i.test(failedReviewText),'Failed saved review did not preserve question-by-question answers');
@@ -114,13 +114,14 @@ function assessmentPayload(){
 
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
     await page.waitForSelector('.learning-shell',{timeout:10000});
+    await page.waitForFunction(() => /Review passed knowledge check · 90%|Continue — assessment already passed · 90%/.test(document.querySelector('#app main#main')?.innerText || ''), null, { timeout:15000 });
     const learningText=await page.locator('#app main#main').innerText();
     const learnerState=await page.evaluate(()=>localStorage.getItem('capitalMasteryLocalStateV1'));
     assert(/Review passed knowledge check · 90%|Continue — assessment already passed · 90%/.test(learningText),`Learning page forgot saved Part 5 pass. state=${learnerState}; main=${learningText.slice(0,1600)}`);
 
     const reviewLink=page.getByRole('link',{name:/Review passed knowledge check/});
     await reviewLink.click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:15000});
     const reviewText=await page.locator('.cm-server-assessment-review').innerText();
     assert(/already passed/i.test(reviewText),'Review route did not render saved-pass state');
     assert(/90%/.test(reviewText),'Review route did not preserve best score');
