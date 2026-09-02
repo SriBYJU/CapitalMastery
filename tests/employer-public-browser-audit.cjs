@@ -42,7 +42,7 @@ async function assertContained(page,label){
 (async()=>{
   const browser=await chromium.launch({headless:true});
   try{
-    for(const [width,height] of [[375,812],[430,932],[768,1024],[1440,900]]){
+    for(const [width,height] of [[320,568],[375,812],[430,932],[768,1024],[1024,768],[1440,900]]){
       const context=await browser.newContext({viewport:{width,height}});
       await context.route(/\/firebase-auth\.js(?:\?.*)?$/,route=>route.fulfill({status:200,contentType:'application/javascript',body:signedOutAuthStub()}));
       await context.route(/\/firebase-sync\.js(?:\?.*)?$/,route=>route.fulfill({status:200,contentType:'application/javascript',body:'window.CM_SYNC={ready:true,flush:async()=>true};'}));

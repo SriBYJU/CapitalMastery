@@ -205,7 +205,7 @@ async function gotoHash(page, hash, settle = 220) {
     }
 
     // 7) Resize + route churn at the same time to provoke observer/layout races.
-    const sizes = [[375,812],[1440,900],[430,932],[768,1024]];
+    const sizes = [[320,568],[375,812],[430,932],[768,1024],[1024,768],[1440,900]];
     const resizeRoutes = ['#/learner-guide','#/career/investment-banking','#/careers','#/career/private-equity'];
     for (let i = 0; i < 20; i++) {
       const [width,height] = sizes[i % sizes.length];

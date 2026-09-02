@@ -248,7 +248,7 @@ try {
   }
 
   // Responsive overflow on the most mutation-heavy surfaces.
-  for(const [width,height] of [[375,812],[430,932],[768,1024],[1440,900]]) {
+  for(const [width,height] of [[320,568],[375,812],[430,932],[768,1024],[1024,768],[1440,900]]) {
     await page.setViewportSize({width,height});
     for(const route of ['#/','#/careers','#/career/investment-banking','#/learner-guide']) {
       await gotoHash(page,route);

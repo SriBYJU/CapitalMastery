@@ -3,7 +3,7 @@ const { chromium } = require('playwright');
 const BASE=process.env.CM_AUDIT_URL||'http://127.0.0.1:4173';
 const WORKER='https://capital-mastery-api.avadhanula-shriyan.workers.dev';
 const routes=['#/','#/careers','#/career/investment-banking','#/learner-guide','#/employers','#/trust','#/about','#/credentials','#/privacy','#/terms'];
-const viewports=[[375,812],[768,1024],[1440,1000]];
+const viewports=[[320,568],[375,812],[430,932],[768,1024],[1024,768],[1440,1000]];
 const assert=(condition,message)=>{if(!condition)throw new Error(message);};
 
 function authStub(){return `(()=>{const user={uid:'contrast-audit',email:'contrast@example.invalid',displayName:'Contrast Audit'};window.CM_AUTH={ready:true,user,isAdmin:false,backendVerified:true,getIdToken:async()=> 'contrast-token',signOut:async()=>{}};setTimeout(()=>document.dispatchEvent(new CustomEvent('cm-auth-changed',{detail:{user,isAdmin:false,backendVerified:true}})),0)})();`;}

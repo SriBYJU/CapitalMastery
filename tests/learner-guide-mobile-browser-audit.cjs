@@ -27,7 +27,7 @@ async function assertContained(page, label) {
 (async () => {
   const browser = await chromium.launch({ headless: true });
   try {
-    for (const [width, height] of [[375, 812], [430, 932]]) {
+    for (const [width, height] of [[320, 568], [375, 812], [430, 932]]) {
       const context = await browser.newContext({ viewport: { width, height } });
       const page = await context.newPage();
       const runtimeErrors = [];

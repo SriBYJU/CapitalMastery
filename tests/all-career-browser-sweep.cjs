@@ -32,8 +32,16 @@ async function gotoHash(page, hash) {
 }
 
 async function assertContained(page, label) {
-  const m=await page.evaluate(()=>({inner:innerWidth,doc:document.documentElement.scrollWidth,body:document.body.scrollWidth}));
-  assert(Math.max(m.doc,m.body)<=m.inner+2,`${label}: horizontal overflow ${Math.max(m.doc,m.body)}px > ${m.inner}px`);
+  const m=await page.evaluate(()=>{
+    const inner=innerWidth;
+    const offenders=[...document.querySelectorAll('body *')].flatMap(el=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.width<1||rect.height<1||rect.right<=inner+2)return [];
+      return [{tag:el.tagName.toLowerCase(),id:el.id||'',className:String(el.className||'').slice(0,100),left:Math.round(rect.left),right:Math.round(rect.right),width:Math.round(rect.width),text:(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,80)}];
+    }).slice(0,8);
+    return {inner,doc:document.documentElement.scrollWidth,body:document.body.scrollWidth,offenders};
+  });
+  assert(Math.max(m.doc,m.body)<=m.inner+2,`${label}: horizontal overflow ${Math.max(m.doc,m.body)}px > ${m.inner}px; offenders=${JSON.stringify(m.offenders)}`);
 }
 
 (async()=>{
@@ -80,7 +88,7 @@ async function assertContained(page, label) {
     // Release-width sweep across all 16 career landing pages. This catches
     // role-specific long titles, badges, workbook labels or track sequences that
     // only overflow at phone, large-phone, tablet or desktop breakpoints.
-    const releaseWidths=[[375,812],[430,932],[768,1024],[1440,900]];
+    const releaseWidths=[[320,568],[375,812],[430,932],[768,1024],[1024,768],[1440,900]];
     for(const [width,height] of releaseWidths) {
       await page.setViewportSize({width,height});
       for(const career of careers) {
@@ -92,7 +100,7 @@ async function assertContained(page, label) {
     }
 
     assert(runtimeErrors.length===0,`All-career browser sweep runtime errors: ${[...new Set(runtimeErrors)].join(' | ')}`);
-    console.log(`ALL-CAREER TWO-TRACK BROWSER SWEEP PASS: ${careers.length} careers × both tracks + 4 release widths`);
+    console.log(`ALL-CAREER TWO-TRACK BROWSER SWEEP PASS: ${careers.length} careers × both tracks + ${releaseWidths.length} release widths`);
   } finally {
     await context.close();
     await browser.close();
