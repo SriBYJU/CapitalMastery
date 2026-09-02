@@ -94,7 +94,9 @@ function assert(condition, message) {
       await page.goto(`${BASE.replace(/\/$/,'')}/#/login`, { waitUntil:'domcontentloaded', timeout:30000 });
       await page.waitForFunction(() => window.CM_AUTH?.ready === true, null, { timeout:15000 });
       assert(providerState.googleAvailable === true, 'Authorized canonical host unexpectedly disabled Google authentication');
-      assert(await page.locator('[data-cm-google-provider]').first().isVisible(), 'Authorized canonical host must keep the Google sign-in control available');
+      const googleProvider = page.locator('[data-cm-google-provider]').first();
+      await googleProvider.waitFor({ state:'visible', timeout:15000 });
+      assert(await googleProvider.isVisible(), 'Authorized canonical host must keep the Google sign-in control available');
       assert(await page.locator('#cm-signin-form input[name="email"]').isVisible(), 'Email authentication fallback must remain available');
       console.log(`FIREBASE AUTHORIZED DOMAIN BROWSER AUDIT PASS: authorized-domain API and provider UI passed; headless popup returned transient ${outcome.code}`);
       return;
