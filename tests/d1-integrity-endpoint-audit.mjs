@@ -10,8 +10,10 @@ ok(route.includes('request.method === "GET"'),'Integrity route must be GET/read-
 ok(route.includes('await requireAdmin(request, env)'),'Integrity route must require verified admin access');
 ok(route.includes('PRAGMA quick_check'),'Integrity route must execute SQLite quick_check');
 ok(route.includes('PRAGMA foreign_key_check'),'Integrity route must execute SQLite foreign_key_check');
-ok(route.includes("SELECT name FROM sqlite_master WHERE type='table'"),'Integrity route must enumerate actual D1 tables');
+ok(route.includes('PRAGMA table_list'),'Integrity route must enumerate actual D1 tables through the supported table-list PRAGMA');
 ok(route.includes('/^[A-Za-z0-9_]+$/.test(name)'),'Dynamic table count identifiers must be strictly sanitized');
+ok(route.includes("!/^(?:sqlite_|_cf_|d1_)/i.test(name)"),'Integrity route must exclude every D1/SQLite reserved table before counting');
+ok(route.includes('await env.DB.batch([')&&route.includes('countResults = tableNames.length'),'Integrity reads must use bounded sequential D1 batches rather than concurrent or N+1 round trips');
 ok(route.includes('SELECT COUNT(*) AS count'),'Integrity response must report table counts');
 ok(!route.includes('SELECT * FROM'),'Integrity route must not expose arbitrary table rows');
 ok(!route.includes('INSERT ')&&!route.includes('UPDATE ')&&!route.includes('DELETE '),'Integrity route must not mutate D1');

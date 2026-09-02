@@ -745,18 +745,25 @@ export default {
       // --------------------------------------------------
       if (request.method === "GET" && url.pathname === "/admin/integrity") {
         await requireAdmin(request, env);
-        const [quick, foreignKeys, tableRows] = await Promise.all([
-          env.DB.prepare(`PRAGMA quick_check`).all(),
-          env.DB.prepare(`PRAGMA foreign_key_check`).all(),
-          env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name`).all()
+        // Use D1's supported table-list PRAGMA and exclude every reserved table.
+        // `_cf_KV` is visible to schema discovery but deliberately unreadable;
+        // counting it produces SQLITE_AUTH and used to break this endpoint only
+        // in production. A read-only batch keeps the three checks sequential.
+        const [quick, foreignKeys, tableRows] = await env.DB.batch([
+          env.DB.prepare(`PRAGMA quick_check`),
+          env.DB.prepare(`PRAGMA foreign_key_check`),
+          env.DB.prepare(`PRAGMA table_list`)
         ]);
+        const tableNames = (tableRows.results || [])
+          .filter(row => String(row.schema || '') === 'main' && String(row.type || '') === 'table')
+          .map(row => String(row.name || ''))
+          .filter(name => /^[A-Za-z0-9_]+$/.test(name) && !/^(?:sqlite_|_cf_|d1_)/i.test(name))
+          .sort();
         const tableCounts = {};
-        for (const row of tableRows.results || []) {
-          const name = String(row.name || '');
-          if (!/^[A-Za-z0-9_]+$/.test(name)) continue;
-          const countRow = await env.DB.prepare(`SELECT COUNT(*) AS count FROM "${name}"`).first();
-          tableCounts[name] = Number(countRow?.count || 0);
-        }
+        const countResults = tableNames.length
+          ? await env.DB.batch(tableNames.map(name => env.DB.prepare(`SELECT COUNT(*) AS count FROM "${name}"`)))
+          : [];
+        tableNames.forEach((name,index) => { tableCounts[name] = Number(countResults[index]?.results?.[0]?.count || 0); });
         return json({
           ok: true,
           checkedAt: new Date().toISOString(),
