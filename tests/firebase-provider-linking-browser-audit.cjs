@@ -89,12 +89,17 @@ export async function deleteUser(){}
     assert(linked.providers.includes('google.com')&&linked.providers.includes('password'),'Both providers were not retained on the same account');
     assert(linked.isAdmin===true,'Provider linking removed administrator authorization');
 
-    await page.evaluate(()=>window.CM_AUTH.signOut());
+    await page.evaluate(async()=>window.CM_AUTH.signOut());
     await page.waitForFunction(()=>window.CM_AUTH?.user===null,null,{timeout:10000});
-    await page.locator('#cm-signin-form input[name="email"]').fill('admin@example.invalid');
-    await page.locator('#cm-signin-form input[name="password"]').fill(password);
-    await page.locator('#cm-signin-form').evaluate(form=>form.requestSubmit());
-    await page.waitForFunction(()=>window.CM_AUTH?.user?.uid==='same-admin-uid'&&window.CM_AUTH?.isAdmin===true,null,{timeout:10000});
+    await page.locator('#cm-full-name-onboarding').waitFor({state:'detached',timeout:10000});
+    const signInForm=page.locator('#cm-signin-form');
+    await signInForm.waitFor({state:'visible',timeout:10000});
+    await signInForm.locator('input[name="email"]').fill('admin@example.invalid');
+    await signInForm.locator('input[name="password"]').fill(password);
+    await signInForm.locator('button[type="submit"]').click();
+    await page.waitForFunction(()=>window.__cmProviderLinkProbe?.passwordSignIns===1,null,{timeout:10000});
+    await page.waitForFunction(()=>window.CM_AUTH?.user?.uid==='same-admin-uid',null,{timeout:15000});
+    await page.waitForFunction(()=>window.CM_AUTH?.backendVerified===true&&window.CM_AUTH?.isAdmin===true,null,{timeout:30000});
     const passwordLogin=await page.evaluate(()=>({uid:window.CM_AUTH.user.uid,isAdmin:window.CM_AUTH.isAdmin,probe:window.__cmProviderLinkProbe}));
     assert(passwordLogin.probe.passwordSignIns===1,'Linked password was not accepted through the normal sign-in form');
     assert(passwordLogin.uid==='same-admin-uid'&&passwordLogin.isAdmin===true,'Password sign-in did not restore the same administrator account');

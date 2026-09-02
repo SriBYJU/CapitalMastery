@@ -548,6 +548,7 @@
     const user = event.detail?.user || null;
     closeGate();
     if (user) setTimeout(() => maybePromptForName(user), 120);
+    else closeNameModal(false);
     setTimeout(enforceCurrentRoute, 80);
   });
   document.addEventListener('cm-certificate-name-changed', () => setTimeout(() => enhanceAccountCard(true), 50));
