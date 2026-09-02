@@ -41,7 +41,7 @@ export async function deleteUser(){}
       if(route.request().url().includes('gstatic.com')) return route.fulfill({status:200,contentType:'application/javascript',body:authModule});
       return route.continue();
     });
-    await context.route(/identitytoolkit\.googleapis\.com\/v1\/projects\?key=/,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authorizedDomains:['127.0.0.1','localhost']})}));
+    await context.route(/identitytoolkit\.googleapis\.com\/v1\/projects\?key=/,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({authorizedDomains:['127.0.0.1','localhost','sribyju.github.io','capitalmastery.pages.dev']})}));
     await context.route(/\/auth-check$/,route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,isAdmin:true})}));
 
     const page=await context.newPage();
