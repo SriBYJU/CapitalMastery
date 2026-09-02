@@ -242,8 +242,9 @@
     };
   }
 
-  function blankState(){
-    return {version:1, profile:{name:DEFAULT_NAME}, careers:{}, credentials:[], preferences:{}, createdAt:new Date().toISOString()};
+  function blankState(accountUser=null){
+    const displayName=String(accountUser?.displayName||'').replace(/\s+/g,' ').trim();
+    return {version:1, profile:{name:displayName||DEFAULT_NAME,...(accountUser?.uid?{accountUid:accountUser.uid}:{}),...(displayName?{certificateName:displayName}:{})}, careers:{}, credentials:[], preferences:{}, createdAt:new Date().toISOString()};
   }
   function loadStateFrom(key){
     try {
@@ -260,11 +261,24 @@
   function activeStateKey(){ return qaMode() ? QA_STATE_KEY : STATE_KEY; }
   function ensureActiveState(){
     const key=activeStateKey();
-    if(key!==stateSourceKey){ state=key===QA_STATE_KEY?loadQaState():loadState(); stateSourceKey=key; }
+    const authSettled=window.CM_AUTH?.ready===true;
+    const accountUser=authSettled?window.CM_AUTH?.user:null;
+    const uid=accountUser?.uid||null;
+    const owner=state?.profile?.accountUid||null;
+    const accountChanged=key===STATE_KEY&&authSettled&&((uid&&owner!==uid)||(!uid&&!!owner));
+    if(key!==stateSourceKey||accountChanged){
+      state=key===QA_STATE_KEY?loadQaState():loadState();
+      stateSourceKey=key;
+    }
+    if(key===STATE_KEY&&authSettled){
+      const loadedOwner=state?.profile?.accountUid||null;
+      if((uid&&loadedOwner!==uid)||(!uid&&!!loadedOwner)) state=blankState(accountUser);
+    }
     return state;
   }
-  function saveState(){ const key=activeStateKey(); stateSourceKey=key; localStorage.setItem(key, JSON.stringify(state)); }
+  function saveState(){ ensureActiveState(); const key=activeStateKey(); stateSourceKey=key; localStorage.setItem(key, JSON.stringify(state)); }
   function getCareerState(id){
+    ensureActiveState();
     if(!state.careers[id]) state.careers[id] = {learningComplete:[],completedParts:[],quizScores:{},simulationKnowledge:null,simulationScore:null,finalScore:null,applied:{},simResponses:{},readiness:null};
     const cs=state.careers[id];
     if(!Array.isArray(cs.learningComplete)) cs.learningComplete=[];
@@ -794,5 +808,13 @@
 
   window.CM={mobileMenu,markPart,toggleQa,qaScores,qaProgress,refreshLocalState,resetState,copy,closeModal,linkedinFields,postModal,postStyle,downloadSocial,downloadCertificateImage,compareGo};
   window.addEventListener('hashchange',renderRoute);
+  // Account isolation swaps the shared localStorage state synchronously before
+  // this listener runs. Refresh app.js's closure immediately as well, so a
+  // same-tab sign-out/sign-in can never render or save the prior account's
+  // profile/progress while Firestore hydration is still settling.
+  document.addEventListener?.('cm-auth-changed',()=>{
+    refreshLocalState();
+    if(window.CM_AUTH?.ready===true) setTimeout(()=>{refreshLocalState();renderRoute();},0);
+  });
   renderRoute();
 })();

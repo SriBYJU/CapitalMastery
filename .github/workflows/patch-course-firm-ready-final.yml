@@ -10,6 +10,7 @@ on:
       - 'tools/patch-secure-assessment-retry-url.mjs'
       - 'tests/course-pass-continuity-audit.mjs'
       - 'tests/account-isolation-course-continuity-audit.mjs'
+      - 'tests/account-switch-app-state-browser-audit.cjs'
       - 'tests/course-pass-continuity-browser-audit.cjs'
       - 'tests/course-no-skip-resume-browser-audit.cjs'
       - 'tests/legacy-simulation-refusal-browser-audit.cjs'
@@ -73,6 +74,11 @@ jobs:
         env:
           CM_AUDIT_URL: http://127.0.0.1:4173
         run: node tests/course-no-skip-resume-browser-audit.cjs
+
+      - name: Prove same-tab account-switch isolation
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: node tests/account-switch-app-state-browser-audit.cjs
 
       - name: Prove stale MCQ simulations are refused
         env:
