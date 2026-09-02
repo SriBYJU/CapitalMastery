@@ -7,6 +7,7 @@ on:
       - '.github/workflows/firebase-live-auth-audit.yml'
       - 'tests/live-firebase-auth-browser-audit.cjs'
       - 'tests/firebase-authorized-domain-browser-audit.cjs'
+      - 'tests/firebase-internal-error-recovery-browser-audit.cjs'
       - 'tests/credential-name-root-persistence-audit.mjs'
       - 'firebase-auth.js'
       - 'firebase-config.js'
@@ -53,6 +54,7 @@ jobs:
           node --check certificate-name.js
           node --check firebase-sync.js
           node --check tests/live-firebase-auth-browser-audit.cjs
+          node --check tests/firebase-internal-error-recovery-browser-audit.cjs
           node tests/auth-assessment-hang-audit.mjs
           node tests/credential-name-root-persistence-audit.mjs
           node tests/deployable-encoding-audit.mjs
@@ -66,6 +68,7 @@ jobs:
             curl -fsS "https://sribyju.github.io/CapitalMastery/certificate-name.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-certificate-name.js || true
             curl -fsS "https://sribyju.github.io/CapitalMastery/firebase-sync.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-firebase-sync.js || true
             if grep -Fq 'certificate-name.js?v=20260902-a11ysecurity1' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'firebase-auth.js?v=20260902-authrecovery1' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'firebase-sync.js?v=20260831-phase2rc7' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'settleProgressAfterIdentity' /tmp/live-certificate-name.js 2>/dev/null \
               && grep -Fq 'verifiedAfterAmbiguousWrite' /tmp/live-certificate-name.js 2>/dev/null \
@@ -82,6 +85,18 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
+
+      - name: Prove Firebase internal-error recovery behavior
+        run: |
+          node tools/build-pages.mjs
+          python3 -m http.server 4173 --directory dist-pages >/tmp/cm-auth-recovery-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 1
+          done
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/firebase-internal-error-recovery-browser-audit.cjs
 
       - name: Disposable real Firebase email/password lifecycle on live primary
         run: |
