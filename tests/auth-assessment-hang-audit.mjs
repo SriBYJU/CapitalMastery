@@ -6,6 +6,12 @@ ok(auth.includes("onAuthStateChanged(auth, user =>"),'auth callback must not blo
 ok(auth.includes('CM_AUTH.ready = true;'),'Firebase readiness must be set immediately');
 ok(auth.includes('verifyWithWorker(user).then'),'backend role verification must run in background');
 ok(auth.includes('AbortController'),'backend identity check must have timeout');
+ok(auth.includes("'auth/internal-error'")&&auth.includes('signInWithRedirect(auth, provider)'),'Google popup internal errors must fall back to same-tab redirect authentication');
+ok(auth.includes('getRedirectResult(auth)'),'Google redirect results must be completed after returning to Capital Mastery');
+ok(auth.includes("if (error?.code !== 'auth/internal-error') throw error")&&auth.includes('setTimeout(resolve, 300)'),'Email/password internal errors must receive one bounded retry');
+ok(auth.includes('function friendlyAuthMessage(error)'),'Firebase failures must render actionable recovery guidance');
+ok(auth.includes('async function repairAuthSession()')&&auth.includes('browserLocalPersistence')&&auth.includes('browserSessionPersistence'),'Internal auth recovery must refresh persistence with a session fallback');
+ok(auth.includes('data-cm-auth-action="repair"')&&auth.includes("Sign-in session refreshed."),'Signed-out users must have an explicit non-destructive sign-in session repair action');
 ok(live.includes('waitForAuthReady'),'assessment route must have auth watchdog');
 ok(live.includes('cm-auth-retry'),'assessment timeout must expose retry action');
 ok(live.includes("setTimeout(() => route(), 250)"),'assessment route must automatically retry while auth initializes');

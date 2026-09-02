@@ -53,6 +53,7 @@ jobs:
           node --check certificate-name.js
           node --check firebase-sync.js
           node --check tests/live-firebase-auth-browser-audit.cjs
+          node tests/auth-assessment-hang-audit.mjs
           node tests/credential-name-root-persistence-audit.mjs
           node tests/deployable-encoding-audit.mjs
 

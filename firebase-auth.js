@@ -12,6 +12,12 @@
   let message = '';
   let messageType = '';
   let googleAvailable = false;
+  const GOOGLE_REDIRECT_FALLBACK_CODES = new Set([
+    'auth/internal-error',
+    'auth/popup-blocked',
+    'auth/operation-not-supported-in-this-environment',
+    'auth/web-storage-unsupported'
+  ]);
 
   const CM_AUTH = window.CM_AUTH = {
     ready: false,
@@ -59,6 +65,28 @@
     }
   }
 
+  function friendlyAuthMessage(error) {
+    return ({
+      'auth/email-already-in-use': 'That email already has an account. Sign in instead.',
+      'auth/invalid-credential': 'Email or password is incorrect. If this account uses Google, choose Continue with Google.',
+      'auth/invalid-email': 'Enter a valid email address.',
+      'auth/weak-password': 'Use a stronger password.',
+      'auth/network-request-failed': 'Firebase could not be reached. Check your connection and try again.',
+      'auth/internal-error': 'Firebase could not finish that sign-in method. Refresh once, then try Google again or use secure email sign-in.',
+      'auth/too-many-requests': 'Firebase temporarily limited sign-in attempts. Wait a few minutes or reset your password.'
+    })[error?.code] || error?.message || 'Authentication request failed.';
+  }
+
+  async function repairAuthSession() {
+    if (!auth || !authApi) return;
+    await authApi.signOut(auth).catch(() => {});
+    try {
+      await authApi.setPersistence(auth, authApi.browserLocalPersistence);
+    } catch (_) {
+      await authApi.setPersistence(auth, authApi.browserSessionPersistence);
+    }
+  }
+
   async function resolveGoogleAvailability() {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 6000);
@@ -94,14 +122,30 @@
         setMessage('Opening Google sign-in…');
         const provider = new authApi.GoogleAuthProvider();
         provider.setCustomParameters({ prompt: 'select_account' });
-        const result = await authApi.signInWithPopup(auth, provider);
-        return result.user;
+        try {
+          const result = await authApi.signInWithPopup(auth, provider);
+          return result.user;
+        } catch (error) {
+          if (!GOOGLE_REDIRECT_FALLBACK_CODES.has(error?.code)) throw error;
+          setMessage('The popup was unavailable. Continuing Google sign-in securely in this tab…');
+          await repairAuthSession();
+          await authApi.signInWithRedirect(auth, provider);
+          return null;
+        }
       };
 
       CM_AUTH.emailSignIn = async (email, password) => {
         setMessage('Signing in…');
-        const result = await authApi.signInWithEmailAndPassword(auth, email, password);
-        return result.user;
+        try {
+          const result = await authApi.signInWithEmailAndPassword(auth, email, password);
+          return result.user;
+        } catch (error) {
+          if (error?.code !== 'auth/internal-error') throw error;
+          await repairAuthSession();
+          await new Promise(resolve => setTimeout(resolve, 300));
+          const result = await authApi.signInWithEmailAndPassword(auth, email, password);
+          return result.user;
+        }
       };
 
       CM_AUTH.emailCreate = async (name, email, password) => {
@@ -122,6 +166,13 @@
         await authApi.sendPasswordResetEmail(auth, email);
         setMessage('Password-reset email sent.', 'good');
       };
+
+      authApi.getRedirectResult(auth).then(result => {
+        if (result?.user) setMessage('Google sign-in completed.', 'good');
+      }).catch(error => {
+        console.error('Capital Mastery Google redirect sign-in failed:', error);
+        setMessage(friendlyAuthMessage(error), 'bad');
+      });
 
 
       CM_AUTH.deleteAccount = async () => {
@@ -248,6 +299,8 @@
             <button class="btn btn-primary btn-block" type="submit">Sign in</button>
           </form>
           <button class="cm-link-button" type="button" data-cm-auth-action="reset">Forgot password?</button>
+          <button class="cm-link-button" type="button" data-cm-auth-action="repair">Refresh sign-in session</button>
+          <p class="cm-auth-method-note">Administrator access follows the exact Firebase account. If that address was created with Google, use Continue with Google; use email/password only if that account has a password.</p>
         </div>
         <div class="card cm-auth-card">
           <div class="eyebrow">NEW TO CAPITAL MASTERY?</div>
@@ -316,7 +369,7 @@
       .cm-auth-form input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}
       .cm-auth-divider{display:flex;align-items:center;gap:12px;color:#8a929b;font-size:.8rem;margin:17px 0}.cm-auth-divider:before,.cm-auth-divider:after{content:"";height:1px;background:#e0e4e8;flex:1}
       .cm-auth-message{padding:11px 13px;border-radius:10px;background:#eef2f6;color:var(--navy);font-size:.88rem;margin:14px 0}.cm-auth-message.good{background:#eaf6ef;color:#245b43}.cm-auth-message.bad{background:#fff0f0;color:#8b3232}
-      .cm-google{background:white}.cm-auth-provider-note{padding:10px 12px;margin:12px 0;border:1px solid #d8e1e9;border-radius:10px;background:#f5f8fa;color:#46586a;font-size:.84rem}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 0 0;text-decoration:underline;cursor:pointer}
+      .cm-google{background:white}.cm-auth-provider-note{padding:10px 12px;margin:12px 0;border:1px solid #d8e1e9;border-radius:10px;background:#f5f8fa;color:#46586a;font-size:.84rem}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 12px 0 0;text-decoration:underline;cursor:pointer}.cm-auth-method-note{margin:14px 0 0;color:#667482;font-size:.78rem;line-height:1.45}
       .cm-account-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.cm-account-grid>div{background:#f5f7f9;border:1px solid #e3e7eb;border-radius:12px;padding:14px}.cm-account-grid span{display:block;color:#77818d;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.cm-account-grid strong{display:block;color:var(--navy);margin-top:5px;word-break:break-word}.cm-uid{font-size:.78rem}.cm-auth-actions{display:flex;flex-wrap:wrap;gap:10px}
       .cm-account-privacy{margin-top:22px;padding:16px;border:1px solid #ead1d1;background:#fff8f8;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}.cm-account-privacy b{color:#7d2727}.cm-account-privacy p{margin:5px 0 0;color:#6d6262;font-size:.82rem;line-height:1.45}.cm-account-privacy>div:last-child{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn-danger{background:#8b2f2f;color:#fff;border-color:#8b2f2f}.btn-danger:hover{background:#702626}
       @media(max-width:760px){.cm-auth-layout,.cm-account-grid{grid-template-columns:1fr}.cm-account-privacy{align-items:stretch;flex-direction:column}.cm-account-privacy>div:last-child{justify-content:flex-start}.cm-auth-card h1{font-size:2.2rem}}
@@ -343,9 +396,13 @@
         const email = document.querySelector('#cm-signin-form input[name="email"]')?.value.trim();
         await CM_AUTH.resetPassword(email);
       }
+      if (action === 'repair') {
+        await repairAuthSession();
+        setMessage('Sign-in session refreshed. Try your original sign-in method again.', 'good');
+      }
     } catch (error) {
       console.error(error);
-      setMessage(error.message || 'Authentication request failed.', 'bad');
+      setMessage(friendlyAuthMessage(error), 'bad');
     } finally {
       button.disabled = false;
     }
@@ -366,13 +423,7 @@
       }
     } catch (error) {
       console.error(error);
-      const friendly = ({
-        'auth/email-already-in-use': 'That email already has an account. Sign in instead.',
-        'auth/invalid-credential': 'Email or password is incorrect.',
-        'auth/invalid-email': 'Enter a valid email address.',
-        'auth/weak-password': 'Use a stronger password.'
-      })[error.code] || error.message || 'Authentication request failed.';
-      setMessage(friendly, 'bad');
+      setMessage(friendlyAuthMessage(error), 'bad');
     } finally {
       submit.disabled = false;
     }
