@@ -16,6 +16,8 @@ ok(ent.includes('ADMIN · DEMO / TEST LAB'),'Admin must have visual Demo/Test La
 ok(ent.includes('Generate Synthetic Firm'),'Admin must be able to create a synthetic firm');
 ok(ent.includes('Mixed cohort')&&ent.includes('Weak modeling cohort')&&ent.includes('Revision cycle'),'Admin must have meaningful scenario presets');
 ok(ent.includes('Open Employer View')&&ent.includes('Launch Guide')&&ent.includes('Reports'),'Admin must have direct scenario preview links');
+ok(ent.includes("api('/admin/integrity')")&&ent.includes('data-cm-admin-integrity'),'Admin Demo Lab must expose the protected read-only D1 integrity result');
+ok(ent.includes('no foreign-key violations')&&ent.includes('production tables were inspected'),'Admin integrity panel must explain both relational health and inspection coverage');
 ok(app.includes('#/admin-demo'),'Existing admin page must expose the Demo/Test Lab');
 ok(ent.includes('roleLab.revisions'),'Manager attention must use report revision field');
 console.log('ADMIN DEMO/TEST LAB AUDIT PASS');
