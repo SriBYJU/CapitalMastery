@@ -1,5 +1,5 @@
 const { chromium } = require('playwright');
-const BASE=process.env.CM_AUDIT_URL||'http://127.0.0.1:4173';
+const BASE=(process.env.CM_AUDIT_URL||'http://127.0.0.1:4173').replace(/\/+$/,'');
 const WORKER='https://capital-mastery-api.avadhanula-shriyan.workers.dev';
 const UID='program-completion-browser-audit';
 const assert=(v,m)=>{if(!v)throw new Error(m);};
@@ -24,7 +24,19 @@ function authStub(){return `(()=>{const user={uid:'${UID}',email:'audit@example.
     });
     const page=await context.newPage();
     await page.goto(BASE+'/#/credentials',{waitUntil:'domcontentloaded',timeout:30000});
-    await page.waitForSelector('.cm-program-completion-card',{timeout:10000});
+    try { await page.waitForSelector('.cm-program-completion-card',{timeout:15000}); }
+    catch (_) {
+      const diagnostic=await page.evaluate(()=>({
+        href:location.href,
+        hash:location.hash,
+        ready:document.readyState,
+        authReady:window.CM_AUTH?.ready,
+        uid:window.CM_AUTH?.user?.uid||null,
+        cardCount:document.querySelectorAll('.cm-program-completion-card').length,
+        appText:(document.querySelector('#app')?.innerText||'').slice(0,1600)
+      }));
+      throw new Error(`Program completion card did not render. diagnostics=${JSON.stringify(diagnostic)}`);
+    }
     const recordsText=await page.locator('#app').innerText();
     assert(/STANDARD 2\.0 CREDENTIALS/.test(recordsText),'Verified credential section missing');
     assert(/PROGRAM COMPLETIONS/.test(recordsText),'Program Completions section missing');
