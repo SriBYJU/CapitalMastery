@@ -28,6 +28,7 @@
     async googleSignIn() { throw new Error('Authentication is still loading.'); },
     async emailSignIn() { throw new Error('Authentication is still loading.'); },
     async emailCreate() { throw new Error('Authentication is still loading.'); },
+    async enablePassword() { throw new Error('Authentication is still loading.'); },
     async signOut() { throw new Error('Authentication is still loading.'); },
     async resetPassword() { throw new Error('Authentication is still loading.'); },
     async deleteAccount() { throw new Error('Authentication is still loading.'); },
@@ -68,8 +69,11 @@
   function friendlyAuthMessage(error) {
     return ({
       'auth/email-already-in-use': 'That email already has an account. Sign in instead.',
+      'auth/credential-already-in-use': 'That email/password sign-in belongs to another account. Sign out and use password reset instead.',
       'auth/invalid-credential': 'Email or password is incorrect. If this account uses Google, choose Continue with Google.',
       'auth/invalid-email': 'Enter a valid email address.',
+      'auth/provider-already-linked': 'Email and password sign-in is already enabled for this account.',
+      'auth/requires-recent-login': 'For security, sign out, sign back in with Google, then create your password immediately.',
       'auth/weak-password': 'Use a stronger password.',
       'auth/network-request-failed': 'Firebase could not be reached. Check your connection and try again.',
       'auth/internal-error': 'Firebase could not finish that sign-in method. Refresh once, then try Google again or use secure email sign-in.',
@@ -154,6 +158,24 @@
         if (name && name.trim()) await authApi.updateProfile(result.user, { displayName: name.trim() });
         await result.user.reload();
         return auth.currentUser;
+      };
+
+      CM_AUTH.enablePassword = async password => {
+        const user = auth.currentUser;
+        if (!user?.email) throw new Error('This Google account does not provide an email address.');
+        if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw new Error('Use a password between 8 and 128 characters.');
+        if (user.providerData?.some(provider => provider.providerId === 'password')) {
+          setMessage('Email and password sign-in is already enabled.', 'good');
+          return user;
+        }
+        setMessage('Securely adding password sign-in…');
+        const credential = authApi.EmailAuthProvider.credential(user.email, password);
+        const result = await authApi.linkWithCredential(user, credential);
+        await result.user.reload();
+        currentUser = auth.currentUser || result.user;
+        CM_AUTH.user = currentUser;
+        setMessage('Password sign-in enabled. You can now use Google or your email and password.', 'good');
+        return currentUser;
       };
 
       CM_AUTH.signOut = async () => {
@@ -261,6 +283,9 @@
 
     if (currentUser) {
       const name = currentUser.displayName || currentUser.email || 'Capital Mastery learner';
+      const providers = new Set((currentUser.providerData || []).map(provider => provider.providerId));
+      const hasGoogle = providers.has('google.com');
+      const hasPassword = providers.has('password');
       return `<section class="section"><div class="container" style="max-width:760px"><div class="card cm-auth-card">
         <div class="eyebrow">YOUR ACCOUNT</div>
         <h1 class="serif">Welcome, ${esc(name.split(' ')[0])}.</h1>
@@ -276,6 +301,19 @@
           <a class="btn btn-primary" href="#/passport">My Learning →</a>
           ${CM_AUTH.isAdmin ? '<a class="btn btn-gold" href="#/admin-preview">Admin →</a>' : ''}
           <button class="btn btn-outline" type="button" data-cm-auth-action="signout">Sign out</button>
+        </div>
+        <div class="cm-signin-methods">
+          <div class="cm-signin-methods-head"><div><b>Sign-in methods</b><p>Both methods open this same account—your user ID, progress${CM_AUTH.isAdmin ? ' and administrator access' : ''} stay unchanged.</p></div></div>
+          <div class="cm-method-grid">
+            <div class="cm-method-status"><span>Google</span><strong>${hasGoogle ? 'Enabled ✓' : 'Not linked'}</strong></div>
+            <div class="cm-method-status"><span>Email &amp; password</span><strong>${hasPassword ? 'Enabled ✓' : 'Set up below'}</strong></div>
+          </div>
+          ${!hasPassword && currentUser.email ? `<form id="cm-enable-password-form" class="cm-auth-form cm-enable-password-form">
+            <p><b>Create your Capital Mastery password</b><br><span>After this one-time step, sign in with either Google or ${esc(currentUser.email)} plus this password.</span></p>
+            <label>New password<input required type="password" name="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="At least 8 characters"></label>
+            <label>Confirm password<input required type="password" name="confirmation" autocomplete="new-password" minlength="8" maxlength="128" placeholder="Type it again"></label>
+            <button class="btn btn-gold" type="submit">Enable password sign-in</button>
+          </form>` : ''}
         </div>
         <div class="cm-account-privacy"><div><b>Privacy & account data</b><p>Export your enterprise data, or permanently remove your personal Capital Mastery data and Firebase account. Sole workspace owners must transfer ownership first.</p></div><div><a class="btn btn-outline btn-sm" href="#/my-data">Export My Data</a><button class="btn btn-danger btn-sm" type="button" data-cm-auth-action="delete-account">Delete Account & Data</button></div></div>
       </div></div></section>`;
@@ -300,7 +338,7 @@
           </form>
           <button class="cm-link-button" type="button" data-cm-auth-action="reset">Forgot password?</button>
           <button class="cm-link-button" type="button" data-cm-auth-action="repair">Refresh sign-in session</button>
-          <p class="cm-auth-method-note">Administrator access follows the exact Firebase account. If that address was created with Google, use Continue with Google; use email/password only if that account has a password.</p>
+          <p class="cm-auth-method-note">Google users can create a password from their account page, then use either sign-in method. Administrator access follows the exact Firebase account and remains available with both methods.</p>
         </div>
         <div class="card cm-auth-card">
           <div class="eyebrow">NEW TO CAPITAL MASTERY?</div>
@@ -371,8 +409,9 @@
       .cm-auth-message{padding:11px 13px;border-radius:10px;background:#eef2f6;color:var(--navy);font-size:.88rem;margin:14px 0}.cm-auth-message.good{background:#eaf6ef;color:#245b43}.cm-auth-message.bad{background:#fff0f0;color:#8b3232}
       .cm-google{background:white}.cm-auth-provider-note{padding:10px 12px;margin:12px 0;border:1px solid #d8e1e9;border-radius:10px;background:#f5f8fa;color:#46586a;font-size:.84rem}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 12px 0 0;text-decoration:underline;cursor:pointer}.cm-auth-method-note{margin:14px 0 0;color:#667482;font-size:.78rem;line-height:1.45}
       .cm-account-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.cm-account-grid>div{background:#f5f7f9;border:1px solid #e3e7eb;border-radius:12px;padding:14px}.cm-account-grid span{display:block;color:#77818d;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.cm-account-grid strong{display:block;color:var(--navy);margin-top:5px;word-break:break-word}.cm-uid{font-size:.78rem}.cm-auth-actions{display:flex;flex-wrap:wrap;gap:10px}
+      .cm-signin-methods{margin-top:22px;padding:17px;border:1px solid #dce3e9;background:#f8fafb;border-radius:12px}.cm-signin-methods-head b{color:var(--navy)}.cm-signin-methods-head p,.cm-enable-password-form p{margin:5px 0 0;color:#5f6d7a;font-size:.84rem;line-height:1.5}.cm-method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.cm-method-status{background:#fff;border:1px solid #e0e5e9;border-radius:10px;padding:12px}.cm-method-status span{display:block;color:#77818d;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800}.cm-method-status strong{display:block;color:var(--navy);margin-top:4px}.cm-enable-password-form{margin-top:16px;padding-top:16px;border-top:1px solid #dce3e9}.cm-enable-password-form p{margin:0 0 2px}.cm-enable-password-form p b{color:var(--navy)}
       .cm-account-privacy{margin-top:22px;padding:16px;border:1px solid #ead1d1;background:#fff8f8;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}.cm-account-privacy b{color:#7d2727}.cm-account-privacy p{margin:5px 0 0;color:#6d6262;font-size:.82rem;line-height:1.45}.cm-account-privacy>div:last-child{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn-danger{background:#8b2f2f;color:#fff;border-color:#8b2f2f}.btn-danger:hover{background:#702626}
-      @media(max-width:760px){.cm-auth-layout,.cm-account-grid{grid-template-columns:1fr}.cm-account-privacy{align-items:stretch;flex-direction:column}.cm-account-privacy>div:last-child{justify-content:flex-start}.cm-auth-card h1{font-size:2.2rem}}
+      @media(max-width:760px){.cm-auth-layout,.cm-account-grid,.cm-method-grid{grid-template-columns:1fr}.cm-account-privacy{align-items:stretch;flex-direction:column}.cm-account-privacy>div:last-child{justify-content:flex-start}.cm-auth-card h1{font-size:2.2rem}}
     `;
     document.head.appendChild(style);
   }
@@ -409,7 +448,7 @@
   });
 
   document.addEventListener('submit', async event => {
-    if (event.target.id !== 'cm-signin-form' && event.target.id !== 'cm-create-form') return;
+    if (event.target.id !== 'cm-signin-form' && event.target.id !== 'cm-create-form' && event.target.id !== 'cm-enable-password-form') return;
     event.preventDefault();
     const form = event.target;
     const submit = form.querySelector('button[type="submit"]');
@@ -418,8 +457,14 @@
       submit.disabled = true;
       if (form.id === 'cm-signin-form') {
         await CM_AUTH.emailSignIn(String(data.get('email') || '').trim(), String(data.get('password') || ''));
-      } else {
+      } else if (form.id === 'cm-create-form') {
         await CM_AUTH.emailCreate(String(data.get('name') || '').trim(), String(data.get('email') || '').trim(), String(data.get('password') || ''));
+      } else {
+        const password = String(data.get('password') || '');
+        const confirmation = String(data.get('confirmation') || '');
+        if (password.length < 8) throw new Error('Use at least 8 characters for your password.');
+        if (password !== confirmation) throw new Error('The passwords do not match.');
+        await CM_AUTH.enablePassword(password);
       }
     } catch (error) {
       console.error(error);

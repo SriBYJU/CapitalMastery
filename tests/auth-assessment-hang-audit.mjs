@@ -12,6 +12,9 @@ ok(auth.includes("if (error?.code !== 'auth/internal-error') throw error")&&auth
 ok(auth.includes('function friendlyAuthMessage(error)'),'Firebase failures must render actionable recovery guidance');
 ok(auth.includes('async function repairAuthSession()')&&auth.includes('browserLocalPersistence')&&auth.includes('browserSessionPersistence'),'Internal auth recovery must refresh persistence with a session fallback');
 ok(auth.includes('data-cm-auth-action="repair"')&&auth.includes("Sign-in session refreshed."),'Signed-out users must have an explicit non-destructive sign-in session repair action');
+ok(auth.includes('EmailAuthProvider.credential(user.email, password)')&&auth.includes('linkWithCredential(user, credential)'),'Google-authenticated users must be able to link a password to the same Firebase UID');
+ok(auth.includes('id="cm-enable-password-form"')&&auth.includes('Enable password sign-in'),'Signed-in Google users must receive a clear password setup flow');
+ok(auth.includes("providers.has('google.com')")&&auth.includes("providers.has('password')"),'Account UI must report linked Google and password providers independently');
 ok(live.includes('waitForAuthReady'),'assessment route must have auth watchdog');
 ok(live.includes('cm-auth-retry'),'assessment timeout must expose retry action');
 ok(live.includes("setTimeout(() => route(), 250)"),'assessment route must automatically retry while auth initializes');
