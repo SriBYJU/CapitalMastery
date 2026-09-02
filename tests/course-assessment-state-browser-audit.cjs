@@ -88,8 +88,8 @@ function assessmentPayload(){
     assert(await savedAttempt.count()===1,'Failed result missing saved-attempt review link');
     assert(!/retake=1/.test(await savedAttempt.getAttribute('href')||''),'Failed result silently started another attempt instead of opening review');
     await savedAttempt.click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:15000});
-    const failedReviewText=await page.locator('.cm-server-assessment-review').innerText();
+    await page.waitForSelector('.cm-assessment-review .cm-review-item',{timeout:15000});
+    const failedReviewText=await page.locator('.cm-assessment-review').innerText();
     assert(/7 \/ 10/.test(failedReviewText)&&/70%/.test(failedReviewText),'Failed saved review did not preserve score count and percentage');
     assert(/Audit question 10[\s\S]*Your submitted answer[\s\S]*Correct answer/i.test(failedReviewText),'Failed saved review did not preserve question-by-question answers');
     const retry=page.getByRole('link',{name:/Retry assessment/});
@@ -121,8 +121,8 @@ function assessmentPayload(){
 
     const reviewLink=page.getByRole('link',{name:/Review passed knowledge check/});
     await reviewLink.click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:15000});
-    const reviewText=await page.locator('.cm-server-assessment-review').innerText();
+    await page.waitForSelector('.cm-assessment-review .cm-review-item',{timeout:15000});
+    const reviewText=await page.locator('.cm-assessment-review').innerText();
     assert(/already passed/i.test(reviewText),'Review route did not render saved-pass state');
     assert(/90%/.test(reviewText),'Review route did not preserve best score');
     assert(await page.locator('#cm-official-form').count()===0,'Review route silently started a new blank assessment');

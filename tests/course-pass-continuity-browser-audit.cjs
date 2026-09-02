@@ -64,8 +64,8 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     await page.waitForSelector('.cm-result.failed',{timeout:10000});
     assert(submitCalls===1,'First failed assessment should submit exactly once');
     await page.getByRole('link',{name:/Review saved attempt/}).click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
-    assert(/7 \/ 10/.test(await page.locator('.cm-server-assessment-review').innerText()),'Failed attempt review did not preserve the answer count');
+    await page.waitForSelector('.cm-assessment-review .cm-review-item',{timeout:15000});
+    assert(/7 \/ 10/.test(await page.locator('.cm-assessment-review').innerText()),'Failed attempt review did not preserve the answer count');
     const getsBeforeRetry=assessmentGets;
     await page.getByRole('link',{name:/Retry assessment/}).click();
     await page.waitForSelector('.cm-official-shell #cm-official-form',{timeout:10000}).catch(async error=>{
@@ -107,9 +107,9 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     const reviewPassed=page.getByRole('link',{name:/Review passed knowledge check/}).first();
     await reviewPassed.waitFor({state:'visible',timeout:15000});
     await reviewPassed.click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:15000});
+    await page.waitForSelector('.cm-assessment-review .cm-review-item',{timeout:15000});
     assert(await page.locator('#cm-official-form').count()===0,'Reviewing an already-passed assessment should not silently open a blank quiz');
-    const savedPassReviewText=await page.locator('.cm-server-assessment-review').innerText();
+    const savedPassReviewText=await page.locator('.cm-assessment-review').innerText();
     assert(/90%/.test(savedPassReviewText),`Saved-pass review did not preserve best score: ${JSON.stringify(savedPassReviewText.slice(0,800))}`);
     assert(await page.getByRole('link',{name:/Retake assessment/i}).count()===0,'A permanent saved pass must not expose a retake action');
     const getsBeforeForgery=assessmentGets, submitsBeforeForgery=submitCalls;
