@@ -1,93 +1,211 @@
-# Capital Mastery Phase 2 — Current Production Evidence
+# Capital Mastery Phase 2 — Final Production Evidence
 
-**Evidence date:** September 1, 2026  
-**Canonical site:** `https://sribyju.github.io/CapitalMastery/`  
-**Cloudflare mirror:** `https://capitalmastery.pages.dev/`  
-**Production API:** `https://capital-mastery-api.avadhanula-shriyan.workers.dev`
+- **Evidence date:** September 1, 2026
+- **Canonical product:** `https://sribyju.github.io/CapitalMastery/`
+- **Secondary mirror:** `https://capitalmastery.pages.dev/`
+- **Production API:** `https://capital-mastery-api.avadhanula-shriyan.workers.dev`
+- **Frontend runtime release:** `5cac6069c0841f7d63a330320cf4b537044e74b3`
+- **Worker source release:** `0a0d9c9bfa07015f1dc346b53b723a81b967881c`
+- **Worker deployment version:** `199ee0bd-7fc6-4dc7-a85e-75a324519666`
+- **Firebase project:** `capital-mastery26`
 
-## Exact generations
+## Release decision
 
-- `08d0781` — enforced canonical no-skip progression, locked read-only look-ahead, permanent passed assessments, saved failed-attempt review, exact resume and Role Lab/final prerequisites.
-- `2295dcd` — made server-authoritative passes monotonically restore the signed-in local/user-scoped state.
-- `51de102` / `fd6ddbd` — removed assessment-review hydration races, prevented count-to-percent corruption and made continuity stable under repeated auth/router/CDN timing.
-- `669a1b1` — added idempotent retry plus remote verification for ambiguous Firestore identity writes and retry-safe disposable cleanup.
-- `1999bfa` — updated the live release sentinels to the exact current production assets.
-- `3c836a9` — recorded the completed course-integrity production evidence and the remaining privileged closure boundary.
-- `51298de` — hardened the disposable live Firestore verifier with cross-account isolation, anonymous denial, schema rejection and asserted document/identity cleanup.
-- `a180818` — added exact-target Admin Demo cleanup, idempotent synthetic-tenant creation and the authenticated Admin closure probe; this Worker generation is deployed.
-- `7a258ae` — made the Admin closure probe deterministic and interruption-safe even when the first create response is ambiguous.
+Phase 2 is release-ready for an employer pilot and a serious firm demonstration. The reported course, assessment, simulation, progression, account isolation, employer workflow, access-control, visual contrast and deployment defects are closed in production. No known application-level P0 or P1 defect remains open.
 
-The exact deployed frontend source is `669a1b1bc82f4025101a135e3d09c18bd07e51d9`; the exact deployed Worker source is `a18081853d0f0a1915a697a2f87ef6d8848d8994`. Commit `1999bfafcb1a5329291a5eeee9f8c0fc947d4609` changes frontend release sentinels only. Commit `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a` changes the privileged verifier only, not the deployed runtime.
+“Firm-ready” here means that the product demonstrates professional workflow realism, deterministic navigation, server-enforced evidence, tenant-aware permissions, auditability, responsive behavior and hostile regression coverage. It is not a claim of bank endorsement, an external security certification, a formal WCAG conformance certification or proven global-bank traffic capacity.
 
-## Verified release results
+## 1. Root causes and repairs
 
-- Independent exact-head revalidation after Firebase domain parity: evidence head `52dfbaac13ceb3e3bbf82d1b67720977d0c97208` (runtime sources unchanged) passed **85 / 85** local static audits, eight critical syntax checks and the production Pages bundle audit. GitHub Pages deployment `33553757003`, live production read-only audit `33554225394`, GitHub Pages 18-suite live browser audit `33554223124`, and failure-seeking/adversarial audit `33554227826` all completed **SUCCESS**.
-- Dependency-free source regressions: **85 / 85 PASS**.
-- Exact local release browser matrix: **18 / 18 PASS**.
-- Failure-seeking / adversarial gate: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551277551`.
-- Live production read-only gate: **PASS** against the promoted Worker at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551277570`.
-- Phase 2 current-source audit: **PASS** for Worker generation `a18081853d0f0a1915a697a2f87ef6d8848d8994`, run `33550631569`.
-- Audited Worker package: **PASS** for Worker generation `a18081853d0f0a1915a697a2f87ef6d8848d8994`, run `33550631574`.
-- Audited Pages package: **PASS**, run `33522858804`.
-- GitHub Pages deployment: **PASS** at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`, run `33551276331`.
-- GitHub Pages live browser matrix at verifier head `7a258ae1f9fb15c46a04c1bf1ba38b9b09c0086a`: **18 / 18 PASS**, run `33551277604`.
-- Live Firebase provider-safety and disposable email/password lifecycle: **PASS**, run `33523908643`.
-- Firebase authorized-domain configuration, re-observed directly through the public project configuration after the owner update: `sribyju.github.io` **present** and `capitalmastery.pages.dev` **present**. Browser-origin probes opened the Google provider successfully from both the canonical primary and the secondary mirror without `auth/unauthorized-domain`.
-- Direct live-primary disposable account lifecycle: **PASS** — create, one-time full-name save, intentional reload, fresh-browser Firestore recovery, data deletion and Firebase account cleanup.
-- Cloudflare mirror browser matrix: **18 / 18 PASS** against `https://capitalmastery.pages.dev/`, including provider fail-safe behavior.
-- Production D1 migrations 016–018: **already present and validated**; `quick_check = ok`; foreign-key violations `0`; before/after counts preserved across 11 audited tables. No migration ran during this release.
-- Production Worker version `f77c74da-d85e-49a0-9d95-389c74efbbbb`: health `200`; unapproved origin `403`; unauthenticated auth check `401`; protected integrity route `401`; Admin Demo discovery/reset `401` without authentication. The opaque `ADMIN_UID` binding remained present. Post-deploy D1 `quick_check = ok`, foreign-key violations `0`, rows written `0`.
-- Cloudflare Pages deployment: exact allowlisted 56-file artifact; deployment `9b11735f.capitalmastery.pages.dev`; production alias/header verification PASS (`X-Frame-Options: DENY`, Permissions Policy present).
-- Repository: clean after final push.
+The failure pattern was architectural rather than a collection of unrelated buttons:
 
-The browser matrix covers explicit locked/current/completed/retry states, direct-route no-skip enforcement, exact reload-safe resume, question-by-question permanent pass/failure review, forged-retake resistance, cross-device authoritative pass recovery, modern no-MCQ simulations, all 16 careers across both programs, employer role/invite boundaries, Admin isolation, program-completion verification, mobile guidance, corruption/offline recovery, and contrast across responsive widths.
+- Course progression was being inferred independently by lessons, quiz results, career pages, track decorators and secure assessment views. A canonical course-state, access and destination layer now owns those decisions.
+- Local state, Firestore synchronization and D1 evidence could arrive in different orders. Official passes are now monotonic, server evidence wins for official results, malformed/stale state is normalized, and refresh/auth events cannot roll a pass backward.
+- The original browser application kept a stale in-memory state closure while the account-isolation layer swapped user-scoped storage. Same-tab account changes now reload the correct UID-bound state before any render or save, preventing cross-account contamination.
+- Review, Continue and Retake were conflated. They now have separate routes and behavior: passed attempts are permanent/read-only, failed attempts may be reviewed and retried explicitly, and Continue resolves the next stage for the selected program.
+- QA helpers previously shared the learner state shape. QA is now an Admin-verified, separate namespace with no credential or official-progress side effects.
+- Modern and legacy simulation paths coexisted. Official learner, Admin Preview and employer-assigned launches now converge on the professional workbench architecture; stale MCQ-style simulation payloads fail closed.
+- Employer UI permissions did not consistently mirror server permissions. Visible actions, direct routes and Worker enforcement now share the least-privilege role model.
+- Release proof previously stopped short of owner-controlled Firebase/Admin operations. Firebase rules, the live rules probe and the authenticated Admin synthetic lifecycle have now been executed and verified.
+- The first Admin D1 integrity implementation enumerated Cloudflare's reserved `_cf_KV` table, which D1 exposes in schema metadata but does not authorize clients to query. The endpoint now uses read-only D1 batches, `PRAGMA table_list`, safe identifier validation and reserved-prefix filtering.
+- The final six-width acceptance sweep found two hidden layout defects: min-content growth at 320px and full navigation overflow at 1024px. Responsive grid tracks now shrink safely and the header enters compact navigation before it can overflow.
 
-## Final experience and campaign pass
+## 2. Files changed
 
-The final usability pass adds:
+The authoritative, exhaustive file manifest is the Git comparison from the Phase 1 production close (`abd7cf1`) through the final Phase 2 frontend release (`5cac606`). It contains 269 relevant files across these groups:
 
-- one exact “Continue where you left off” action backed by the canonical state machine;
-- read-only look-ahead with controls withheld until prerequisites pass;
-- permanent passed assessments with count, percentage, submitted answer, correct answer and rationale review;
-- saved failed attempts with review first and an explicit retry action;
-- visible local/sync/offline save confidence;
-- contextual learner, workbench and employer guidance;
-- safe last-activity resume behavior;
-- seven-day device draft recovery for numeric, written and structured workbench fields;
-- automatic draft removal after submission;
-- direct-link simulation shell recovery; and
-- stable workbench step navigation while smooth scrolling.
+- Runtime shell and course state: `app.js`, `course-state.js`, `course-continuity.js`, `course-release-fix.js`, `training-tracks.js`, `state-resilience.js`, `ux-stability.js`, `runtime-audit-fixes.js` and account/auth synchronization modules.
+- Course and simulation content: `data.js`, `capital-mastery-live.js`, `capital-mastery-live-ui.js`, `capital-mastery-e2e.js`, `ib-analyst-toolkit.js`, learner guidance and professional visual modules.
+- Employer product: `enterprise-v2.js`, `enterprise-v2.css`, Worker enterprise routes, report routes, public evidence and credential verification.
+- Security/data: `v2/worker-v2-phase1-release.js`, `firestore.rules`, `firebase.json`, `wrangler.jsonc`, migrations 012–018 and D1 release tooling.
+- Accessibility/responsive UI: `styles.css`, `accessibility-fixes.css`, `training-tracks.css`, learner/employer mobile styles and `index.html` cache generations.
+- Release automation: 17 current GitHub workflows, audited Pages/Worker packaging, live read-only gates, Firebase rules release and D1 preflight tooling.
+- Verification: 108 test files, including 85 dependency-free static audits and browser, live Firebase, live Firestore and authenticated Admin probes.
+- Evidence and go-to-market: Phase 2 architecture/security/demo documents, production captures and the complete `ads/` campaign package.
 
-The ad kit now contains three vertical H.264 masters, including dedicated 18.6-second learner and employer cuts assembled from real product UI. The campaign explicitly avoids customer/endorsement claims and labels synthetic case data.
+Compare: `https://github.com/SriBYJU/CapitalMastery/compare/abd7cf1...5cac606`
 
-## Remaining external production closure boundary
+## 3. Course architecture
 
-The intended Firestore rules are correct in source and compile in the release workflow. The owner-only `users/{uid}/progress/state` compatibility path works, and the complete live signup/name/reload/fresh-device lifecycle passes. The save path now also retries idempotently and verifies an already-committed document after ambiguous Firestore 5xx responses, closing the learner-facing failure observed during this release.
+The product now resolves each career through one track-aware course model:
 
-An additional disposable live rules probe on September 1 directly exercised both paths. The compatibility progress write passed, while the protected `users/{uid}` identity write returned `403 PERMISSION_DENIED`. The hardened verifier additionally proved progress cross-account isolation, anonymous denial, progress schema enforcement and successful removal of the disposable documents and both Firebase identities. User-root negative checks were denied as expected but remain independently uncertifiable until the owner-positive user-root write passes. This is explicit evidence that the checked-in protected-root rule has not yet been promoted to the live Firestore project; it is not an application-flow inference.
+1. Normalize local state and bind it to the active Firebase UID.
+2. Reconcile Firestore continuity data without allowing older state to erase newer completion.
+3. Hydrate D1-authoritative official attempts, simulations, program completion and credentials.
+4. Resolve each stage as `locked`, `available`, `in_progress`, `failed`, `passed` or `review`.
+5. Derive the exact next, review and failed-only retry destinations from the selected Career Skills or Professional Readiness sequence.
+6. Render tiles and enforce routes from the same access result.
 
-The exact checked-in rules compiled successfully in the GitHub Java 21 Firestore emulator, run `33529328549`. The fail-closed workflow then stopped at `Require Firebase deployment credential`, before any production mutation. A fresh authorization audit confirmed: Firebase CLI has no authorized accounts; Google Cloud CLI is not installed; Application Default Credentials are absent; no Firebase/Google credential environment variable is set; the GitHub repository has no secrets; the GitHub `production` environment has no secrets; and the Cloudflare Worker retains an opaque `ADMIN_UID` secret binding whose value is correctly not readable through the deployment surface.
+Locked stages remain available as clearly labeled read-only look-ahead. They expose no assessment controls and identify the missing prerequisite. The single Continue action resumes the exact next actionable stage. Passed work remains reviewable and cannot be accidentally repeated.
 
-The active Composio Firebase connector was also inspected. It exposes Firebase client-authentication operations only: public configuration lookup and user sign-in/token exchange when the caller already supplies provider, password, custom-token or refresh-token credentials. It exposes no Firestore-rules deployment or authorized-domain management operation and cannot manufacture the protected Admin identity. Its public-config call was independently replaced with a direct successful public project-config check after the connector request returned `403` for lacking established API consumer identity.
+## 4. Simulation architecture
 
-Formal evidence still requires a rules deployment/probe performed with a Firebase-authorized operator so the protected user-root fields can be certified independently of the compatibility path.
+All 16 careers now use the secure workday/workbench path instead of the old browser-scored practical quiz:
 
-The rules release cannot be completed from the present machine or GitHub configuration because all three authorization paths are absent:
+- realistic role, manager/client and assignment brief;
+- source packet or data-room material;
+- calculation, research, workbook, memo or decision work appropriate to the role;
+- material mid-assignment change;
+- dependent revision and QA;
+- evidence requirements and explicit acceptance criteria;
+- professional manager/reviewer handoff; and
+- Worker-side scoring with critical rubric floors.
 
-- Firebase CLI reports **no authorized accounts**.
-- The GitHub repository has no Firebase deployment secret.
-- The GitHub `production` environment has no Firebase deployment secret.
+Investment Banking is the flagship Project Northstar experience: Inbox, Data Room, Transaction Model, Trading Comps, Precedents, DCF, Management Update, Model QA, Client Takeaway and Associate Email. Every workbench step routes to the correct panel, explains its purpose, reports progress, exposes source files that open, preserves device drafts for seven days and automatically clears submitted drafts.
 
-Required one-time authorization: either sign the Firebase CLI into an account that can deploy rules to `capital-mastery26`, or add `FIREBASE_SERVICE_ACCOUNT_CAPITAL_MASTERY26` (preferred) / `FIREBASE_TOKEN` to the GitHub production environment. Then run **Firebase Firestore rules release** and require `tests/live-firestore-rules-probe.cjs` plus the disposable live Firebase lifecycle to pass.
+Admin Preview uses the same quality surface without mutating official progress. Employer assignments use the same engine with tenant and assignment context. Degraded legacy MCQ payloads are refused rather than silently presented as job simulations.
 
-No application-level permission can substitute for this Google/Firebase account authorization, and no secret should be committed to the repository.
+## 5. QA and account isolation
 
-Google-provider domain parity is now closed: the owner added `capitalmastery.pages.dev`, the public Firebase project configuration reports both production hosts, and live browser-origin probes opened the Google provider from each host. GitHub Pages remains the canonical primary; this configuration change only removes the secondary mirror's provider limitation.
+- QA progress is stored separately and requires a backend-verified Admin identity.
+- Local QA score/progress helpers fail closed for ordinary learners even if a flag is forged.
+- Admin simulation/credential previews cannot issue official credentials or mutate learner results.
+- Same-tab A→B account changes synchronously swap the app's in-memory state before the next render or save.
+- User A's saved snapshot remains unchanged when user B continues work in the same tab.
+- Credential-name confirmation is merge-only and survives reload/fresh-device hydration.
 
-## Additional privileged evidence boundary
+## 6. Assessment review and final integrity
 
-The underlying production D1 database has already passed the audited integrity preflight. The deployed Worker now advertises exact-target synthetic cleanup, rejects every non-`demo_org_` cleanup target, and supports idempotent closure-probe creation. `tests/live-admin-closure-probe.cjs` verifies the protected identity, pre/during/post D1 integrity, a deterministic three-learner tenant, retry reuse, learner-state transition, permission evidence, exact cleanup and preservation of every pre-existing demo tenant. It refuses to create data unless the targeted-cleanup capability is present and computes the deterministic cleanup target before its first create request.
+- No attempt means `Not attempted`; there is no inherited or synthetic 90% score.
+- Passed assessments are permanently read-only.
+- Review shows the original prompt, submitted answer, correctness, correct answer, rationale, score and date where available.
+- Review creates no new attempt and cannot change credentials.
+- Failed attempts preserve answer review and expose one explicit retry action.
+- Only post-submission, owner-scoped Worker responses include answer/rationale data.
+- The Professional Readiness Final uses one prerequisite resolver, one route owner and D1-authoritative attempt evidence.
 
-Executing that probe still requires a fresh Firebase ID token whose UID matches the opaque production `ADMIN_UID`. That identity is not available on the present machine and cannot be fabricated with a normal learner account; the deployed Worker correctly rejects that escalation.
+## 7. Track routing
 
-Phase 2 production behavior, course integrity, both public mirrors and disposable-account release gates are green. Formal closure remains withheld until the live Firestore rules probe and the remaining privileged administrator verification are performed with real authorized credentials.
+Career Skills and Professional Readiness are distinct programs with centrally defined sequences and credential semantics.
+
+- Career Skills proceeds from Part 5 into the secure career capstone and portable Career Skills completion evidence.
+- Professional Readiness proceeds into the deeper Role Lab/change-control/reviewer pathway and separate final gate.
+- Review, Continue and Retake are never interchangeable.
+- Repeated auth events, refresh, Back navigation and lesson review preserve a completed assessment and move forward correctly.
+- Employer assignment status is scoped to the exact program and assignment; portable learner evidence cannot falsely satisfy firm-specific completion.
+
+## 8. Test results
+
+Final local release candidate results:
+
+- **85 / 85 static audit files PASS**.
+- **Pages production bundle PASS**: allowlisted frontend only, pre-router Admin guard, baseline security headers and no backend/test publication.
+- **Failure-seeking browser torture PASS**.
+- **Adversarial chaos browser PASS**: malformed deep links, delayed/out-of-order responses, rapid route and program switching, corrupted storage, forged QA flags, reload and render-loop settlement.
+- **Visual contrast PASS**: 10 major routes at all six required responsive widths.
+- **Course continuity PASS**: permanent pass, Back/refresh, cross-device hydration, no forced retake and exact resume.
+- **Assessment state PASS**: saved pass/failure review, previous answers, failed-only retry and locked direct-route controls withheld.
+- **Legacy simulation refusal PASS**.
+- **Admin zero-exposure and simulation race PASS**.
+- **Program completion verification PASS**.
+- **Employer invitation lifecycle, public walkthrough and role matrix PASS**.
+- **IB workbench navigation/guidance PASS**.
+- **Learner guide mobile PASS**.
+- **State resilience and same-tab account switch PASS**.
+
+## 9. All-career result
+
+The browser sweep passed **16 careers × both programs × six release widths**:
+
+Investment Banking, Private Equity, Venture Capital, Equity Research, Asset Management, Hedge Funds, Sales & Trading, Quantitative Finance, Private Credit, Corporate Banking, Corporate Development, FP&A, Treasury, Wealth Management, Risk Management and Real Estate Finance.
+
+The content audits additionally require each career to have differentiated source material, professional work products, a role-specific changing-information event and a manager handoff. The 15 non-IB careers cannot fall back to IB-flavored generic tasks.
+
+## 10. Responsive, mobile and accessibility result
+
+The permanent browser matrix now covers the exact requested widths:
+
+- 320 × 568
+- 375 × 812
+- 430 × 932
+- 768 × 1024
+- 1024 × 768
+- 1440 × 900/1000
+
+The sweep checks global overflow, course program controls, career pages, learner guide panels, employer public surfaces and high-mutation routes. Workbook-like surfaces retain their structure inside controlled horizontal scrolling regions. Keyboard-native program controls, focusable forms, labels, status semantics, reduced motion and text contrast are regression-gated. This is an implementation-backed accessibility posture, not a third-party WCAG certification claim.
+
+## 11. Employer, Firm Layer and RBAC result
+
+- Owner, Admin, Content Admin, Manager, Reviewer and Viewer behaviors are server-enforced and reflected by the UI.
+- Direct-route privilege escalation and cross-tenant identifiers fail closed.
+- Manager review can inspect appropriate learner evidence, request revision and record final status.
+- Readiness reports answer what the learner did, what evidence exists, where revision occurred, the current level and remaining development needs.
+- Employer invitations bind the exact email and use a guided learner sign-in/acceptance flow.
+- Standard curriculum remains portable and separate from tenant-scoped Firm Layer content.
+- Firm Layer supports active, hidden, archived, restored and version-history behavior; ordinary UI does not center irreversible deletion.
+- CSV exports neutralize spreadsheet formula injection.
+- Notifications cover assignment, review, revision, completion and credential actions without relying on a hidden course-only screen.
+- The Admin synthetic lifecycle created a three-learner revision cohort, changed one learner to Ready/Complete, verified the report and permission matrix, and removed every synthetic workspace afterward.
+
+## 12. Production result
+
+- GitHub Pages is the canonical primary and deploys automatically from `main`.
+- Frontend release `5cac6069c0841f7d63a330320cf4b537044e74b3` contains the final six-width fixes and cache generation `20260902-mobile3201`.
+- Worker source `0a0d9c9bfa07015f1dc346b53b723a81b967881c` is deployed as version `199ee0bd-7fc6-4dc7-a85e-75a324519666`.
+- Live Admin identity was verified against the configured opaque `ADMIN_UID`.
+- The authenticated Admin integrity panel reports `D1 integrity verified`, `quick_check` passing, zero foreign-key violations and 37 inspected production tables.
+- Independent direct D1 execution returned `quick_check = ok`, an empty foreign-key violation result, `rows_written = 0` and `changed_db = false`.
+- Production reports zero remaining synthetic demo workspaces.
+- Firestore rules were deployed to `capital-mastery26`; the live probe passed owner writes, cross-account denial, anonymous denial, schema enforcement and cleanup.
+- A disposable Firebase signup/name/reload/fresh-device/delete lifecycle passed and removed its test identity/data.
+- Both `sribyju.github.io` and `capitalmastery.pages.dev` are authorized Firebase domains; GitHub Pages remains canonical.
+
+Exact-release GitHub workflows for `5cac606`:
+
+- Pages build and deployment: `33579920405`
+- Package audited Pages release: `33579921609`
+- Failure-seeking audit round 2: `33579921598`
+- Live production read-only audit: `33579921614`
+- GitHub Pages live read-only audit: `33579921517`
+- Deployable encoding audit: `33579921547`
+
+All six workflows completed successfully. Live production run `33579921614` passed on attempt 2: attempt 1 started while one GitHub Pages edge still served the older stylesheet and reported the now-fixed 320px overflow, while the later tests in that same run already saw the new asset. The exact live stylesheet generation was then verified directly, the production torture audit passed, and the complete workflow rerun passed after propagation.
+
+Worker package and runtime release workflows for `0a0d9c9` completed successfully, including audited Worker packaging, failure-seeking round 2 and both live read-only audits.
+
+## 13. External blockers and honest boundaries
+
+There are **no remaining owner-controlled deployment blockers** for this release. Firebase CLI authorization, live Firestore rules, both Firebase authorized domains, the verified production Admin identity, Worker deployment and D1 integrity have all been closed.
+
+Remaining work is operational rather than a hidden release defect:
+
+- Formal penetration testing, accessibility certification and large-cohort load testing require independent programs if the company chooses to claim them.
+- Firm names appear only as source-linked public benchmarks with an explicit no-affiliation/no-endorsement disclosure. Third-party logos were not added; that avoids implying a relationship and avoids unnecessary trademark risk without written brand permission.
+- Real customer adoption, time-to-productivity impact and hiring outcomes must not be claimed until measured.
+
+## Campaign and final polish
+
+The repository contains a complete production-based campaign kit:
+
+- `capital-mastery-15s.mp4`
+- `capital-mastery-learner-work-19s.mp4`
+- `capital-mastery-employer-readiness-19s.mp4`
+- three static ad formats;
+- editable 1080 × 1920 campaign frames;
+- production source captures, storyboard and deterministic render scripts.
+
+All videos are H.264 vertical masters built from real product UI. Campaign copy is limited to implemented product claims and avoids adoption, endorsement, accreditation, regulatory approval or guaranteed-outcome language.
+
+## Final status
+
+The original P0 course defects, P1 architecture defects, course/simulation realism requirements, learner/employer guidance, RBAC/security gates, all-career/browser/mobile coverage and owner-controlled production closure steps are complete. The canonical product is ready to publish and demonstrate with the evidence and claim boundaries above.

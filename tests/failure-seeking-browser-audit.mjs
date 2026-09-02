@@ -109,8 +109,16 @@ async function mutationCount(page,duration=700) {
 }
 
 async function assertNoOverflow(page,label) {
-  const metrics=await page.evaluate(()=>({innerWidth:window.innerWidth,doc:document.documentElement.scrollWidth,body:document.body.scrollWidth}));
-  assert(Math.max(metrics.doc,metrics.body)<=metrics.innerWidth+2,`${label}: horizontal overflow ${Math.max(metrics.doc,metrics.body)}px > ${metrics.innerWidth}px`);
+  const metrics=await page.evaluate(()=>{
+    const innerWidth=window.innerWidth;
+    const offenders=[...document.querySelectorAll('body *')].flatMap(el=>{
+      const rect=el.getBoundingClientRect();
+      if(rect.width<1||rect.height<1||rect.right<=innerWidth+2)return [];
+      return [{tag:el.tagName.toLowerCase(),id:el.id||'',className:String(el.className||'').slice(0,100),left:Math.round(rect.left),right:Math.round(rect.right),width:Math.round(rect.width),text:(el.textContent||'').trim().replace(/\s+/g,' ').slice(0,80)}];
+    }).slice(0,8);
+    return {innerWidth,doc:document.documentElement.scrollWidth,body:document.body.scrollWidth,offenders};
+  });
+  assert(Math.max(metrics.doc,metrics.body)<=metrics.innerWidth+2,`${label}: horizontal overflow ${Math.max(metrics.doc,metrics.body)}px > ${metrics.innerWidth}px; offenders=${JSON.stringify(metrics.offenders)}`);
 }
 
 async function assertTrackUi(page) {
