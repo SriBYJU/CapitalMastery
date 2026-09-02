@@ -103,9 +103,11 @@ function assessmentPayload(){return {ok:true,pathway:{id:'investment-banking',ti
     assert(assessmentGets===getsAfterPass,'Clicking Next/Continue after reviewing a passed lesson must not reopen the quiz');
 
     await page.evaluate(()=>{location.hash='#/learn/investment-banking/5';});
-    await page.waitForSelector('[data-cm-review-passed]',{timeout:10000});
-    await page.locator('[data-cm-review-passed]').first().click();
-    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:10000});
+    await page.waitForSelector('.lesson-actions',{timeout:10000});
+    const reviewPassed=page.getByRole('link',{name:/Review passed knowledge check/}).first();
+    await reviewPassed.waitFor({state:'visible',timeout:15000});
+    await reviewPassed.click();
+    await page.waitForSelector('.cm-server-assessment-review .cm-review-item',{timeout:15000});
     assert(await page.locator('#cm-official-form').count()===0,'Reviewing an already-passed assessment should not silently open a blank quiz');
     const savedPassReviewText=await page.locator('.cm-server-assessment-review').innerText();
     assert(/90%/.test(savedPassReviewText),`Saved-pass review did not preserve best score: ${JSON.stringify(savedPassReviewText.slice(0,800))}`);
