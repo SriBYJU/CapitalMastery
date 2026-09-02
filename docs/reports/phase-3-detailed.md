@@ -4,7 +4,7 @@
 
 Phase 3 implemented the project-level assurance controls that are valuable now and available at zero additional cost. It deliberately did not manufacture paperwork that would be meaningless for an unregistered project or imply that an external auditor, security firm, lawyer or customer identity provider had approved the product.
 
-The implementation checkpoint is `b02255fc1b719b31a4cc81a5aeda3ca0fbd92753`, dated September 2, 2026.
+The assurance implementation checkpoint is `b02255fc1b719b31a4cc81a5aeda3ca0fbd92753`, dated September 2, 2026. The final application candidate is `16b0bd2c59ba3939f9935b4e40311227e9925736`. That candidate also separates passed-assessment Continue and Review actions at first paint and makes the Continue destination program-aware before any asynchronous enhancement runs.
 
 ## Browser and supply-chain hardening
 
@@ -57,12 +57,30 @@ Read-only production inspection on September 2 reported 37 D1 tables, `PRAGMA qu
 - In-app browser signed-out learning-gate naming, focus entry, Escape and focus return: PASS.
 - Primary production health/security monitor: PASS, 7 / 7 checks.
 - Mirror production health/security monitor: PASS, 7 / 7 checks.
-- Bounded live static-shell run: 24 / 24, p95 79 ms.
-- Bounded live Worker/D1 health run: 24 / 24, p95 156 ms.
+- Bounded live static-shell run: 24 / 24, p50 13 ms, p95 60 ms and p99 131 ms.
+- Bounded live Worker/D1 health run: 24 / 24, p50 83 ms, p95 495 ms and p99 495 ms.
 - Worker deployment version: `8e290984-631f-4975-b37e-12a5103aa2b6`.
-- Cloudflare Pages deployment preview: `https://2b7008b1.capitalmastery.pages.dev` promoted to the main mirror.
+- Cloudflare Pages deployment preview: `https://12ec6f03.capitalmastery.pages.dev` promoted to the main mirror.
 
-Exact GitHub workflow run IDs for this checkpoint are appended after the full release matrix completes.
+## Exact release evidence
+
+All of the following completed successfully against application candidate `16b0bd2c59ba3939f9935b4e40311227e9925736`:
+
+- GitHub Pages build and deployment: [33653905193](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653905193).
+- Audited Pages package: [33653906508](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906508).
+- Deployable encoding audit: [33653906070](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906070).
+- Course assessment-state validation: [33653906066](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906066).
+- Firm-ready workbench validation: [33653906078](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906078).
+- Full firm-ready course validation: [33653906352](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906352).
+- GitHub Pages nineteen-suite live browser matrix: [33653906156](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906156).
+- Failure-seeking static and browser audit: [33653906193](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906193).
+- Live production frontend/Worker/browser audit: [33653906283](https://github.com/SriBYJU/CapitalMastery/actions/runs/33653906283).
+- Real Firebase provider-safety and disposable email/password lifecycle: [33654669325](https://github.com/SriBYJU/CapitalMastery/actions/runs/33654669325).
+- Production availability/security monitor: [33654672077](https://github.com/SriBYJU/CapitalMastery/actions/runs/33654672077).
+- Bounded read-only resilience check: [33654674878](https://github.com/SriBYJU/CapitalMastery/actions/runs/33654674878).
+- Audited Worker package: [33654835075](https://github.com/SriBYJU/CapitalMastery/actions/runs/33654835075).
+
+The primary and mirror each passed the seven-check health/security monitor after deployment. The exact course pass-continuity browser scenario also passed directly against both live origins.
 
 ## Claim boundary
 

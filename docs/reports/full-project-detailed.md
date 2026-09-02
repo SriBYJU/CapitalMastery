@@ -27,6 +27,8 @@ Course navigation is deterministic. Each stage has one state and one valid next 
 
 Passed assessments cannot be retaken or overwritten. Learners can review the question, submitted answer, correctness, permitted correct answer/rationale, score and date. Failed attempts remain reviewable and receive an explicit retry route. Official answer keys and critical grading rules remain server-side until the allowed post-submission response.
 
+The final release removes a timing-sensitive passed-assessment transition: Continue and Review are separate on the core first render, and the Continue target is program-aware before enhancement scripts finish. Professional Readiness proceeds to Role Lab; Career Skills proceeds to its practical capstone.
+
 ## 4. Applied work and simulations
 
 All careers include role-native work rather than relying on renamed multiple-choice quizzes. The workbench design combines a manager/client brief, source files, calculations or research, a realistic deliverable, a material update, QA/revision and a final handoff. Scoring requires overall quality plus critical work-product and communication floors.
@@ -69,7 +71,7 @@ The product includes keyboard focus states, reduced-motion handling, labeled con
 
 ## 8. Release and operational quality
 
-The current source passes 88 dependency-free static audit files. Broader release evidence includes 16 careers × two programs × six widths, hostile deep links, corrupted state, delayed/out-of-order responses, account switching, permanent assessment review, no-skip/resume behavior, legacy simulation refusal, employer invitation/role tests and live production probes.
+The current source passes 88 dependency-free static audit files. Broader release evidence includes 16 careers × two programs × six widths, hostile deep links, corrupted state, delayed/out-of-order responses, account switching, permanent assessment review, no-skip/resume behavior, legacy simulation refusal, employer invitation/role tests and live production probes. The final application candidate is `16b0bd2c59ba3939f9935b4e40311227e9925736`.
 
 The production build publishes only allowlisted frontend files. Worker code, migrations, tests, internal documentation and configuration are excluded. GitHub Actions package exact candidates, run static/browser/live gates and deploy GitHub Pages from main. Cloudflare deployment remains explicit and independently verifiable.
 
@@ -79,7 +81,7 @@ Daily zero-cost monitoring checks public availability and security boundaries. W
 
 - **Phase 1 (`abd7cf1`):** Enterprise Core, production backend and complete Investment Banking reference pathway.
 - **Phase 2 (`2ce85e7`):** all-career/two-program course and workbench expansion, progression repair, employer closure, responsive/contrast coverage, owner-controlled Firebase/Admin/D1 closure and campaign assets.
-- **Phase 3 (`b02255f`):** zero-cost CSP/SRI/API hardening, keyboard dialog completion, monitoring, resilience, threat model, recovery and incident readiness.
+- **Phase 3 (`b02255f`):** zero-cost CSP/SRI/API hardening, keyboard dialog completion, monitoring, resilience, threat model, recovery and incident readiness. Final application candidate `16b0bd2` adds the course first-paint continuity repair.
 
 ## 10. Current readiness decision
 
@@ -92,3 +94,5 @@ It should not yet be presented as independently penetration-tested, SOC 2 audite
 Run a small, consent-based pilot using synthetic or low-risk content. Measure where learners hesitate, which tasks require manager explanation, whether invitations and resume work across real devices, and whether readiness reports answer employer questions. Record defects separately from desired features and keep marketing claims tied to observed evidence.
 
 Supporting material: [report index](README.md), [Phase 2 production evidence](../release-evidence/phase2-status-2026-09-01.md), [security policy](../../SECURITY.md), [deployment runbook](../deployment-runbook.md) and [zero-cost operations pack](../operations/README.md).
+
+Exact Phase 3 workflow runs, deployment identifiers and measured resilience results are recorded in the [Phase 3 detailed report](phase-3-detailed.md).

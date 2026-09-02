@@ -1,7 +1,11 @@
 # Phase 3 — Simple Report
 
-**Status:** Complete  
-**Implementation checkpoint:** `b02255fc1b719b31a4cc81a5aeda3ca0fbd92753`  
+**Status:** Complete
+
+**Assurance checkpoint:** `b02255fc1b719b31a4cc81a5aeda3ca0fbd92753`
+
+**Final application candidate:** `16b0bd2c59ba3939f9935b4e40311227e9925736`
+
 **Completed:** September 2, 2026
 
 ## What Phase 3 added
@@ -16,12 +20,13 @@ Phase 3 implemented the useful assurance work that can be done now for free, wit
 - Added a permanent keyboard/accessibility browser audit.
 - Added daily production health/security monitoring and a capped weekly read-only resilience check.
 - Documented a free D1/Git recovery process, incident response, threat model and operating limits.
+- Removed a passed-assessment first-paint race by giving Continue and read-only Review separate controls and making the next destination program-aware immediately.
 
 ## What was proven
 
-The final reported source passed all 88 dependency-free static audit files, the Pages release bundle audit, Worker packaging dry run, real-browser signed-out dialog testing, live health/security checks on both frontends, production D1 integrity checks and a bounded 48-request live resilience run.
+The final application candidate passed all 88 dependency-free static audit files, course and workbench browser suites, a nineteen-suite live primary-site browser matrix, failure-seeking tests, Worker and Pages packaging, a real disposable Firebase account lifecycle, health/security checks on both frontends, production D1 integrity checks and a bounded 48-request live resilience run.
 
-The production Worker was deployed as version `8e290984-631f-4975-b37e-12a5103aa2b6`. Both GitHub Pages and the Cloudflare mirror received the hardened frontend generation.
+The production Worker was deployed as version `8e290984-631f-4975-b37e-12a5103aa2b6`. GitHub Pages and the Cloudflare mirror both received the final frontend; the mirror deployment preview is `https://12ec6f03.capitalmastery.pages.dev`. Exact workflow links are recorded in the detailed report.
 
 ## Cost and scope
 

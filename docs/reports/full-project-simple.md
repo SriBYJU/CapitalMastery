@@ -27,7 +27,7 @@ The platform includes 16 finance career pathways, two program depths, 80 five-le
 
 ## Quality and assurance
 
-The product has passed 88 current dependency-free static audit files, all-career/two-program/six-width browser coverage, hostile route/state tests, course continuity, account isolation, visual contrast, employer roles, Firebase/Firestore and production D1 checks. Phase 3 added CSP, SRI, stricter API inputs, keyboard dialogs, daily monitoring, bounded weekly resilience checks and recovery/incident documentation.
+The product has passed 88 current dependency-free static audit files, all-career/two-program/six-width browser coverage, a nineteen-suite live-primary browser matrix, hostile route/state tests, course continuity, account isolation, visual contrast, employer roles, a real disposable Firebase account lifecycle and production D1 checks. Phase 3 added CSP, SRI, stricter API inputs, keyboard dialogs, daily monitoring, bounded weekly resilience checks, recovery/incident documentation and a final first-paint repair that keeps passed-assessment Continue and Review behavior deterministic.
 
 ## Bottom line
 
