@@ -52,7 +52,9 @@ The Career Skills Program can produce a printable/shareable program-completion c
 ## System architecture
 
 ```text
-Cloudflare Pages frontend
+GitHub Pages canonical frontend
+        │
+        ├── Cloudflare Pages mirror
         │
         ├── Firebase Authentication
         │
@@ -90,11 +92,13 @@ Workspace permissions are separated across Owner, Training Admin, Content Manage
 
 Start here for technical or firm review:
 
-- [`docs/phase2-release-audit.md`](docs/phase2-release-audit.md) — authoritative current release evidence, audited artifact IDs and unresolved live blockers
+- [`docs/reports/README.md`](docs/reports/README.md) — simple and detailed reports for every phase plus the full project
+- [`docs/release-evidence/phase2-status-2026-09-01.md`](docs/release-evidence/phase2-status-2026-09-01.md) — final Phase 2 production evidence and audited artifact IDs
 - [`docs/training-track-standard.md`](docs/training-track-standard.md) — Career Skills / Professional Readiness product contract and no-repeat stacking rules
 - [`docs/credential-system.md`](docs/credential-system.md) — five-level Standard 2.0 credential architecture and program-completion distinction
 - [`SECURITY.md`](SECURITY.md) — implemented security boundaries, release checks and claim limits
 - [`docs/deployment-runbook.md`](docs/deployment-runbook.md) — guarded Cloudflare promotion, live validation and rollback procedure
+- [`docs/operations/README.md`](docs/operations/README.md) — zero-cost threat model, monitoring, recovery and incident response
 
 Architecture and security detail:
 
@@ -132,17 +136,18 @@ Phase 2 uses separate source, browser and live-production gates rather than trea
 Key automated gates include:
 
 - Worker and frontend syntax validation
-- all dependency-free regression audits
+- all **88 dependency-free regression audits**
 - D1 integrity-route contract
 - production Pages allowlist / security-header bundle audit
 - state-resilience Chromium testing
 - failure-seeking browser torture testing
 - learner-guide mobile testing
-- **16 careers × both tracks × 4 release widths**
+- **16 careers × both tracks × 6 release widths**
 - employer public walkthrough / calculator testing
+- keyboard/dialog accessibility and ten-route contrast testing
 - **Owner / Training Admin / Content Manager / Manager / Viewer** browser role-matrix testing
 
-The exact current evidence, artifact identifiers and unresolved live blockers are recorded in [`docs/phase2-release-audit.md`](docs/phase2-release-audit.md). Do not infer production completion from a green source build alone.
+The exact Phase 2 evidence and artifact identifiers are recorded in [`docs/release-evidence/phase2-status-2026-09-01.md`](docs/release-evidence/phase2-status-2026-09-01.md). Current assurance work is summarized in [`docs/reports/phase-3-detailed.md`](docs/reports/phase-3-detailed.md). Do not infer production completion from a green source build alone.
 
 ## Production build
 

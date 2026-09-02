@@ -95,7 +95,7 @@ function signedOutAuthStub() {
       const guestPage = await guestContext.newPage();
       await guestPage.goto(`${BASE}/#/`, { waitUntil:'domcontentloaded', timeout:30000 });
       await guestPage.waitForSelector('#app main#main', { timeout:15000 });
-      const learningOpener = guestPage.locator('.nav-primary a[href="#/careers"]').first();
+      const learningOpener = guestPage.getByRole('navigation', { name:'Primary' }).getByRole('link', { name:'Careers', exact:true }).first();
       await learningOpener.click();
       const learningGate = guestPage.locator('#cm-learning-gate [role="dialog"]');
       await learningGate.waitFor({ state:'visible', timeout:3000 });
