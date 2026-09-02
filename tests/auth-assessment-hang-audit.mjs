@@ -17,6 +17,7 @@ ok(auth.includes('id="cm-enable-password-form"')&&auth.includes('Enable password
 ok(auth.includes("providers.has('google.com')")&&auth.includes("providers.has('password')"),'Account UI must report linked Google and password providers independently');
 ok(auth.includes("script.src = 'https://accounts.google.com/gsi/client'")&&auth.includes('googleIdentity.renderButton'),'Official Google Identity Services must be the primary Google sign-in surface');
 ok(auth.includes('GoogleAuthProvider.credential(idToken)')&&auth.includes('signInWithCredential(auth, credential)'),'Direct Google ID tokens must be exchanged through Firebase without cross-origin helper storage');
+ok(auth.includes("initTokenClient")&&auth.includes("requestAccessToken({ prompt:'select_account' })")&&auth.includes('GoogleAuthProvider.credential(null, accessToken)'),'Users must have a direct Google account chooser that bypasses Firebase cross-origin helper storage');
 ok(live.includes('waitForAuthReady'),'assessment route must have auth watchdog');
 ok(live.includes('cm-auth-retry'),'assessment timeout must expose retry action');
 ok(live.includes("setTimeout(() => route(), 250)"),'assessment route must automatically retry while auth initializes');

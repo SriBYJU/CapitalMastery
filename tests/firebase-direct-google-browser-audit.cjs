@@ -13,13 +13,13 @@ export function initializeApp(config){const app={config};apps.push(app);return a
 const authModule = `
 const auth={currentUser:null};
 let listener=null;
-window.__cmDirectGoogleProbe={firebaseExchanges:0,idToken:'',uid:''};
+window.__cmDirectGoogleProbe={firebaseExchanges:0,idToken:'',accessToken:'',uid:''};
 export const browserLocalPersistence={kind:'local'};
 export const browserSessionPersistence={kind:'session'};
 export function getAuth(){return auth;}
 export class GoogleAuthProvider{
   setCustomParameters(value){this.parameters=value;}
-  static credential(idToken){return{providerId:'google.com',idToken};}
+  static credential(idToken,accessToken){return{providerId:'google.com',idToken,accessToken};}
 }
 export class EmailAuthProvider{static credential(email,password){return{providerId:'password',email,password};}}
 export async function getRedirectResult(){return null;}
@@ -27,6 +27,7 @@ export function onAuthStateChanged(_auth,callback){listener=callback;setTimeout(
 export async function signInWithCredential(_auth,credential){
   window.__cmDirectGoogleProbe.firebaseExchanges++;
   window.__cmDirectGoogleProbe.idToken=credential.idToken;
+  window.__cmDirectGoogleProbe.accessToken=credential.accessToken;
   const user={uid:'direct-google-admin-uid',email:'admin@example.invalid',displayName:'Direct Google Admin',providerData:[{providerId:'google.com'}],getIdToken:async()=> 'mock-firebase-token',reload:async()=>{}};
   window.__cmDirectGoogleProbe.uid=user.uid;
   auth.currentUser=user;
@@ -46,11 +47,14 @@ export async function deleteUser(){}
 `;
 
 const googleIdentityModule = `
-window.__cmGoogleIdentityProbe={initialized:0,rendered:0,clientId:'',configuration:null};
+window.__cmGoogleIdentityProbe={initialized:0,rendered:0,clientId:'',configuration:null,tokenClient:0,requestedPrompt:''};
 let configuration=null;
+let tokenConfiguration=null;
 window.google={accounts:{id:{
   initialize(value){configuration=value;window.__cmGoogleIdentityProbe.initialized++;window.__cmGoogleIdentityProbe.clientId=value.client_id;window.__cmGoogleIdentityProbe.configuration={auto_select:value.auto_select,ux_mode:value.ux_mode};},
   renderButton(mount){window.__cmGoogleIdentityProbe.rendered++;const button=document.createElement('button');button.id='cm-direct-google-probe';button.type='button';button.textContent='Continue with Google';button.addEventListener('click',()=>configuration.callback({credential:'signed-google-id-token'}));mount.appendChild(button);}
+},oauth2:{
+  initTokenClient(value){tokenConfiguration=value;window.__cmGoogleIdentityProbe.tokenClient++;return{requestAccessToken(options){window.__cmGoogleIdentityProbe.requestedPrompt=options?.prompt||'';tokenConfiguration.callback({access_token:'signed-google-access-token'});}};}
 }}};
 `;
 
@@ -78,13 +82,15 @@ window.google={accounts:{id:{
     assert(initialized.clientId==='13730226275-bqn30lg5j96fm52k2387qojgthmrrbki.apps.googleusercontent.com','Google Identity Services used the wrong OAuth client');
     assert(initialized.configuration.auto_select===false&&initialized.configuration.ux_mode==='popup','Direct Google sign-in was not configured for explicit user choice');
 
-    await page.locator('#cm-direct-google-probe').click();
+    await page.locator('[data-cm-auth-action="google-choose"]').click();
     await page.waitForFunction(()=>window.CM_AUTH?.user?.uid==='direct-google-admin-uid'&&window.CM_AUTH?.isAdmin===true,null,{timeout:10000});
     const result=await page.evaluate(()=>({probe:window.__cmDirectGoogleProbe,uid:window.CM_AUTH.user?.uid,isAdmin:window.CM_AUTH.isAdmin}));
-    assert(result.probe.firebaseExchanges===1&&result.probe.idToken==='signed-google-id-token','Google ID token was not exchanged exactly once with Firebase');
+    assert(result.probe.firebaseExchanges===1&&result.probe.accessToken==='signed-google-access-token','Google access token was not exchanged exactly once with Firebase');
+    const chooser=await page.evaluate(()=>window.__cmGoogleIdentityProbe);
+    assert(chooser.tokenClient===1&&chooser.requestedPrompt==='select_account','Google account chooser did not explicitly require account selection');
     assert(result.uid==='direct-google-admin-uid'&&result.isAdmin===true,'Direct Google sign-in did not establish the verified administrator identity');
     assert(errors.length===0,`Direct Google browser errors: ${errors.join(' | ')}`);
-    console.log('FIREBASE DIRECT GOOGLE BROWSER AUDIT PASS: official Google ID token exchanged directly for the verified Firebase administrator identity');
+    console.log('FIREBASE DIRECT GOOGLE BROWSER AUDIT PASS: explicit Google account chooser token exchanged directly for the verified Firebase administrator identity');
   }finally{
     await context.close();
     await browser.close();

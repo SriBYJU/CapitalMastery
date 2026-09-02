@@ -48,7 +48,7 @@ export async function deleteUser(){}
     page.on('pageerror',error=>errors.push(error.message));
     await page.goto(`${BASE.replace(/\/$/,'')}/#/login`,{waitUntil:'domcontentloaded',timeout:30000});
     await page.waitForFunction(()=>window.CM_AUTH?.ready===true,null,{timeout:15000});
-    await page.locator('[data-cm-auth-action="google"]').click();
+    await page.evaluate(()=>window.CM_AUTH.googleSignIn());
     await page.waitForFunction(()=>window.__cmAuthRecoveryProbe?.redirect===1,null,{timeout:10000});
     const google=await page.evaluate(()=>window.__cmAuthRecoveryProbe);
     assert(google.popup===1,'Google sign-in did not attempt the normal popup first');

@@ -15,6 +15,7 @@
   let googleAvailable = false;
   let googleIdentityLoad = null;
   let googleIdentityInitialized = false;
+  let googleTokenClient = null;
   const GOOGLE_REDIRECT_FALLBACK_CODES = new Set([
     'auth/internal-error',
     'auth/popup-blocked',
@@ -31,6 +32,8 @@
     googleAvailable: false,
     async googleSignIn() { throw new Error('Authentication is still loading.'); },
     async googleCredentialSignIn() { throw new Error('Authentication is still loading.'); },
+    async googleAccessTokenSignIn() { throw new Error('Authentication is still loading.'); },
+    async googleChooseAccount() { throw new Error('Authentication is still loading.'); },
     async emailSignIn() { throw new Error('Authentication is still loading.'); },
     async emailCreate() { throw new Error('Authentication is still loading.'); },
     async enablePassword() { throw new Error('Authentication is still loading.'); },
@@ -133,6 +136,33 @@
     return googleIdentityLoad;
   }
 
+  function ensureGoogleTokenClient() {
+    if (googleTokenClient) return googleTokenClient;
+    const oauth = window.google?.accounts?.oauth2;
+    if (!oauth) throw new Error('Google account selection is unavailable. Try email and password instead.');
+    googleTokenClient = oauth.initTokenClient({
+      client_id: GOOGLE_CLIENT_ID,
+      scope: 'openid email profile',
+      prompt: 'select_account',
+      include_granted_scopes: true,
+      callback: response => {
+        if (response?.error || !response?.access_token) {
+          setMessage(response?.error_description || 'Google account selection did not complete. Try again.', 'bad');
+          return;
+        }
+        CM_AUTH.googleAccessTokenSignIn(response.access_token).catch(error => {
+          console.error('Capital Mastery Google access-token sign-in failed:', error);
+          setMessage(friendlyAuthMessage(error), 'bad');
+        });
+      },
+      error_callback: error => {
+        if (error?.type === 'popup_closed') setMessage('Google sign-in was closed. No account changes were made.');
+        else setMessage('Google could not open the account chooser. Try again or use email and password.', 'bad');
+      }
+    });
+    return googleTokenClient;
+  }
+
   async function renderGoogleIdentityButton() {
     const mount = document.getElementById('cm-google-identity');
     if (!mount || currentUser || !googleAvailable) return;
@@ -153,6 +183,7 @@
         });
         googleIdentityInitialized = true;
       }
+      ensureGoogleTokenClient();
       const liveMount = document.getElementById('cm-google-identity');
       if (!liveMount || liveMount.dataset.rendered === 'true') return;
       liveMount.replaceChildren();
@@ -211,6 +242,21 @@
         const credential = authApi.GoogleAuthProvider.credential(idToken);
         const result = await authApi.signInWithCredential(auth, credential);
         return result.user;
+      };
+
+      CM_AUTH.googleAccessTokenSignIn = async accessToken => {
+        if (!accessToken) throw new Error('Google did not return a secure access credential. Try again.');
+        setMessage('Completing secure Google sign-in…');
+        const credential = authApi.GoogleAuthProvider.credential(null, accessToken);
+        const result = await authApi.signInWithCredential(auth, credential);
+        return result.user;
+      };
+
+      CM_AUTH.googleChooseAccount = async () => {
+        if (!googleAvailable) throw new Error('Google sign-in is not available on this domain. Use secure email sign-in instead.');
+        await loadGoogleIdentityServices();
+        setMessage('Choose the Google account you want to use…');
+        ensureGoogleTokenClient().requestAccessToken({ prompt:'select_account' });
       };
 
       CM_AUTH.emailSignIn = async (email, password) => {
@@ -396,7 +442,7 @@
     }
 
     const googleEntry = googleAvailable
-      ? `<div id="cm-google-identity" class="cm-google-identity"><div class="cm-google-loading" role="status">Loading secure Google sign-in…</div></div><button class="cm-link-button cm-google-alternate" type="button" data-cm-auth-action="google">Use alternate Google sign-in</button><div class="cm-auth-divider"><span>or</span></div>`
+      ? `<div id="cm-google-identity" class="cm-google-identity" data-cm-google-provider="official"><div class="cm-google-loading" role="status">Loading secure Google sign-in…</div></div><button class="cm-link-button cm-google-alternate" type="button" data-cm-auth-action="google-choose" data-cm-google-provider="chooser">Choose another Google account</button><div class="cm-auth-divider"><span>or</span></div>`
       : `<div class="cm-auth-provider-note">Secure email sign-in is available on this site.</div>`;
 
     return `<section class="section"><div class="container" style="max-width:900px">
@@ -500,6 +546,7 @@
     try {
       button.disabled = true;
       if (action === 'google') await CM_AUTH.googleSignIn();
+      if (action === 'google-choose') await CM_AUTH.googleChooseAccount();
       if (action === 'signout') await CM_AUTH.signOut();
       if (action === 'delete-account') {
         const first = confirm('Permanently delete your Capital Mastery personal data, credentials, synced progress, memberships and Firebase account? This cannot be undone.');
