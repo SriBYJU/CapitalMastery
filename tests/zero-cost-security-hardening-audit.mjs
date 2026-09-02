@@ -58,7 +58,7 @@ ok(app.includes('<main id="main" tabindex="-1">'), 'SPA main landmark must be pr
 ok(app.includes('role="dialog" aria-modal="true" tabindex="-1"'), 'Shared dialog must expose modal semantics');
 ok(app.includes("if(e.key==='Escape')") && app.includes("if(e.key!=='Tab'||!panel)return"), 'Shared dialog must support Escape and trapped Tab navigation');
 ok(app.includes('modalReturnFocus?.isConnected'), 'Shared dialog must restore focus to its opener');
-ok(app.includes('data-cm-review-passed="true" data-cm-release-review="true"') && app.includes("assessmentPassed?'?review=1':''"), 'Passed-assessment review must be explicit in the first lesson render and cannot depend on an asynchronous enhancer');
+ok(app.includes('data-cm-passed-assessment="true"') && app.includes('data-cm-review-passed="true" data-cm-release-review="true"') && app.includes('assessmentReviewPath(c,n,false)'), 'Passed assessment Continue and read-only Review must be separate in the first lesson render and cannot depend on an asynchronous enhancer');
 ok(credentialName.includes('function activateDialog(') && credentialName.includes("event.key === 'Escape'") && credentialName.includes("event.key !== 'Tab'"), 'Account and credential-name dialogs must implement bounded keyboard navigation');
 ok(credentialName.includes('gateReturnFocus?.isConnected') && credentialName.includes('nameReturnFocus?.isConnected'), 'Account and credential-name dialogs must restore focus to their openers');
 for (const source of [index, liveWorkflow, firebaseWorkflow]) {

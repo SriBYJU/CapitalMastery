@@ -166,7 +166,7 @@
     if (r.root !== 'learn' || r.pathway !== pathway || Number(r.rawPart) !== Number(part) || best < PASS) return;
     const actions = document.querySelector('#app main#main .lesson-actions');
     if (!actions) return;
-    const quiz = actions.querySelector(`a[href^="#/quiz/${CSS.escape(pathway)}/${part}"]`) || actions.querySelector('a[href*="#/quiz/"]');
+    const quiz = actions.querySelector('[data-cm-passed-assessment]') || actions.querySelector(`a[href^="#/quiz/${CSS.escape(pathway)}/${part}"]:not([data-cm-review-passed])`) || actions.querySelector('a[href*="#/quiz/"]:not([data-cm-review-passed])');
     if (!quiz) return;
     quiz.dataset.cmPassedAssessment = 'true';
     quiz.dataset.cmBestScore = String(best);
