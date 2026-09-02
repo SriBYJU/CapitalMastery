@@ -4,6 +4,7 @@
   const API_URL = window.CAPITAL_MASTERY_API_URL;
   const CONFIG = window.CAPITAL_MASTERY_FIREBASE_CONFIG;
   const SDK = '12.18.0';
+  const GOOGLE_CLIENT_ID = '13730226275-bqn30lg5j96fm52k2387qojgthmrrbki.apps.googleusercontent.com';
 
   let auth = null;
   let authApi = null;
@@ -12,6 +13,8 @@
   let message = '';
   let messageType = '';
   let googleAvailable = false;
+  let googleIdentityLoad = null;
+  let googleIdentityInitialized = false;
   const GOOGLE_REDIRECT_FALLBACK_CODES = new Set([
     'auth/internal-error',
     'auth/popup-blocked',
@@ -27,6 +30,7 @@
     backendVerified: false,
     googleAvailable: false,
     async googleSignIn() { throw new Error('Authentication is still loading.'); },
+    async googleCredentialSignIn() { throw new Error('Authentication is still loading.'); },
     async emailSignIn() { throw new Error('Authentication is still loading.'); },
     async emailCreate() { throw new Error('Authentication is still loading.'); },
     async enablePassword() { throw new Error('Authentication is still loading.'); },
@@ -107,6 +111,68 @@
     }
   }
 
+  function loadGoogleIdentityServices() {
+    if (window.google?.accounts?.id) return Promise.resolve(window.google.accounts.id);
+    if (googleIdentityLoad) return googleIdentityLoad;
+    googleIdentityLoad = new Promise((resolve, reject) => {
+      const existing = document.getElementById('cm-google-identity-script');
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.google?.accounts?.id), { once:true });
+        existing.addEventListener('error', () => reject(new Error('Google sign-in could not load.')), { once:true });
+        return;
+      }
+      const script = document.createElement('script');
+      script.id = 'cm-google-identity-script';
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => window.google?.accounts?.id ? resolve(window.google.accounts.id) : reject(new Error('Google sign-in did not initialize.'));
+      script.onerror = () => reject(new Error('Google sign-in could not load.'));
+      document.head.appendChild(script);
+    });
+    return googleIdentityLoad;
+  }
+
+  async function renderGoogleIdentityButton() {
+    const mount = document.getElementById('cm-google-identity');
+    if (!mount || currentUser || !googleAvailable) return;
+    try {
+      const googleIdentity = await loadGoogleIdentityServices();
+      if (!document.getElementById('cm-google-identity') || currentUser) return;
+      if (!googleIdentityInitialized) {
+        googleIdentity.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          auto_select: false,
+          ux_mode: 'popup',
+          callback: response => {
+            CM_AUTH.googleCredentialSignIn(response?.credential).catch(error => {
+              console.error('Capital Mastery direct Google sign-in failed:', error);
+              setMessage(friendlyAuthMessage(error), 'bad');
+            });
+          }
+        });
+        googleIdentityInitialized = true;
+      }
+      const liveMount = document.getElementById('cm-google-identity');
+      if (!liveMount || liveMount.dataset.rendered === 'true') return;
+      liveMount.replaceChildren();
+      googleIdentity.renderButton(liveMount, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'rectangular',
+        logo_alignment: 'left',
+        width: Math.max(240, Math.min(400, Math.floor(liveMount.getBoundingClientRect().width || 360)))
+      });
+      liveMount.dataset.rendered = 'true';
+    } catch (error) {
+      console.warn('Capital Mastery official Google button unavailable; Firebase fallback remains available.', error);
+      const loading = mount.querySelector('.cm-google-loading');
+      if (loading) loading.textContent = 'Use alternate Google sign-in below.';
+    }
+  }
+
   async function boot() {
     if (!CONFIG) {
       console.error('Capital Mastery Firebase config is missing.');
@@ -137,6 +203,14 @@
           await authApi.signInWithRedirect(auth, provider);
           return null;
         }
+      };
+
+      CM_AUTH.googleCredentialSignIn = async idToken => {
+        if (!idToken) throw new Error('Google did not return a secure identity credential. Try again.');
+        setMessage('Completing secure Google sign-in…');
+        const credential = authApi.GoogleAuthProvider.credential(idToken);
+        const result = await authApi.signInWithCredential(auth, credential);
+        return result.user;
       };
 
       CM_AUTH.emailSignIn = async (email, password) => {
@@ -322,7 +396,7 @@
     }
 
     const googleEntry = googleAvailable
-      ? `<button class="btn btn-outline btn-block cm-google" type="button" data-cm-auth-action="google">Continue with Google</button><div class="cm-auth-divider"><span>or</span></div>`
+      ? `<div id="cm-google-identity" class="cm-google-identity"><div class="cm-google-loading" role="status">Loading secure Google sign-in…</div></div><button class="cm-link-button cm-google-alternate" type="button" data-cm-auth-action="google">Use alternate Google sign-in</button><div class="cm-auth-divider"><span>or</span></div>`
       : `<div class="cm-auth-provider-note">Secure email sign-in is available on this site.</div>`;
 
     return `<section class="section"><div class="container" style="max-width:900px">
@@ -384,6 +458,7 @@
       if (force || main.dataset.cmAuthView !== stamp) {
         main.dataset.cmAuthView = stamp;
         main.innerHTML = accountHtml();
+        queueMicrotask(() => renderGoogleIdentityButton());
       }
       return;
     }
@@ -409,7 +484,7 @@
       .cm-auth-form input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(185,138,67,.13)}
       .cm-auth-divider{display:flex;align-items:center;gap:12px;color:#8a929b;font-size:.8rem;margin:17px 0}.cm-auth-divider:before,.cm-auth-divider:after{content:"";height:1px;background:#e0e4e8;flex:1}
       .cm-auth-message{padding:11px 13px;border-radius:10px;background:#eef2f6;color:var(--navy);font-size:.88rem;margin:14px 0}.cm-auth-message.good{background:#eaf6ef;color:#245b43}.cm-auth-message.bad{background:#fff0f0;color:#8b3232}
-      .cm-google{background:white}.cm-auth-provider-note{padding:10px 12px;margin:12px 0;border:1px solid #d8e1e9;border-radius:10px;background:#f5f8fa;color:#46586a;font-size:.84rem}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 12px 0 0;text-decoration:underline;cursor:pointer}.cm-auth-method-note{margin:14px 0 0;color:#667482;font-size:.78rem;line-height:1.45}
+      .cm-google{background:white}.cm-google-identity{min-height:44px;display:flex;justify-content:center;align-items:center;margin-top:14px;overflow:hidden}.cm-google-identity>div,.cm-google-identity iframe{max-width:100%}.cm-google-loading{width:100%;padding:11px 13px;border:1px solid #d8e1e9;border-radius:8px;background:#fff;color:#53616f;text-align:center;font-size:.84rem}.cm-google-alternate{display:block;margin:2px auto 0;padding:8px;text-align:center;font-size:.76rem}.cm-auth-provider-note{padding:10px 12px;margin:12px 0;border:1px solid #d8e1e9;border-radius:10px;background:#f5f8fa;color:#46586a;font-size:.84rem}.cm-link-button{border:0;background:transparent;color:var(--navy-3);padding:10px 12px 0 0;text-decoration:underline;cursor:pointer}.cm-auth-method-note{margin:14px 0 0;color:#667482;font-size:.78rem;line-height:1.45}
       .cm-account-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:22px 0}.cm-account-grid>div{background:#f5f7f9;border:1px solid #e3e7eb;border-radius:12px;padding:14px}.cm-account-grid span{display:block;color:#77818d;font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800}.cm-account-grid strong{display:block;color:var(--navy);margin-top:5px;word-break:break-word}.cm-uid{font-size:.78rem}.cm-auth-actions{display:flex;flex-wrap:wrap;gap:10px}
       .cm-signin-methods{margin-top:22px;padding:17px;border:1px solid #dce3e9;background:#f8fafb;border-radius:12px}.cm-signin-methods-head b{color:var(--navy)}.cm-signin-methods-head p,.cm-enable-password-form p{margin:5px 0 0;color:#5f6d7a;font-size:.84rem;line-height:1.5}.cm-method-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.cm-method-status{background:#fff;border:1px solid #e0e5e9;border-radius:10px;padding:12px}.cm-method-status span{display:block;color:#77818d;font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;font-weight:800}.cm-method-status strong{display:block;color:var(--navy);margin-top:4px}.cm-enable-password-form{margin-top:16px;padding-top:16px;border-top:1px solid #dce3e9}.cm-enable-password-form p{margin:0 0 2px}.cm-enable-password-form p b{color:var(--navy)}
       .cm-account-privacy{margin-top:22px;padding:16px;border:1px solid #ead1d1;background:#fff8f8;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:16px}.cm-account-privacy b{color:#7d2727}.cm-account-privacy p{margin:5px 0 0;color:#6d6262;font-size:.82rem;line-height:1.45}.cm-account-privacy>div:last-child{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.btn-danger{background:#8b2f2f;color:#fff;border-color:#8b2f2f}.btn-danger:hover{background:#702626}

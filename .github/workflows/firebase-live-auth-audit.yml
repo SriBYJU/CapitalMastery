@@ -9,6 +9,7 @@ on:
       - 'tests/firebase-authorized-domain-browser-audit.cjs'
       - 'tests/firebase-internal-error-recovery-browser-audit.cjs'
       - 'tests/firebase-provider-linking-browser-audit.cjs'
+      - 'tests/firebase-direct-google-browser-audit.cjs'
       - 'tests/credential-name-root-persistence-audit.mjs'
       - 'firebase-auth.js'
       - 'firebase-config.js'
@@ -57,6 +58,7 @@ jobs:
           node --check tests/live-firebase-auth-browser-audit.cjs
           node --check tests/firebase-internal-error-recovery-browser-audit.cjs
           node --check tests/firebase-provider-linking-browser-audit.cjs
+          node --check tests/firebase-direct-google-browser-audit.cjs
           node tests/auth-assessment-hang-audit.mjs
           node tests/credential-name-root-persistence-audit.mjs
           node tests/deployable-encoding-audit.mjs
@@ -70,7 +72,7 @@ jobs:
             curl -fsS "https://sribyju.github.io/CapitalMastery/certificate-name.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-certificate-name.js || true
             curl -fsS "https://sribyju.github.io/CapitalMastery/firebase-sync.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-firebase-sync.js || true
             if grep -Fq 'certificate-name.js?v=20260902-a11ysecurity1' /tmp/live-index.html 2>/dev/null \
-              && grep -Fq 'firebase-auth.js?v=20260902-providerlink2' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'firebase-auth.js?v=20260902-directgoogle1' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'firebase-sync.js?v=20260831-phase2rc7' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'settleProgressAfterIdentity' /tmp/live-certificate-name.js 2>/dev/null \
               && grep -Fq 'verifiedAfterAmbiguousWrite' /tmp/live-certificate-name.js 2>/dev/null \
@@ -100,6 +102,7 @@ jobs:
           done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/firebase-internal-error-recovery-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/firebase-provider-linking-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/firebase-direct-google-browser-audit.cjs
 
       - name: Disposable real Firebase email/password lifecycle on live primary
         run: |
