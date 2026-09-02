@@ -24,7 +24,7 @@ export async function signInWithPopup(){window.__cmAuthRecoveryProbe.popup++;con
 export async function signInWithRedirect(){window.__cmAuthRecoveryProbe.redirect++;}
 export async function signOut(){window.__cmAuthRecoveryProbe.signOut++;auth.currentUser=null;listener?.(null);}
 export async function setPersistence(_auth,persistence){if(persistence===browserLocalPersistence)window.__cmAuthRecoveryProbe.localPersistence++;else window.__cmAuthRecoveryProbe.sessionPersistence++;}
-export async function signInWithEmailAndPassword(){window.__cmAuthRecoveryProbe.email++;if(window.__cmAuthRecoveryProbe.email===1){const error=new Error('Firebase: Error (auth/internal-error).');error.code='auth/internal-error';throw error;}return{user:{uid:'recovered-admin',email:'admin@example.invalid',displayName:'Recovered Admin',getIdToken:async()=> 'mock-token'}};}
+export async function signInWithEmailAndPassword(){window.__cmAuthRecoveryProbe.email++;if(window.__cmAuthRecoveryProbe.email===1){const error=new Error('Firebase: Error (auth/internal-error).');error.code='auth/internal-error';throw error;}if(window.__cmAuthRecoveryProbe.email===3){const error=new Error('Firebase: Error (auth/network-request-failed).');error.code='auth/network-request-failed';throw error;}return{user:{uid:'recovered-admin',email:'admin@example.invalid',displayName:'Recovered Admin',getIdToken:async()=> 'mock-token'}};}
 export async function createUserWithEmailAndPassword(){throw new Error('not used');}
 export async function updateProfile(){}
 export async function sendPasswordResetEmail(){}
@@ -62,8 +62,14 @@ export async function deleteUser(){}
     assert(email.uid==='recovered-admin','Email/password recovery did not return the authenticated user');
     assert(email.probe.email===2,'Email/password auth/internal-error did not receive exactly one retry');
     assert(email.probe.signOut>=2&&email.probe.localPersistence>=2,'Email/password recovery did not refresh the Firebase auth session');
+    const network=await page.evaluate(async()=>{
+      const user=await window.CM_AUTH.emailSignIn('admin@example.invalid','correct-password');
+      return {uid:user?.uid||'',probe:window.__cmAuthRecoveryProbe};
+    });
+    assert(network.uid==='recovered-admin','Transient network recovery did not return the authenticated user');
+    assert(network.probe.email===4,'Email/password network failure did not receive exactly one retry');
     assert(errors.length===0,`Firebase recovery browser errors: ${errors.join(' | ')}`);
-    console.log('FIREBASE INTERNAL-ERROR RECOVERY BROWSER AUDIT PASS: popup internal error falls back to same-tab redirect; email/password refreshes auth state and retries exactly once');
+    console.log('FIREBASE AUTH RECOVERY BROWSER AUDIT PASS: popup internal error falls back to same-tab redirect; email/password internal and transient network errors refresh auth and retry exactly once');
   }finally{
     await context.close();
     await browser.close();

@@ -18,6 +18,7 @@
     'auth/operation-not-supported-in-this-environment',
     'auth/web-storage-unsupported'
   ]);
+  const EMAIL_RETRY_CODES = new Set(['auth/internal-error', 'auth/network-request-failed']);
 
   const CM_AUTH = window.CM_AUTH = {
     ready: false,
@@ -144,7 +145,8 @@
           const result = await authApi.signInWithEmailAndPassword(auth, email, password);
           return result.user;
         } catch (error) {
-          if (error?.code !== 'auth/internal-error') throw error;
+          if (!EMAIL_RETRY_CODES.has(error?.code)) throw error;
+          setMessage('Refreshing the secure sign-in connection…');
           await repairAuthSession();
           await new Promise(resolve => setTimeout(resolve, 300));
           const result = await authApi.signInWithEmailAndPassword(auth, email, password);

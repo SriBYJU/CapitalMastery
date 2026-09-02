@@ -70,7 +70,7 @@ jobs:
             curl -fsS "https://sribyju.github.io/CapitalMastery/certificate-name.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-certificate-name.js || true
             curl -fsS "https://sribyju.github.io/CapitalMastery/firebase-sync.js?sha=${GITHUB_SHA}&attempt=${i}" -o /tmp/live-firebase-sync.js || true
             if grep -Fq 'certificate-name.js?v=20260902-a11ysecurity1' /tmp/live-index.html 2>/dev/null \
-              && grep -Fq 'firebase-auth.js?v=20260902-providerlink1' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'firebase-auth.js?v=20260902-providerlink2' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'firebase-sync.js?v=20260831-phase2rc7' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'settleProgressAfterIdentity' /tmp/live-certificate-name.js 2>/dev/null \
               && grep -Fq 'verifiedAfterAmbiguousWrite' /tmp/live-certificate-name.js 2>/dev/null \

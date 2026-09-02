@@ -8,7 +8,7 @@ ok(auth.includes('verifyWithWorker(user).then'),'backend role verification must 
 ok(auth.includes('AbortController'),'backend identity check must have timeout');
 ok(auth.includes("'auth/internal-error'")&&auth.includes('signInWithRedirect(auth, provider)'),'Google popup internal errors must fall back to same-tab redirect authentication');
 ok(auth.includes('getRedirectResult(auth)'),'Google redirect results must be completed after returning to Capital Mastery');
-ok(auth.includes("if (error?.code !== 'auth/internal-error') throw error")&&auth.includes('setTimeout(resolve, 300)'),'Email/password internal errors must receive one bounded retry');
+ok(auth.includes("const EMAIL_RETRY_CODES = new Set(['auth/internal-error', 'auth/network-request-failed'])")&&auth.includes('if (!EMAIL_RETRY_CODES.has(error?.code)) throw error')&&auth.includes('setTimeout(resolve, 300)'),'Email/password internal and transient network errors must receive one bounded retry');
 ok(auth.includes('function friendlyAuthMessage(error)'),'Firebase failures must render actionable recovery guidance');
 ok(auth.includes('async function repairAuthSession()')&&auth.includes('browserLocalPersistence')&&auth.includes('browserSessionPersistence'),'Internal auth recovery must refresh persistence with a session fallback');
 ok(auth.includes('data-cm-auth-action="repair"')&&auth.includes("Sign-in session refreshed."),'Signed-out users must have an explicit non-destructive sign-in session repair action');
