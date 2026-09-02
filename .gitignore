@@ -1,5 +1,7 @@
 dist-pages/
 node_modules/
 .wrangler/
+__pycache__/
+.tts-models/
 d1-production-preflight.json
 

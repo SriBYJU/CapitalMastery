@@ -1,5 +1,11 @@
 # Capital Mastery Video Ad Storyboard
 
+## After Effects-style dynamic campaign
+
+The dynamic campaign is a separate motion-graphics system rather than a screenshot slideshow. It uses kinetic type, animated interface components, formula entry, live model changes, review comments, readiness bars, evidence connections and audit events. Two 15-second vertical masters are delivered for learner and employer audiences, with silent and soothing female-voiceover versions.
+
+The visual reference is modern app/UI motion design: fast but controlled scene choreography, clean easing, restrained brand color, information appearing through interaction and a decisive final CTA. The production stays original to Capital Mastery and does not reproduce another creator's branded artwork.
+
 ## 15–17 second vertical cut
 
 1. **Hook — 0:00–0:02**  

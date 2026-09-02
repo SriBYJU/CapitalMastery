@@ -13,13 +13,21 @@ This folder contains ad-ready creative built from **real production UI screensho
 - `video/capital-mastery-15s.mp4` — ~17-second silent vertical master assembled from production screenshots.
 - `video/capital-mastery-learner-work-19s.mp4` — 18.6-second vertical learner cut: realistic work, source data, live updates, feedback and competency evidence.
 - `video/capital-mastery-employer-readiness-19s.mp4` — 18.6-second vertical employer cut: assignments, manager review, revision behavior, readiness reporting and audit history.
+- `video/capital-mastery-dynamic-learner-15s.mp4` — true-motion learner master with drawn UI animation and no screenshot scene plates.
+- `video/capital-mastery-dynamic-employer-15s.mp4` — true-motion employer master with animated assignment, review, readiness and audit flows.
+- `video/capital-mastery-dynamic-learner-15s-vo.mp4` — dynamic learner cut with a mastered, soothing female voiceover.
+- `video/capital-mastery-dynamic-employer-15s-vo.mp4` — dynamic employer cut with a mastered, soothing female voiceover.
+- `video/dynamic-ad-contact-sheet.png` — scene overview for both dynamic campaigns.
+- `video/build_dynamic_ads.py` — deterministic 30 fps motion-graphics renderer; requires only free local Pillow and FFmpeg tooling.
+- `video/build_neural_voiceovers.py` — local Kokoro neural speech renderer using the high-quality `af_bella` female voice.
+- `video/build_dynamic_voiceovers.ps1` — voice mastering and video-mux pipeline; no paid voice service or account is required.
 - `video/frames/01.png` through `08.png` — full-resolution 1080×1920 edit frames for Reels/Shorts/TikTok/vertical placements.
 - `video/campaign-frames/` — editable 1080×1920 frames for the learner and employer cuts.
 - `video/build_campaign_frames.py` — deterministic Pillow frame compositor using real product captures.
 - `video/render_campaigns.ps1` — FFmpeg 5+ renderer with subtle motion, crossfades, H.264/yuv420p output and fast-start metadata.
 - `video/storyboard.md` — 15-second and 30-second copy/shot guidance.
 
-All three MP4s are silent masters so platform-native audio, captions and voiceover can be added without removing an embedded track. The two campaign cuts are 1080×1920, 30 fps, H.264 High Profile and broadly compatible with vertical social placements.
+The three original MP4s remain silent masters. The dynamic campaign includes both silent and voiced versions. All delivery videos are 1080×1920, 30 fps, H.264 High Profile and broadly compatible with vertical social placements.
 
 ## Source screenshots
 
