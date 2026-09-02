@@ -28,8 +28,13 @@ ok(fs.existsSync(path.join(output, 'admin-route-guard.js')), 'Production bundle 
 ok(bundledGuardIndex >= 0 && bundledAppIndex >= 0 && bundledGuardIndex < bundledAppIndex, 'Production bundle must load admin-route-guard.js before app.js');
 
 const headers = fs.readFileSync(path.join(output, '_headers'), 'utf8');
-for (const control of ['X-Content-Type-Options: nosniff', 'X-Frame-Options: DENY', 'Permissions-Policy:', 'Strict-Transport-Security:']) {
+for (const control of ['X-Content-Type-Options: nosniff', 'X-Frame-Options: DENY', 'Permissions-Policy:', 'Strict-Transport-Security:', 'Content-Security-Policy:']) {
   ok(headers.includes(control), `Production response headers are missing ${control}`);
+}
+
+const csp = index.match(/<meta\s+http-equiv="Content-Security-Policy"\s+content="([^"]+)"/i)?.[1] || '';
+for (const directive of ["default-src 'self'", "base-uri 'self'", "object-src 'none'", "form-action 'self'", 'https://www.gstatic.com', 'https://cdn.jsdelivr.net', 'https://capital-mastery-api.avadhanula-shriyan.workers.dev']) {
+  ok(csp.includes(directive), `Primary-host CSP meta policy is missing ${directive}`);
 }
 
 ok(fs.existsSync(path.join(output, 'assets', 'seal.svg')), 'Credential seal must ship in the production asset set');

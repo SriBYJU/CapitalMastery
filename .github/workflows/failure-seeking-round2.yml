@@ -16,6 +16,8 @@ on:
       - 'tools/prepare-production-d1.mjs'
       - '.github/workflows/cloudflare-production-release.yml'
       - '.github/workflows/github-pages-live-readonly-audit.yml'
+      - '.github/workflows/zero-cost-production-monitor.yml'
+      - '.github/workflows/zero-cost-resilience-audit.yml'
       - '.github/workflows/failure-seeking-round2.yml'
   workflow_dispatch:
 
@@ -72,6 +74,9 @@ jobs:
           node --check tests/state-resilience-browser-audit.cjs
           node --check tests/course-pass-continuity-browser-audit.cjs
           node --check tests/course-no-skip-resume-browser-audit.cjs
+          node --check tests/accessibility-keyboard-browser-audit.cjs
+          node --check tests/production-health-monitor.cjs
+          node --check tests/zero-cost-load-resilience-audit.cjs
           node --check tests/live-firestore-rules-probe.cjs
           node --check tests/live-admin-closure-probe.cjs
 
@@ -145,3 +150,4 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-invite-lifecycle-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/accessibility-keyboard-browser-audit.cjs

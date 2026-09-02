@@ -12,6 +12,8 @@ on:
       - 'tests/enterprise-least-privilege-audit.mjs'
       - 'tests/account-deletion-audit.mjs'
       - 'tests/career-skills-five-level-boundary-audit.mjs'
+      - 'tests/zero-cost-security-hardening-audit.mjs'
+      - 'tests/recovery-readiness-audit.mjs'
       - '.github/workflows/package-worker-release.yml'
   workflow_dispatch:
 
@@ -36,6 +38,8 @@ jobs:
           node tests/enterprise-least-privilege-audit.mjs
           node tests/account-deletion-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
+          node tests/zero-cost-security-hardening-audit.mjs
+          node tests/recovery-readiness-audit.mjs
           sha256sum v2/worker-v2-phase1-release.js | tee worker-release-sha256.txt
 
       - name: Upload exact audited Worker source

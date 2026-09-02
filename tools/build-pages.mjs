@@ -45,6 +45,7 @@ await writeFile(path.join(outputRoot, '_headers'), `/*
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://cdn.jsdelivr.net; connect-src 'self' https://*.googleapis.com https://capital-mastery-api.avadhanula-shriyan.workers.dev; img-src 'self' data: blob: https://quickchart.io; style-src 'self' 'unsafe-inline'; font-src 'self' data:; frame-src https://accounts.google.com https://capital-mastery26.firebaseapp.com; upgrade-insecure-requests
 
 /index.html
   Cache-Control: no-cache, no-store, must-revalidate

@@ -140,7 +140,8 @@ jobs:
             tests/all-career-browser-sweep.cjs \
             tests/employer-public-browser-audit.cjs \
             tests/employer-role-matrix-browser-audit.cjs \
-            tests/employer-invite-lifecycle-browser-audit.cjs; do
+            tests/employer-invite-lifecycle-browser-audit.cjs \
+            tests/accessibility-keyboard-browser-audit.cjs; do
             echo "=== LIVE $test ==="
             if ! CM_AUDIT_URL="$LIVE_URL" node "$test"; then
               echo "LIVE_BROWSER_TEST_FAILED: $test"

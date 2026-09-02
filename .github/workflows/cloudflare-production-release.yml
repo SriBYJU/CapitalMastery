@@ -69,6 +69,9 @@ jobs:
           node --check tests/admin-route-zero-exposure-browser-audit.cjs
           node --check tests/admin-simulation-route-stability-browser-audit.cjs
           node --check tests/program-completion-public-browser-audit.cjs
+          node --check tests/accessibility-keyboard-browser-audit.cjs
+          node --check tests/production-health-monitor.cjs
+          node --check tests/zero-cost-load-resilience-audit.cjs
           node tests/admin-route-boundary-audit.mjs
           node tests/d1-integrity-endpoint-audit.mjs
           node tests/release-security-abuse-audit.mjs
@@ -126,6 +129,7 @@ jobs:
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-invite-lifecycle-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/visual-contrast-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/accessibility-keyboard-browser-audit.cjs
           CM_CANONICAL_URL=http://127.0.0.1:4173/ node tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Require live Firebase readiness before any D1 mutation
@@ -226,6 +230,7 @@ jobs:
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/employer-role-matrix-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/employer-invite-lifecycle-browser-audit.cjs
           CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/visual-contrast-browser-audit.cjs
+          CM_AUDIT_URL="${CLOUDFLARE_MIRROR_URL}" node tests/accessibility-keyboard-browser-audit.cjs
           CM_CANONICAL_URL="${CLOUDFLARE_MIRROR_URL}/" node tests/firebase-authorized-domain-browser-audit.cjs
 
       - name: Release boundary summary
@@ -236,7 +241,7 @@ jobs:
           This proves:
           - current source/static regression gate passed
           - Worker dry-run packaging passed before deployment
-          - exact dist-pages artifact survived eighteen hostile Chromium suites before any production mutation
+          - exact dist-pages artifact survived nineteen hostile Chromium suites before any production mutation
           - live Firebase email/password credential-name persistence passed before any D1 mutation
           - exact-artifact Firebase provider-safety probe passed before any D1 mutation
           - production D1 schema was inspected and only missing migrations 016/017/018 were conditionally applied
@@ -247,7 +252,7 @@ jobs:
           - exact production Pages allowlist deployed
           - Cloudflare-mirror Firebase provider-safety probe passed after Pages deployment
           - Cloudflare mirror generation/security headers passed
-          - eighteen Cloudflare-mirror Chromium suites passed again after deployment, including no-skip/resume persistence, permanent pass review, non-MCQ simulation refusal, employer invitation lifecycle, visual contrast, the Admin auth-timing race, and Program Completion verification
+          - nineteen Cloudflare-mirror Chromium suites passed again after deployment, including no-skip/resume persistence, permanent pass review, non-MCQ simulation refusal, employer invitation lifecycle, keyboard/dialog accessibility, visual contrast, the Admin auth-timing race, and Program Completion verification
 
           This does NOT close Phase 2 by itself. Still required:
           - authenticated administrator /admin/integrity execution and D1 counts

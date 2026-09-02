@@ -1,0 +1,27 @@
+name: Zero-cost bounded resilience audit
+
+on:
+  schedule:
+    - cron: '27 13 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zero-cost-bounded-resilience
+  cancel-in-progress: true
+
+jobs:
+  bounded-read-only-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CM_ALLOW_LIVE_LOAD: '1'
+      CM_LOAD_REQUESTS: '24'
+      CM_LOAD_CONCURRENCY: '4'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run capped read-only concurrency checks
+        run: node tests/zero-cost-load-resilience-audit.cjs
+

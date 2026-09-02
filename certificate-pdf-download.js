@@ -10,7 +10,7 @@
   const LOGICAL_H = 595;
   const SCALE = 2;
 
-  function loadScript(src, test, marker) {
+  function loadScript(src, test, marker, integrity) {
     if (test()) return Promise.resolve();
     const existing = document.querySelector(`script[data-${marker}]`);
     if (existing) {
@@ -22,6 +22,8 @@
     return new Promise((resolve, reject) => {
       const script = document.createElement('script');
       script.src = src;
+      script.integrity = integrity;
+      script.crossOrigin = 'anonymous';
       script.async = true;
       script.dataset[marker] = 'true';
       script.onload = resolve;
@@ -35,7 +37,8 @@
       jsPdfPromise = loadScript(
         'https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js',
         () => !!window.jspdf?.jsPDF,
-        'cmJspdf'
+        'cmJspdf',
+        'sha384-JcnsjUPPylna1s1fvi1u12X5qjY5OL56iySh75FdtrwhO/SWXgMjoVqcKyIIWOLk'
       );
     }
     return jsPdfPromise;
@@ -47,7 +50,8 @@
       qrLoader = loadScript(
         'https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js',
         () => !!window.QRCode,
-        'cmQrcodePdf'
+        'cmQrcodePdf',
+        'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU'
       ).then(() => window.QRCode);
     }
     return qrLoader;

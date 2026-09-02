@@ -583,17 +583,17 @@ export default {
     try {
       const url = new URL(request.url);
 
+      const origin = request.headers.get("Origin");
+
+      if (origin && !allowedOriginList(env).includes(origin)) {
+        throw new HttpError(403, "Origin not allowed");
+      }
+
       if (request.method === "OPTIONS") {
         return new Response(null, {
           status: 204,
           headers: corsHeaders(env)
         });
-      }
-
-      const origin = request.headers.get("Origin");
-
-      if (origin && !allowedOriginList(env).includes(origin)) {
-        throw new HttpError(403, "Origin not allowed");
       }
 
       // --------------------------------------------------
@@ -2606,6 +2606,13 @@ async function requireUser(request, env) {
 
   const token =
     authorization.substring(7).trim();
+
+  if (!token || token.length > 4096) {
+    throw new HttpError(
+      401,
+      "Invalid or expired authentication"
+    );
+  }
 
   try {
     return await verifyFirebaseIdToken(
@@ -5454,6 +5461,18 @@ function holderNameFromUser(user) {
 // ======================================================
 
 async function readJson(request) {
+  const contentType = String(request.headers.get("Content-Type") || "")
+    .split(";", 1)[0]
+    .trim()
+    .toLowerCase();
+
+  if (contentType !== "application/json") {
+    throw new HttpError(
+      415,
+      "Content-Type must be application/json"
+    );
+  }
+
   const length = Number(
     request.headers.get(
       "Content-Length"
@@ -5693,6 +5712,15 @@ function json(data, status, env) {
 
         "X-Content-Type-Options":
           "nosniff",
+
+        "Referrer-Policy":
+          "no-referrer",
+
+        "Permissions-Policy":
+          "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+
+        "X-Frame-Options":
+          "DENY",
 
         ...corsHeaders(env)
       }

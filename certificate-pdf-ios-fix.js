@@ -16,6 +16,8 @@
       }
       const script = document.createElement('script');
       script.src = 'https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+      script.integrity = 'sha384-weMABwrltA6jWR8DDe9Jp5blk+tZQh7ugpCsF3JwSA53WZM9/14PjS5LAJNHNjAI';
+      script.crossOrigin = 'anonymous';
       script.async = true;
       script.dataset.cmPdflib = 'true';
       script.onload = () => window.PDFLib?.PDFDocument ? resolve(window.PDFLib) : reject(new Error('PDF library did not initialize.'));

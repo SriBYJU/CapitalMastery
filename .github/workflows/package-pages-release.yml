@@ -11,6 +11,8 @@ on:
       - 'tools/build-pages.mjs'
       - 'tests/pages-production-bundle-audit.mjs'
       - 'tests/career-skills-five-level-boundary-audit.mjs'
+      - 'tests/zero-cost-security-hardening-audit.mjs'
+      - 'tests/recovery-readiness-audit.mjs'
       - '.github/workflows/package-pages-release.yml'
   workflow_dispatch:
 
@@ -34,6 +36,8 @@ jobs:
           node --check enterprise-v2.js
           node tests/csv-export-security-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
+          node tests/zero-cost-security-hardening-audit.mjs
+          node tests/recovery-readiness-audit.mjs
           node tools/build-pages.mjs
           node tests/pages-production-bundle-audit.mjs
           find dist-pages -type f -print0 | sort -z | xargs -0 sha256sum > pages-release-sha256.txt

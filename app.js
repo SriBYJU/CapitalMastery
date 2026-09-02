@@ -390,7 +390,7 @@
     </div><div class="footer-bottom"><span>© ${new Date().getFullYear()} Capital Mastery. Made by Shriyan Avadhanula.</span><span>Independent educational platform. No employer endorsement implied.</span></div></div></footer>`;
   }
 
-  function render(html,active=''){ app.innerHTML=header(active)+`<main id="main">${html}</main>`+footer(); bindGlobal(); }
+  function render(html,active=''){ app.innerHTML=header(active)+`<main id="main" tabindex="-1">${html}</main>`+footer(); bindGlobal(); }
 
   function publicEvidenceCards(limit=4){
     const ev=window.CM_PUBLIC_EVIDENCE||{};
@@ -742,9 +742,39 @@
   function refreshLocalState(){ stateSourceKey=activeStateKey(); state=stateSourceKey===QA_STATE_KEY?loadQaState():loadState(); }
   function resetState(){ if(confirm('Reset the isolated Capital Mastery QA preview state? Learner progress will not be changed.')){localStorage.removeItem(QA_STATE_KEY);stateSourceKey=QA_STATE_KEY;state=loadQaState();saveState();renderRoute();} }
 
+  let modalReturnFocus=null;
   function mobileMenu(){ modal(`<h2>Menu</h2><div class="grid"><a class="btn btn-outline" href="#/" onclick="CM.closeModal()">Home</a><a class="btn btn-outline" href="#/careers" onclick="CM.closeModal()">Careers</a><a class="btn btn-outline" href="#/credentials" onclick="CM.closeModal()">Credentials</a><a class="btn btn-outline" href="#/academy" onclick="CM.closeModal()">Academies</a><a class="btn btn-outline" href="#/passport" onclick="CM.closeModal()">My Learning</a><a class="btn btn-outline" href="#/about" onclick="CM.closeModal()">About</a></div>`); }
-  function modal(html){ const d=document.createElement('div');d.className='modal-backdrop';d.id='cm-modal';d.innerHTML=`<div class="modal">${html}</div>`;d.addEventListener('click',e=>{if(e.target===d)closeModal()});document.body.appendChild(d); }
-  function closeModal(){ document.getElementById('cm-modal')?.remove(); }
+  function modal(html){
+    closeModal(false);
+    modalReturnFocus=document.activeElement instanceof HTMLElement?document.activeElement:null;
+    const d=document.createElement('div');
+    d.className='modal-backdrop';
+    d.id='cm-modal';
+    d.innerHTML=`<div class="modal" role="dialog" aria-modal="true" tabindex="-1">${html}</div>`;
+    const panel=d.firstElementChild;
+    const heading=panel?.querySelector('h1,h2,h3');
+    if(heading){heading.id=heading.id||'cm-modal-title';panel.setAttribute('aria-labelledby',heading.id);}
+    else panel?.setAttribute('aria-label','Capital Mastery dialog');
+    d.addEventListener('click',e=>{if(e.target===d)closeModal()});
+    d.addEventListener('keydown',e=>{
+      if(e.key==='Escape'){e.preventDefault();closeModal();return;}
+      if(e.key!=='Tab'||!panel)return;
+      const focusable=[...panel.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')].filter(x=>!x.hidden&&x.getAttribute('aria-hidden')!=='true');
+      if(!focusable.length){e.preventDefault();panel.focus();return;}
+      const first=focusable[0],last=focusable[focusable.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    });
+    document.body.appendChild(d);
+    (panel?.querySelector('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled])')||panel)?.focus();
+  }
+  function closeModal(restoreFocus=true){
+    const modal=document.getElementById('cm-modal');
+    if(!modal)return;
+    modal.remove();
+    if(restoreFocus&&modalReturnFocus?.isConnected)modalReturnFocus.focus();
+    modalReturnFocus=null;
+  }
   function toast(msg,type=''){ const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),3200); }
   function copy(text){ navigator.clipboard?.writeText(text).then(()=>toast('Copied.','good')).catch(()=>{const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();toast('Copied.','good');}); }
   function formatDate(d){ return new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',year:'numeric'}).format(new Date(d)); }

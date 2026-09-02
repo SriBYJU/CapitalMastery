@@ -15,6 +15,8 @@
   let gateOpen = false;
   let nameModalOpen = false;
   let routeGuardBusy = false;
+  let gateReturnFocus = null;
+  let nameReturnFocus = null;
   const nameChecks = new Map();
 
   function esc(value = '') {
@@ -75,9 +77,33 @@
   function pendingRoute() { return sessionStorage.getItem(PENDING_ROUTE_KEY) || ''; }
   function clearPendingRoute() { sessionStorage.removeItem(PENDING_ROUTE_KEY); }
 
-  function closeGate() {
+  function activateDialog(backdrop, { onEscape, initialFocus } = {}) {
+    const panel = backdrop?.querySelector('[role="dialog"]');
+    if (!panel) return;
+    panel.setAttribute('tabindex', '-1');
+    backdrop.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && typeof onEscape === 'function') {
+        event.preventDefault();
+        onEscape();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = [...panel.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])')]
+        .filter(element => !element.hidden && element.getAttribute('aria-hidden') !== 'true');
+      if (!focusable.length) { event.preventDefault(); panel.focus(); return; }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    });
+    setTimeout(() => (initialFocus || panel.querySelector('button:not([disabled]),input:not([disabled]),a[href]') || panel).focus(), 0);
+  }
+
+  function closeGate(restoreFocus = true) {
     document.getElementById('cm-learning-gate')?.remove();
     gateOpen = false;
+    if (restoreFocus && gateReturnFocus?.isConnected) gateReturnFocus.focus();
+    gateReturnFocus = null;
   }
 
   function openLearningGate(targetHash = '#/careers') {
@@ -85,6 +111,7 @@
     if (targetHash && isGatedHash(targetHash)) savePendingRoute(targetHash);
     if (gateOpen) return;
     gateOpen = true;
+    gateReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const d = document.createElement('div');
     d.id = 'cm-learning-gate';
@@ -111,6 +138,7 @@
     d.querySelector('[data-cm-gate-continue]')?.addEventListener('click', () => { closeGate(); location.hash = '#/login'; });
     d.querySelector('[data-cm-gate-close]')?.addEventListener('click', closeGate);
     d.addEventListener('click', event => { if (event.target === d) closeGate(); });
+    activateDialog(d, { onEscape:closeGate, initialFocus:d.querySelector('[data-cm-gate-continue]') });
   }
 
   function fullNameError(name) {
@@ -346,9 +374,11 @@
     return cleaned;
   }
 
-  function closeNameModal() {
+  function closeNameModal(restoreFocus = true) {
     document.getElementById('cm-full-name-onboarding')?.remove();
     nameModalOpen = false;
+    if (restoreFocus && nameReturnFocus?.isConnected) nameReturnFocus.focus();
+    nameReturnFocus = null;
   }
 
   function resumeAfterName() {
@@ -366,6 +396,7 @@
     if (!user || nameModalOpen) return;
     if (targetHash && isGatedHash(targetHash)) savePendingRoute(targetHash);
     nameModalOpen = true;
+    nameReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
     const suggested = currentDisplayName(user);
     const d = document.createElement('div');
@@ -430,6 +461,7 @@
         switchAccount.textContent = label;
       }
     });
+    activateDialog(d, { onEscape:forceEdit ? closeNameModal : null, initialFocus:input });
     setTimeout(() => { input?.focus(); if (!suggested) input?.select(); }, 50);
   }
 
