@@ -9,6 +9,8 @@ const mobileCertificate = fs.readFileSync('certificate-mobile-fix.js', 'utf8');
 const pdfCertificate = fs.readFileSync('certificate-pdf-download.js', 'utf8');
 const iosCertificate = fs.readFileSync('certificate-pdf-ios-fix.js', 'utf8');
 const credentialName = fs.readFileSync('certificate-name.js', 'utf8');
+const liveWorkflow = fs.readFileSync('.github/workflows/live-production-readonly-audit.yml', 'utf8');
+const firebaseWorkflow = fs.readFileSync('.github/workflows/firebase-live-auth-audit.yml', 'utf8');
 
 const failures = [];
 const ok = (value, message) => { if (!value) failures.push(message); };
@@ -58,6 +60,9 @@ ok(app.includes("if(e.key==='Escape')") && app.includes("if(e.key!=='Tab'||!pane
 ok(app.includes('modalReturnFocus?.isConnected'), 'Shared dialog must restore focus to its opener');
 ok(credentialName.includes('function activateDialog(') && credentialName.includes("event.key === 'Escape'") && credentialName.includes("event.key !== 'Tab'"), 'Account and credential-name dialogs must implement bounded keyboard navigation');
 ok(credentialName.includes('gateReturnFocus?.isConnected') && credentialName.includes('nameReturnFocus?.isConnected'), 'Account and credential-name dialogs must restore focus to their openers');
+for (const source of [index, liveWorkflow, firebaseWorkflow]) {
+  ok(source.includes('certificate-name.js?v=20260902-a11ysecurity1'), 'Credential-name cache generation must stay aligned across HTML and live workflow gates');
+}
 
 if (failures.length) {
   console.error(`ZERO-COST SECURITY HARDENING AUDIT FAILED\n - ${failures.join('\n - ')}`);
