@@ -1,4 +1,5 @@
 name: Worker route smoke
+# Recheck after configuring the dedicated CMWB Cloudflare Workers Builds token.
 
 on:
   push:
