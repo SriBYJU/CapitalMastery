@@ -4,7 +4,7 @@ const ux=fs.readFileSync('ux-stability.js','utf8');
 const html=fs.readFileSync('index.html','utf8');
 const must=(value,message)=>{if(!value)throw new Error(message);};
 
-must(html.includes('ux-stability.js?v=20260901-courseintegrity1'),'Experience polish must ship with a fresh production cache key');
+must(html.includes('ux-stability.js?v=20260908-credentials-stability1'),'Experience polish must ship with a fresh production cache key');
 must(ux.includes("const LAST_ACTIVITY_KEY = 'cmLastLearningActivityV1'"),'Learning resume must use a dedicated account-browser record');
 must(ux.includes("const RESUMABLE_ROOTS = new Set(['career','learn','quiz','official-simulation','final','assigned','role-lab','role-lab-run','v2-assessment','diagnostic','readiness','assessment-lab','skills'])"),'Only real learner-work routes may become resumable');
 must(ux.includes('function canonicalResume(item)'),'Resume must resolve through the canonical course state machine');

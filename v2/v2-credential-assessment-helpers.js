@@ -257,7 +257,13 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
     .bind(attemptId,user.sub,orgId,cohortId,assignmentId,assessment.pathway_id,assessment.assessment_key,assessment.version,score,passed?1:0,JSON.stringify(answers||{}),JSON.stringify({correct,total:qs.length,competencyScores:compScores})).run();
 
   let readiness=null;
+  let evidenceRefreshPending=false;
+  let evidenceRefreshWarning=null;
   if(passed){
+    let lastEvidenceError=null;
+    for(const delay of [0,250,900]){
+      if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+      try{
     const sourceType=assessment.stage==='final'?'final':'assessment';
     const scope=assignmentId||'public';
     const statements=[];
@@ -276,8 +282,18 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
     if(statements.length) await env.DB.batch(statements);
     for(const competencyId of Object.keys(compScores)) await v2RecomputeCompetency(env,{uid:user.sub,orgId,assignmentId,pathwayId:assessment.pathway_id,competencyId});
     readiness=await v2CreateReadinessSnapshot(env,{uid:user.sub,orgId,cohortId,assignmentId,pathwayId:assessment.pathway_id,curriculumVersion});
+        lastEvidenceError=null;
+        break;
+      }catch(error){
+        lastEvidenceError=error;
+      }
+    }
+    if(lastEvidenceError){
+      evidenceRefreshPending=true;
+      evidenceRefreshWarning='Your assessment attempt is saved, but readiness evidence could not finish updating yet.';
+    }
   }
-  return {attemptId,score,passed,correct,total:qs.length,competencyScores:compScores,details,readiness};
+  return {attemptId,score,passed,correct,total:qs.length,competencyScores:compScores,details,readiness,evidenceRefreshPending,evidenceRefreshWarning};
 }
 
 async function v2EnforceDiagnosticRate(env, uid, pathwayId, assignmentId = null) {

@@ -25,8 +25,25 @@
         const answers=body.answers&&typeof body.answers==='object'&&!Array.isArray(body.answers)?body.answers:{};
         const result=await v2GradeAssessment(env,{user,assessment,answers,assignmentId,orgId:access.orgId,cohortId:access.cohortId,curriculumVersion:access.curriculumVersion});
         const pathway=getPathway(assessment.pathway_id);
-        const refreshed=result.passed?await v2RefreshCredentials(env,{user,pathway,orgId:access.orgId,assignmentId}):[];
-        return json({ok:true,assessmentKey:key,version:assessment.version,passScore:Number(assessment.pass_score),...result,issuedCredentials:refreshed.filter(x=>x.issued).map(x=>x.credential),credentialRefresh:refreshed.map(x=>({level:x.level,issued:x.issued===true,eligible:x.eligible===true,missing:x.missing||x.eligibility?.missing||[]}))},200,env);
+        let refreshed=[];
+        let credentialRefreshPending=result.evidenceRefreshPending===true;
+        let credentialRefreshWarning=result.evidenceRefreshWarning||null;
+        if(result.passed && !result.evidenceRefreshPending){
+          let lastRefreshError=null;
+          for(const delay of [0,250,900]){
+            if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+            try{
+              refreshed=await v2RefreshCredentials(env,{user,pathway,orgId:access.orgId,assignmentId});
+              lastRefreshError=null;
+              break;
+            }catch(error){ lastRefreshError=error; }
+          }
+          if(lastRefreshError){
+            credentialRefreshPending=true;
+            credentialRefreshWarning='Your assessment attempt is saved, but credential issuance could not finish yet.';
+          }
+        }
+        return json({ok:true,assessmentSaved:true,pathwayId:pathway.id,assignmentId,assessmentKey:key,version:assessment.version,passScore:Number(assessment.pass_score),...result,credentialRefreshPending,credentialRefreshWarning,issuedCredentials:refreshed.filter(x=>x.issued).map(x=>x.credential),credentialRefresh:refreshed.map(x=>({level:x.level,issued:x.issued===true,eligible:x.eligible===true,missing:x.missing||x.eligibility?.missing||[]}))},200,env);
       }
 
       if (request.method === 'POST' && url.pathname === '/enterprise/credentials/refresh') {

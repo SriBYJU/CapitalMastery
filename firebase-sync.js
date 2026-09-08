@@ -14,6 +14,8 @@
   let fs = null;
   let user = null;
   let debounceTimer = null;
+  let retryTimer = null;
+  const PENDING_SYNC_PREFIX = 'capitalMasteryPendingCloudSyncV1:';
   let syncTail = Promise.resolve(true);
   let suppressLocalHook = false;
   let initialized = false;
@@ -36,6 +38,35 @@
     document.dispatchEvent(new CustomEvent('cm-sync-changed', {
       detail: { status: CM_SYNC.status, lastSyncedAt: CM_SYNC.lastSyncedAt, error: CM_SYNC.error }
     }));
+  }
+
+  function pendingSyncKey(uid = user?.uid) {
+    return uid ? `${PENDING_SYNC_PREFIX}${uid}` : null;
+  }
+
+  function markPending(state) {
+    const key = pendingSyncKey();
+    if (!key) return;
+    try {
+      localStorage.setItem(key, JSON.stringify({ at:Date.now(), updatedAt:state?.updatedAt || null }));
+    } catch (error) {
+      window.CM_RELIABILITY?.report?.('browser-storage', 'This browser could not record the pending cloud save.', { severity:'error', detail:String(error?.message || error) });
+    }
+  }
+
+  function clearPending() {
+    const key = pendingSyncKey();
+    if (!key) return;
+    try { localStorage.removeItem(key); } catch (_) {}
+  }
+
+  function scheduleRetry(delay = 4000) {
+    if (!user || qaMode()) return;
+    clearTimeout(retryTimer);
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      scheduleCloudSync(readLocalState());
+    }, Math.max(1000, Number(delay || 4000)));
   }
 
   function parseState(raw) {
@@ -309,50 +340,73 @@
       base.credentialNameUpdatedAt = fs.serverTimestamp();
     }
 
-    if (rootProfileInitializedForUid !== uid) {
+    const initializingRootProfile = rootProfileInitializedForUid !== uid;
+    if (initializingRootProfile) {
       const snap = await fs.getDoc(ref);
       if (!snap.exists()) base.createdAt = fs.serverTimestamp();
-      rootProfileInitializedForUid = uid;
     }
 
     await fs.setDoc(ref, base, { merge: true });
+    if (initializingRootProfile) rootProfileInitializedForUid = uid;
   }
 
   async function syncLocalToCloud(state) {
-    if (!db || !fs || !user || !state) return false;
+    if (!user || !state) return false;
     if (qaMode()) {
       setStatus('qa-local-only');
+      return false;
+    }
+    if (!db || !fs) {
+      const error = new Error('Account sync is not initialized yet. Your work remains saved on this device and will retry.');
+      markPending(state);
+      setStatus('error', error);
+      scheduleRetry();
       return false;
     }
 
     const clean = normalizeState(state, user, 'local');
     if (clean.profile?.accountUid !== user.uid) {
-      console.warn('Blocked cross-account Capital Mastery state sync.');
+      const error = new Error('Capital Mastery blocked a cross-account progress write. Sign in again before continuing.');
+      console.warn(error.message);
+      setStatus('error', error);
       return false;
     }
 
     try {
+      markPending(clean);
       setStatus('syncing');
       await fs.setDoc(fs.doc(db, 'users', user.uid, 'progress', 'state'), cloudPayload(clean), { merge: false });
-      // Progress is an owner-only UX mirror and must remain available during a
-      // rolling Firestore-rules deployment. The protected root identity is
-      // attempted independently so a stale root rule cannot stop course sync.
+      let rootProfileError = null;
       try {
         await writeRootProfile(clean);
-      } catch (rootError) {
-        console.warn('Protected account-profile mirror will retry after rules convergence:', rootError);
+      } catch (error) {
+        rootProfileError = error;
+        console.warn('Protected account-profile mirror will retry after rules convergence:', error);
       }
-      localStorage.setItem(userStateKey(user.uid), JSON.stringify(clean));
+      try {
+        localStorage.setItem(userStateKey(user.uid), JSON.stringify(clean));
+      } catch (error) {
+        window.CM_RELIABILITY?.report?.('browser-storage', 'Your cloud progress saved, but this browser could not update its local account cache.', { severity:'error', detail:String(error?.message || error) });
+      }
+      clearPending();
       CM_SYNC.lastSyncedAt = new Date().toISOString();
-      setStatus('synced');
+      if (rootProfileError) {
+        setStatus('degraded', new Error('Your progress is saved. The protected account-profile mirror is still retrying.'));
+        scheduleRetry(5000);
+      } else {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+        setStatus('synced');
+      }
       return true;
     } catch (error) {
       console.error('Capital Mastery Firestore sync failed:', error);
+      markPending(clean);
       setStatus('error', error);
+      scheduleRetry(typeof navigator !== 'undefined' && navigator.onLine === false ? 15000 : 4000);
       return false;
     }
   }
-
   function scheduleCloudSync(state) {
     // Serialize cloud writes so an older first-login hydration can never finish
     // after a newer credential/profile write and silently roll it back.
@@ -409,8 +463,11 @@
 
   function queueSync(state) {
     if (!user || qaMode() || suppressLocalHook) return;
+    const latest = state || readLocalState();
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => scheduleCloudSync(state || readLocalState()), 700);
+    markPending(latest);
+    setStatus('pending');
+    debounceTimer = setTimeout(() => scheduleCloudSync(latest || readLocalState()), 700);
   }
 
   function installLocalStorageHook() {
@@ -487,6 +544,19 @@
     const switched = activateUserState(user);
     await hydrateFromCloud(user, { forceReload: switched });
   });
+
+  function flushLatestBeforeBackground() {
+    if (!user || qaMode()) return;
+    clearTimeout(debounceTimer);
+    debounceTimer = null;
+    const latest = readLocalState();
+    if (latest) scheduleCloudSync(latest);
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushLatestBeforeBackground();
+  });
+  window.addEventListener('pagehide', flushLatestBeforeBackground);
 
   initFirestore();
 })();

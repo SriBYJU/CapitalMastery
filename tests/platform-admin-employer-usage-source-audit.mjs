@@ -31,17 +31,22 @@ assert.match(helpers, /async function requireOrgRole|function requireOrgRole/);
 assert.match(helpers, /WHERE m\.org_id = \? AND m\.uid = \?/);
 
 assert.match(guard, /ADMIN_PREFIX\s*=\s*['"]#\/admin-preview['"]/);
-assert.match(frontend, /#\/admin-preview\/employer-usage/);
+assert.match(frontend, /ADMIN_VIEW_PARAM\s*=\s*['"]adminView['"]/);
+assert.match(frontend, /history\[replace \? 'replaceState' : 'pushState'\]/);
+assert.match(frontend, /data-cm-open-employer-usage/);
 assert.match(frontend, /backendVerified\s*===\s*true/);
 assert.match(frontend, /Authorization:\s*`Bearer \$\{token\}`/);
 assert.match(frontend, /Demo\/Test Lab organizations are excluded/);
 assert.match(frontend, /does not add the platform administrator to any organization/);
-assert.match(frontend, /Capital Mastery is the official onboarding training platform for Sterling Point Advisors\./);
+assert.match(frontend, /Capital Mastery is the official onboarding training platform for the following firms:/);
+assert.match(frontend, /Richmond, Virginia · Mergers &amp; Acquisitions/);
+assert.match(frontend, /data-cm-firm-card=\"sterling-point-advisors\"/);
+assert.match(frontend, /does not imply sponsorship, investment-services endorsement, exclusivity/);
 assert.match(frontend, /assets\/sterling-point-logo\.svg/);
 assert.doesNotMatch(frontend, /localStorage[^\n]*(?:isAdmin|admin)/i);
 
-assert.match(index, /founder-admin-employer-usage\.css\?v=20260908-founderadmin1/);
-assert.match(index, /founder-admin-employer-usage\.js\?v=20260908-founderadmin1/);
+assert.match(index, /founder-admin-employer-usage\.css\?v=20260908-founderadmin2/);
+assert.match(index, /founder-admin-employer-usage\.js\?v=20260908-founderadmin2/);
 const config = JSON.parse(wrangler);
 assert.equal(config.main, 'v2/platform-admin-overlay.js');
 assert.equal(config.vars.ALLOWED_ORIGIN, 'https://sribyju.github.io');

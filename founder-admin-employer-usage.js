@@ -2,7 +2,10 @@
   'use strict';
 
   const API = window.CAPITAL_MASTERY_V2_API_URL || window.CAPITAL_MASTERY_API_URL;
-  const ADMIN_ROUTE = '#/admin-preview/employer-usage';
+  const ADMIN_ROUTE = '#/admin-preview';
+  const LEGACY_ADMIN_ROUTE = '#/admin-preview/employer-usage';
+  const ADMIN_VIEW_PARAM = 'adminView';
+  const ADMIN_VIEW = 'employer-usage';
   let renderSerial = 0;
   let observerQueued = false;
   let usageLoading = false;
@@ -17,6 +20,27 @@
     return String(location.hash || '#/').replace(/^#\/?/, '').split(/[/?]/, 1)[0] || '';
   }
 
+  function adminUsageRoute(hash = location.hash) {
+    const normalized = String(hash || '#/').split('?', 1)[0].replace(/\/$/, '');
+    return normalized === ADMIN_ROUTE && new URLSearchParams(location.search).get(ADMIN_VIEW_PARAM) === ADMIN_VIEW;
+  }
+
+  function legacyAdminUsageRoute(hash = location.hash) {
+    const raw = String(hash || '#/');
+    if (raw.split('?', 1)[0].replace(/\/$/, '') === LEGACY_ADMIN_ROUTE) return true;
+    const [route, query=''] = raw.split('?');
+    return route.replace(/\/$/, '') === ADMIN_ROUTE && new URLSearchParams(query).get('view') === ADMIN_VIEW;
+  }
+
+  function setAdminUsageView(active, { replace = false } = {}) {
+    const url = new URL(location.href);
+    if (active) url.searchParams.set(ADMIN_VIEW_PARAM, ADMIN_VIEW);
+    else url.searchParams.delete(ADMIN_VIEW_PARAM);
+    url.hash = ADMIN_ROUTE;
+    const next = `${url.pathname}${url.search}${url.hash}`;
+    history[replace ? 'replaceState' : 'pushState']({ cmAdminView: active ? ADMIN_VIEW : null }, '', next);
+    syncRoute();
+  }
   function main() {
     return document.querySelector('#app main#main');
   }
@@ -42,23 +66,28 @@
     const section = document.createElement('section');
     section.className = `cm-official-platform-proof cm-official-platform-proof-${context}`;
     section.dataset.cmOfficialPlatformProof = context;
-    section.setAttribute('aria-label', 'Sterling Point Advisors onboarding platform');
+    section.setAttribute('aria-label', 'Firms using Capital Mastery for onboarding and training');
     section.innerHTML = `
-      <div class="container cm-official-platform-inner">
+      <div class="container cm-official-platform-multi">
         <div class="cm-official-platform-copy">
-          <div class="eyebrow">OFFICIAL ONBOARDING USE</div>
-          <h2>Capital Mastery is the official onboarding training platform for Sterling Point Advisors.</h2>
-          <p>Capital Mastery supports pre-Day-1 finance preparation with structured role training, realistic work, evidence-backed readiness, and employer cohort tools.</p>
-          <p class="cm-official-platform-note">Sterling Point Advisors has given permission for its name and logo to be displayed in connection with this onboarding use. This is not a sponsorship or investment-services endorsement.</p>
+          <div class="eyebrow">OFFICIAL ONBOARDING ADOPTION</div>
+          <h2>Capital Mastery is the official onboarding training platform for the following firms:</h2>
+          <p>Capital Mastery gives finance teams a structured pre-Day-1 layer for role training, realistic work, evidence-backed readiness, and cohort administration. This section is designed to grow as additional firms adopt the platform.</p>
         </div>
-        <div class="cm-official-platform-logo-wrap">
-          <span>OFFICIAL ONBOARDING TRAINING PLATFORM FOR</span>
-          <img src="assets/sterling-point-logo.svg" alt="Sterling Point Advisors" loading="lazy" />
+        <div class="cm-official-firms-grid" aria-label="Official onboarding firms">
+          <article class="cm-official-firm-card" data-cm-firm-card="sterling-point-advisors">
+            <div class="cm-official-firm-logo"><img src="assets/sterling-point-logo.svg" alt="Sterling Point Advisors" loading="lazy" /></div>
+            <div class="cm-official-firm-meta">
+              <span class="cm-official-firm-location">Richmond, Virginia · Mergers &amp; Acquisitions</span>
+              <h3>Sterling Point Advisors</h3>
+              <p>A specialized M&amp;A advisory firm serving closely held businesses. Its principals bring decades of transaction experience across industries, including work representing billions of dollars in aggregate deal value.</p>
+            </div>
+          </article>
         </div>
+        <p class="cm-official-platform-note">Firm names and logos are displayed with permission in connection with onboarding/training use. Inclusion does not imply sponsorship, investment-services endorsement, exclusivity, or that these are the only firms Capital Mastery can support.</p>
       </div>`;
     return section;
   }
-
   function decoratePublicProof() {
     const root = rootRoute();
     if (root !== '' && root !== 'employers') return;
@@ -75,7 +104,8 @@
 
   function decorateAdminCard() {
     const normalized = String(location.hash || '#/').split('?', 1)[0].replace(/\/$/, '');
-    if (normalized !== '#/admin-preview') return;
+    if (normalized !== ADMIN_ROUTE) return;
+    if (adminUsageRoute()) return;
     if (!verifiedAdmin()) return;
     const grid = document.querySelector('.admin-grid');
     if (!grid || grid.querySelector('[data-cm-employer-usage-card]')) return;
@@ -87,20 +117,22 @@
       <div class="eyebrow">PLATFORM ADMIN</div>
       <h3>Employer Usage</h3>
       <p>View aggregate real-employer workspace usage across Capital Mastery. Demo/Test Lab organizations and learner identity details are excluded.</p>
-      <a class="btn btn-primary btn-sm" href="${ADMIN_ROUTE}">Open Employer Usage →</a>`;
+      <button class="btn btn-primary btn-sm" type="button" data-cm-open-employer-usage>Open Employer Usage →</button>`;
+    card.querySelector('[data-cm-open-employer-usage]')?.addEventListener('click', () => setAdminUsageView(true));
     grid.prepend(card);
   }
-
   function renderShell(inner) {
     const pageMain = main();
     if (!pageMain) return false;
     pageMain.innerHTML = `<section class="cm-founder-admin-page"><div class="container">${inner}</div></section>`;
+    pageMain.querySelectorAll('[data-cm-founder-admin-back]').forEach((control) => {
+      control.addEventListener('click', () => setAdminUsageView(false));
+    });
     return true;
   }
-
   function renderLoading() {
     renderShell(`
-      <a class="cm-founder-admin-back" href="#/admin-preview">← Admin / QA</a>
+      <button class="cm-founder-admin-back" type="button" data-cm-founder-admin-back>← Admin / QA</button>
       <div class="cm-founder-admin-head">
         <div><div class="eyebrow">PLATFORM ADMIN · AGGREGATE ONLY</div><h1>Employer Usage</h1><p>Loading real employer workspaces. Synthetic Demo/Test Lab data is excluded.</p></div>
       </div>
@@ -144,7 +176,7 @@
       </tr>`).join('');
 
     renderShell(`
-      <a class="cm-founder-admin-back" href="#/admin-preview">← Admin / QA</a>
+      <button class="cm-founder-admin-back" type="button" data-cm-founder-admin-back>← Admin / QA</button>
       <div class="cm-founder-admin-head">
         <div>
           <div class="eyebrow">PLATFORM ADMIN · AGGREGATE ONLY</div>
@@ -181,7 +213,7 @@
 
   function renderError(message) {
     renderShell(`
-      <a class="cm-founder-admin-back" href="#/admin-preview">← Admin / QA</a>
+      <button class="cm-founder-admin-back" type="button" data-cm-founder-admin-back>← Admin / QA</button>
       <div class="card cm-founder-admin-denied">
         <div class="eyebrow">EMPLOYER USAGE</div><h1>Could not load aggregate usage.</h1>
         <p>${esc(message || 'Try again.')}</p>
@@ -191,7 +223,7 @@
   }
 
   async function loadUsage(force = false) {
-    if (String(location.hash || '').split('?', 1)[0] !== ADMIN_ROUTE) return;
+    if (!adminUsageRoute()) return;
     if (usageLoading && !force) return;
 
     const serial = ++renderSerial;
@@ -220,7 +252,7 @@
         cache: 'no-store'
       });
       const data = await response.json().catch(() => ({}));
-      if (serial !== renderSerial || String(location.hash || '').split('?', 1)[0] !== ADMIN_ROUTE) return;
+      if (serial !== renderSerial || !adminUsageRoute()) return;
       if (!response.ok || data?.ok === false) {
         const error = new Error(data?.error || `Request failed (${response.status})`);
         error.status = response.status;
@@ -237,19 +269,27 @@
   }
 
   function syncRoute() {
-    const normalized = String(location.hash || '').split('?', 1)[0];
-    if (normalized === ADMIN_ROUTE) {
+    const normalized = String(location.hash || '#/').split('?', 1)[0].replace(/\/$/, '');
+    if (legacyAdminUsageRoute() && verifiedAdmin()) {
+      setAdminUsageView(true, { replace: true });
+      return;
+    }
+    if (adminUsageRoute()) {
       const page = document.querySelector('.cm-founder-admin-page');
       const settled = page?.querySelector('.cm-founder-metric-grid, .cm-founder-admin-loading, .cm-founder-admin-denied');
       if (!page || !settled) loadUsage();
       return;
+    }
+    if (normalized !== ADMIN_ROUTE && new URLSearchParams(location.search).has(ADMIN_VIEW_PARAM)) {
+      const url = new URL(location.href);
+      url.searchParams.delete(ADMIN_VIEW_PARAM);
+      history.replaceState(history.state, '', `${url.pathname}${url.search}${url.hash}`);
     }
     renderSerial += 1;
     usageLoading = false;
     decoratePublicProof();
     decorateAdminCard();
   }
-
   function queueSync() {
     if (observerQueued) return;
     observerQueued = true;
@@ -260,6 +300,7 @@
   }
 
   window.addEventListener('hashchange', () => setTimeout(syncRoute, 0));
+  window.addEventListener('popstate', () => setTimeout(syncRoute, 0));
   window.addEventListener('cm-auth-ready', queueSync);
   window.addEventListener('cm-auth-changed', queueSync);
   document.addEventListener('DOMContentLoaded', queueSync, { once: true });

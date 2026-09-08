@@ -306,26 +306,42 @@
     }
 
     const main = document.querySelector('main#main');
-    if (!main || main.querySelector('.cm-live-credential') || main.querySelector('.credentials-hero')) {
+    if (!main) return;
+
+    // Both the local preview renderer and the authoritative D1 renderer are valid
+    // settled states. The previous watchdog treated .cm-credential-card (the real
+    // verified card) as a broken renderer and manually fired up to three extra
+    // hashchange events. Those synthetic route changes repeatedly rebuilt the page
+    // and caused the Credentials tab to jump up/down. Only repair a genuinely blank
+    // credentials route, and never a loading, error, preview, or verified state.
+    const cmCredentialRouteSettled = !!main.querySelector(
+      '.credentials-hero, .cm-live-card, .cm-live-error, .cm-live-credential, .cm-credential-card, [data-cm-credentials-live]'
+    ) || [...main.querySelectorAll('.page-hero .eyebrow')].some(node =>
+      /VERIFIED CREDENTIALS(?: & COMPLETIONS)?/i.test(String(node.textContent || ''))
+    );
+
+    if (cmCredentialRouteSettled) {
       credentialRepairCount = 0;
       clearTimeout(credentialRepairTimer);
       credentialRepairTimer = null;
       return;
     }
 
-    const basicRendererVisible = !!main.querySelector('.cm-credential-card') ||
-      [...main.querySelectorAll('.page-hero .eyebrow')].some(x => x.textContent.includes('VERIFIED CREDENTIALS'));
-    if (!basicRendererVisible || credentialRepairCount >= 3 || credentialRepairTimer) return;
-
+    if (credentialRepairCount >= 1 || credentialRepairTimer) return;
     credentialRepairTimer = setTimeout(() => {
       credentialRepairTimer = null;
       const currentMain = document.querySelector('main#main');
-      if (routeParts()[0] !== 'credentials' || currentMain?.querySelector('.cm-live-credential') || currentMain?.querySelector('.credentials-hero')) return;
+      if (routeParts()[0] !== 'credentials' || !currentMain) return;
+      const settled = !!currentMain.querySelector(
+        '.credentials-hero, .cm-live-card, .cm-live-error, .cm-live-credential, .cm-credential-card, [data-cm-credentials-live]'
+      ) || [...currentMain.querySelectorAll('.page-hero .eyebrow')].some(node =>
+        /VERIFIED CREDENTIALS(?: & COMPLETIONS)?/i.test(String(node.textContent || ''))
+      );
+      if (settled) return;
       credentialRepairCount++;
       window.dispatchEvent(new HashChangeEvent('hashchange'));
-    }, 160);
+    }, 320);
   }
-
   function enhance() {
     if (redirectLegacySimulation()) return;
     ensureProfileButton();

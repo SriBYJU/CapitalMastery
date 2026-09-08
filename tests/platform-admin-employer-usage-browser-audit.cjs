@@ -59,14 +59,17 @@ async function waitForUsage(page, width) {
     await publicPage.goto(`${BASE}/#/`, {waitUntil:'domcontentloaded',timeout:30000});
     await publicPage.waitForSelector('[data-cm-official-platform-proof="home"]',{timeout:15000});
     let proof = await publicPage.textContent('[data-cm-official-platform-proof="home"]');
-    assert(/Capital Mastery is the official onboarding training platform for Sterling Point Advisors\./.test(proof||''),'Home official-onboarding statement missing');
+    assert(/Capital Mastery is the official onboarding training platform for the following firms:/i.test(proof||''),'Home multi-firm onboarding statement missing');
+    assert(/Richmond, Virginia/i.test(proof||''),'Home firm location missing');
+    assert(/specialized M&A advisory firm/i.test(proof||''),'Home firm description missing');
     assert(await publicPage.locator('[data-cm-official-platform-proof="home"] img[alt="Sterling Point Advisors"]').count()===1,'Home Sterling Point logo missing');
     await contained(publicPage,'home proof mobile');
 
     await publicPage.goto(`${BASE}/#/employers`, {waitUntil:'domcontentloaded',timeout:30000});
     await publicPage.waitForSelector('[data-cm-official-platform-proof="employers"]',{timeout:15000});
     proof = await publicPage.textContent('[data-cm-official-platform-proof="employers"]');
-    assert(/official onboarding training platform for Sterling Point Advisors/i.test(proof||''),'Employer official-onboarding statement missing');
+    assert(/official onboarding training platform for the following firms/i.test(proof||''),'Employer multi-firm onboarding statement missing');
+    assert(await publicPage.locator('[data-cm-official-platform-proof="employers"] [data-cm-firm-card="sterling-point-advisors"]').count()===1,'Employer Sterling Point firm card missing');
     await contained(publicPage,'employer proof mobile');
     await publicContext.close();
 
@@ -80,7 +83,8 @@ async function waitForUsage(page, width) {
       await page.goto(`${BASE}/#/admin-preview`,{waitUntil:'domcontentloaded',timeout:30000});
       await page.waitForSelector('[data-cm-employer-usage-card]',{timeout:15000});
       assert(/Employer Usage/.test(await page.textContent('[data-cm-employer-usage-card]')||''),`Admin card missing @ ${viewport.width}`);
-      await page.locator('[data-cm-employer-usage-card] a').click();
+      await page.locator('[data-cm-open-employer-usage]').click();
+      await page.waitForFunction(() => new URLSearchParams(location.search).get('adminView') === 'employer-usage');
       try { await waitForUsage(page, viewport.width); }
       catch (error) { if (browserErrors.length) console.error(`EMPLOYER_USAGE_BROWSER_ERRORS @ ${viewport.width}: ${browserErrors.join(' | ')}`); throw error; }
       const text = await page.textContent('#app');
@@ -99,7 +103,7 @@ async function waitForUsage(page, width) {
     const deniedContext = await browser.newContext({viewport:{width:430,height:932}});
     await installCommonRoutes(deniedContext, false);
     const deniedPage = await deniedContext.newPage();
-    await deniedPage.goto(`${BASE}/#/admin-preview/employer-usage`,{waitUntil:'domcontentloaded',timeout:30000});
+    await deniedPage.goto(`${BASE}/?adminView=employer-usage#/admin-preview`,{waitUntil:'domcontentloaded',timeout:30000});
     await deniedPage.waitForTimeout(350);
     const deniedState = await deniedPage.evaluate(() => ({hash:location.hash,text:document.getElementById('app')?.textContent||''}));
     assert(!deniedState.hash.startsWith('#/admin-preview'),`Non-admin stayed on protected employer usage hash: ${deniedState.hash}`);

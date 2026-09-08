@@ -43,3 +43,15 @@
 @media (prefers-reduced-motion:reduce){.cm-founder-spinner{animation:none;border-top-color:#d1d8e1}}
 @media (max-width:900px){.cm-official-platform-inner{grid-template-columns:1fr}.cm-founder-metric-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cm-founder-admin-head{align-items:flex-start;flex-direction:column}}
 @media (max-width:520px){.cm-official-platform-proof{padding:22px 0}.cm-official-platform-logo-wrap{padding:18px}.cm-founder-admin-page{padding:28px 0 52px}.cm-founder-metric-grid{grid-template-columns:1fr 1fr;gap:10px}.cm-founder-metric{padding:16px!important}.cm-founder-metric strong{font-size:1.75rem}.cm-founder-table-head{padding:18px;align-items:flex-start;flex-direction:column}.cm-founder-table th,.cm-founder-table td{padding:13px 14px}}
+
+/* Multi-firm official onboarding proof */
+.cm-official-platform-multi{display:grid;gap:22px}
+.cm-official-firms-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px}
+.cm-official-firm-card{display:grid;grid-template-columns:minmax(160px,.72fr) minmax(0,1.28fr);gap:22px;align-items:center;padding:22px;border:1px solid #dfe5ec;border-radius:18px;background:#fff;box-shadow:0 14px 35px rgba(7,26,51,.07)}
+.cm-official-firm-logo{display:grid;place-items:center;min-height:116px;padding:15px;border:1px solid #edf0f4;border-radius:14px;background:#fbfcfd}
+.cm-official-firm-logo img{display:block;width:100%;max-width:360px;height:auto}
+.cm-official-firm-meta h3{margin:6px 0 8px;color:var(--navy,#071a33);font-size:1.45rem}
+.cm-official-firm-meta p{margin:0;color:#445166;line-height:1.58}
+.cm-official-firm-location{display:block;color:#8a672f;font-size:.72rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}
+.cm-official-platform-multi>.cm-official-platform-note{margin:0;color:#68758a;font-size:.84rem}
+@media(max-width:680px){.cm-official-firm-card{grid-template-columns:1fr;padding:18px}.cm-official-firm-logo{min-height:96px}.cm-official-firm-meta h3{font-size:1.3rem}}

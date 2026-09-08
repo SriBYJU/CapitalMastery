@@ -276,7 +276,7 @@
     }
     return state;
   }
-  function saveState(){ ensureActiveState(); const key=activeStateKey(); stateSourceKey=key; localStorage.setItem(key, JSON.stringify(state)); }
+  function saveState(){ ensureActiveState(); const key=activeStateKey(); stateSourceKey=key; try{ localStorage.setItem(key, JSON.stringify(state)); return true; }catch(error){ window.CM_RELIABILITY?.report?.('browser-storage','Capital Mastery could not save your latest progress in this browser.',{severity:'error',detail:String(error?.message||error)}); throw new Error('Your latest progress could not be saved on this device. Free browser storage or enable site storage, then retry.'); } }
   function getCareerState(id){
     ensureActiveState();
     if(!state.careers[id]) state.careers[id] = {learningComplete:[],completedParts:[],quizScores:{},simulationKnowledge:null,simulationScore:null,finalScore:null,applied:{},simResponses:{},readiness:null};

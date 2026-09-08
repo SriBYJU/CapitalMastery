@@ -54,6 +54,6 @@ await writeFile(path.join(outputRoot, '_headers'), `/*
   Cache-Control: no-cache, no-store, must-revalidate
 `, 'utf8');
 
-console.log(`Cloudflare Pages bundle ready: ${path.relative(repoRoot, outputRoot)}`);
+console.log(`GitHub Pages bundle ready: ${path.relative(repoRoot, outputRoot)}`);
 console.log(`Included ${new Set([...requiredStaticFiles, ...referencedFiles]).size} root files plus assets/ and _headers`);
 

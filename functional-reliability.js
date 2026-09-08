@@ -212,6 +212,22 @@
     }).catch(() => {});
   }
 
+  function inspectOtherDurableWrites(url, response) {
+    if (!response.ok) return;
+    response.clone().json().then(data => {
+      if (/\/enterprise\/diagnostic\/submit(?:$|\?)/.test(url)) {
+        if (data?.enrichmentPending === true) {
+          report('diagnostic-enrichment', safeText(data.enrichmentWarning, 'Your baseline is saved, but readiness calculations are still updating.'), { severity:'error', detail:'Do not resubmit the diagnostic. Your saved baseline remains authoritative.' });
+        } else clear('diagnostic-enrichment');
+      }
+      if (/\/enterprise\/role-lab-runs\/[^/]+\/submit(?:$|\?)/.test(url)) {
+        if (data?.postProcessingPending === true) {
+          report('rolelab-enrichment', safeText((data.postProcessingWarnings || []).join(' '), 'Your Role Lab submission is saved, but post-processing is still updating.'), { severity:'error', detail:'Do not submit the same work again. Reopen the saved run to continue once processing recovers.' });
+        } else clear('rolelab-enrichment');
+      }
+    }).catch(() => {});
+  }
+
   function installFetchGuard() {
     if (!nativeFetch || window.fetch.__cmFunctionalReliabilityWrapped) return;
     const wrapped = async function(input, init={}) {
@@ -230,6 +246,7 @@
           }
         }
         inspectAssessmentSubmit(url, response, input, init);
+        inspectOtherDurableWrites(url, response);
         return response;
       } catch (error) {
         if (mutation && window.CM_AUTH?.user) {

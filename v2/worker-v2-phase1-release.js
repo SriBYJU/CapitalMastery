@@ -2124,9 +2124,24 @@ export default {
           `).bind(eid,user.sub,orgId,assignmentId,pathway.id,competencyId,'diagnostic',attemptId,cScore,0.25,JSON.stringify({diagnosticVersion:'2.0',baselineOnly:true})));
         }
         await env.DB.batch(statements);
-        for(const [competencyId] of evidenceIds) await v2RecomputeCompetency(env,{uid:user.sub,orgId,assignmentId,pathwayId:pathway.id,competencyId});
-        const readiness=await v2CreateReadinessSnapshot(env,{uid:user.sub,orgId,cohortId,assignmentId,pathwayId:pathway.id,curriculumVersion});
-        return json({ok:true,attemptId,score,correct,total:qs.length,competencyScores:compScores,readiness,note:'Diagnostic score is baseline-only and has 0% credential weight.'},200,env);
+        let readiness=null;
+        let enrichmentPending=false;
+        let enrichmentWarning=null;
+        let lastEnrichmentError=null;
+        for(const delay of [0,250,900,1800]){
+          if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+          try{
+            for(const [competencyId] of evidenceIds) await v2RecomputeCompetency(env,{uid:user.sub,orgId,assignmentId,pathwayId:pathway.id,competencyId});
+            readiness=await v2CreateReadinessSnapshot(env,{uid:user.sub,orgId,cohortId,assignmentId,pathwayId:pathway.id,curriculumVersion});
+            lastEnrichmentError=null;
+            break;
+          }catch(error){ lastEnrichmentError=error; }
+        }
+        if(lastEnrichmentError){
+          enrichmentPending=true;
+          enrichmentWarning='Your baseline diagnostic is saved, but readiness calculations could not finish updating yet.';
+        }
+        return json({ok:true,diagnosticSaved:true,pathwayId:pathway.id,assignmentId,attemptId,score,correct,total:qs.length,competencyScores:compScores,readiness,enrichmentPending,enrichmentWarning,note:'Diagnostic score is baseline-only and has 0% credential weight.'},200,env);
       }
 
       if (request.method === "GET" && parts[0] === "enterprise" && parts[1] === "learner" && parts[2] === "skills" && parts.length === 4) {
@@ -2188,26 +2203,120 @@ export default {
         const body=await readJson(request); const taskId=cleanId(body.taskId); if(taskId!==state.current.id) throw new HttpError(409,'Complete the current Role Lab task before moving ahead');
         const prior=await env.DB.prepare(`SELECT MAX(attempt_no) AS n FROM role_lab_submissions WHERE run_id=? AND task_id=?`).bind(runId,taskId).first(); const attemptNo=Number(prior?.n||0)+1; if(attemptNo>Number(state.current.max_attempts)) throw new HttpError(409,'Maximum attempts reached for this task');
         const response=body.response&&typeof body.response==='object'?body.response:{}; const grading=v2ParseJson(state.current.grading_json,{}); const result=v2GradeRules(grading,response); const passedTask=result.score>=Number(state.current.pass_score); const feedback={messages:result.feedback,breakdown:result.breakdown,passed:passedTask,managerNote:passedTask?'Work accepted. Continue to the next desk task.':'Revision required. Fix the issues below and resubmit before continuing.'};
-        const subId=`sub_${crypto.randomUUID().replace(/-/g,'').slice(0,20)}`; await env.DB.prepare(`INSERT INTO role_lab_submissions (id,run_id,task_id,attempt_no,response_json,score_json,feedback_json) VALUES (?,?,?,?,?,?,?)`).bind(subId,runId,taskId,attemptNo,JSON.stringify(response),JSON.stringify({score:result.score,earned:result.earned,possible:result.possible}),JSON.stringify(feedback)).run();
+        const subId=`sub_${crypto.randomUUID().replace(/-/g,'').slice(0,20)}`;
+        await env.DB.prepare(`INSERT INTO role_lab_submissions (id,run_id,task_id,attempt_no,response_json,score_json,feedback_json) VALUES (?,?,?,?,?,?,?)`).bind(subId,runId,taskId,attemptNo,JSON.stringify(response),JSON.stringify({score:result.score,earned:result.earned,possible:result.possible}),JSON.stringify(feedback)).run();
+        let postProcessingPending=false;
+        const postProcessingWarnings=[];
+        let evidenceReady=!passedTask;
         if(passedTask){
-          const cmap=v2ParseJson(state.current.competency_map_json,{}); const statements=[]; const comps=[];
-          for(const [competencyId,mapWeight] of Object.entries(cmap)){const scope=run.assignment_id||'public';const eid=`evi_${(await sha256Hex(`role_lab|${user.sub}|${scope}|${run.lab_key}|${run.lab_version}|${taskId}|${competencyId}`)).slice(0,28)}`;comps.push(competencyId);statements.push(env.DB.prepare(`
-            INSERT INTO competency_evidence (id,uid,org_id,assignment_id,pathway_id,competency_id,source_type,source_id,score,weight,evidence_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            ON CONFLICT(id) DO UPDATE SET
-              source_id=CASE WHEN excluded.score >= competency_evidence.score THEN excluded.source_id ELSE competency_evidence.source_id END,
-              score=MAX(competency_evidence.score, excluded.score),
-              weight=excluded.weight,
-              evidence_json=CASE WHEN excluded.score >= competency_evidence.score THEN excluded.evidence_json ELSE competency_evidence.evidence_json END
-          `).bind(eid,user.sub,run.org_id,run.assignment_id,run.pathway_id,competencyId,'role_lab',subId,result.score,Math.max(0.25,1.5*Number(mapWeight||1)),JSON.stringify({labKey:run.lab_key,taskId,attemptNo,breakdown:result.breakdown})));}
-          if(statements.length) await env.DB.batch(statements); for(const competencyId of comps) await v2RecomputeCompetency(env,{uid:user.sub,orgId:run.org_id,assignmentId:run.assignment_id,pathwayId:run.pathway_id,competencyId});
+          const cmap=v2ParseJson(state.current.competency_map_json,{});
+          const statements=[];
+          const comps=[];
+          for(const [competencyId,mapWeight] of Object.entries(cmap)){
+            const scope=run.assignment_id||'public';
+            const eid=`evi_${(await sha256Hex(`role_lab|${user.sub}|${scope}|${run.lab_key}|${run.lab_version}|${taskId}|${competencyId}`)).slice(0,28)}`;
+            comps.push(competencyId);
+            statements.push(env.DB.prepare(`
+              INSERT INTO competency_evidence (id,uid,org_id,assignment_id,pathway_id,competency_id,source_type,source_id,score,weight,evidence_json) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+              ON CONFLICT(id) DO UPDATE SET
+                source_id=CASE WHEN excluded.score >= competency_evidence.score THEN excluded.source_id ELSE competency_evidence.source_id END,
+                score=MAX(competency_evidence.score, excluded.score),
+                weight=excluded.weight,
+                evidence_json=CASE WHEN excluded.score >= competency_evidence.score THEN excluded.evidence_json ELSE competency_evidence.evidence_json END
+            `).bind(eid,user.sub,run.org_id,run.assignment_id,run.pathway_id,competencyId,'role_lab',subId,result.score,Math.max(0.25,1.5*Number(mapWeight||1)),JSON.stringify({labKey:run.lab_key,taskId,attemptNo,breakdown:result.breakdown})));
+          }
+          let lastEvidenceError=null;
+          for(const delay of [0,250,900,1800]){
+            if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+            try{
+              if(statements.length) await env.DB.batch(statements);
+              for(const competencyId of comps) await v2RecomputeCompetency(env,{uid:user.sub,orgId:run.org_id,assignmentId:run.assignment_id,pathwayId:run.pathway_id,competencyId});
+              lastEvidenceError=null;
+              break;
+            }catch(error){ lastEvidenceError=error; }
+          }
+          evidenceReady=!lastEvidenceError;
+          if(lastEvidenceError){
+            postProcessingPending=true;
+            postProcessingWarnings.push('Your Role Lab submission is saved, but competency evidence is still updating.');
+          }
         }
-        const nextState=await v2RunState(env,run); let runStatus=passedTask?'in_progress':'revision_required'; let finalScore=null;
-        if(nextState.complete){runStatus='passed';finalScore=nextState.overall;await env.DB.prepare(`UPDATE role_lab_runs SET status='passed',score=?,submitted_at=CURRENT_TIMESTAMP,completed_at=CURRENT_TIMESTAMP WHERE id=?`).bind(finalScore,runId).run();}
-        else await env.DB.prepare(`UPDATE role_lab_runs SET status=?,revision_count=revision_count+?,submitted_at=CURRENT_TIMESTAMP WHERE id=?`).bind(runStatus,passedTask?0:1,runId).run();
-        const readiness=passedTask?await v2CreateReadinessSnapshot(env,{uid:user.sub,orgId:run.org_id,cohortId:run.cohort_id,assignmentId:run.assignment_id,pathwayId:run.pathway_id,curriculumVersion:'2.0'}):null;
+
+        let nextState=null;
+        let lastStateError=null;
+        for(const delay of [0,250,900,1800]){
+          if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+          try{ nextState=await v2RunState(env,run); lastStateError=null; break; }
+          catch(error){ lastStateError=error; }
+        }
+        if(lastStateError || !nextState){
+          postProcessingPending=true;
+          postProcessingWarnings.push('Your Role Lab submission is saved, but the next-task state could not finish updating yet.');
+          return json({ok:true,submissionSaved:true,submissionId:subId,taskId,attemptNo,score:result.score,passed:passedTask,feedback,runStatus:'processing',overallScore:null,complete:false,readiness:null,issuedCredentials:[],nextTask:null,postProcessingPending,postProcessingWarnings},200,env);
+        }
+
+        let runStatus=passedTask?'in_progress':'revision_required';
+        let finalScore=null;
+        if(nextState.complete){runStatus='passed';finalScore=nextState.overall;}
+        let runStateSaved=false;
+        let lastRunUpdateError=null;
+        for(const delay of [0,250,900,1800]){
+          if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+          try{
+            if(nextState.complete){
+              await env.DB.prepare(`UPDATE role_lab_runs SET status='passed',score=?,submitted_at=CURRENT_TIMESTAMP,completed_at=CURRENT_TIMESTAMP WHERE id=?`).bind(finalScore,runId).run();
+            }else{
+              await env.DB.prepare(`UPDATE role_lab_runs SET status=?,revision_count=revision_count+?,submitted_at=CURRENT_TIMESTAMP WHERE id=?`).bind(runStatus,passedTask?0:1,runId).run();
+            }
+            runStateSaved=true;
+            lastRunUpdateError=null;
+            break;
+          }catch(error){ lastRunUpdateError=error; }
+        }
+        if(lastRunUpdateError){
+          postProcessingPending=true;
+          postProcessingWarnings.push('Your Role Lab submission is saved, but the run summary is still updating.');
+        }
+
+        let readiness=null;
+        if(passedTask && evidenceReady){
+          let lastReadinessError=null;
+          for(const delay of [0,250,900,1800]){
+            if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+            try{
+              readiness=await v2CreateReadinessSnapshot(env,{uid:user.sub,orgId:run.org_id,cohortId:run.cohort_id,assignmentId:run.assignment_id,pathwayId:run.pathway_id,curriculumVersion:'2.0'});
+              lastReadinessError=null;
+              break;
+            }catch(error){ lastReadinessError=error; }
+          }
+          if(lastReadinessError){
+            postProcessingPending=true;
+            postProcessingWarnings.push('Your Role Lab submission is saved, but readiness calculations are still updating.');
+          }
+        }
+
         let issuedCredentials=[];
-        if(nextState.complete){const pathway=getPathway(run.pathway_id);const refreshed=await v2RefreshCredentials(env,{user,pathway,orgId:run.org_id,assignmentId:run.assignment_id});issuedCredentials=refreshed.filter(x=>x.issued).map(x=>x.credential);}
-        return json({ok:true,submissionId:subId,taskId,attemptNo,score:result.score,passed:passedTask,feedback,runStatus,overallScore:nextState.overall,complete:nextState.complete,readiness,issuedCredentials,nextTask:nextState.current?v2PublicLabTask(nextState.current):null},200,env);
+        if(nextState.complete && evidenceReady && runStateSaved){
+          const pathway=getPathway(run.pathway_id);
+          let refreshed=[];
+          let lastCredentialError=null;
+          for(const delay of [0,250,900,1800]){
+            if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+            try{ refreshed=await v2RefreshCredentials(env,{user,pathway,orgId:run.org_id,assignmentId:run.assignment_id}); lastCredentialError=null; break; }
+            catch(error){ lastCredentialError=error; }
+          }
+          if(lastCredentialError){
+            postProcessingPending=true;
+            postProcessingWarnings.push('Your Role Lab completion is saved, but credential issuance is still updating.');
+          }else{
+            issuedCredentials=refreshed.filter(x=>x.issued).map(x=>x.credential);
+          }
+        }else if(nextState.complete && (!evidenceReady || !runStateSaved)){
+          postProcessingPending=true;
+          postProcessingWarnings.push('Credential issuance is waiting for the saved Role Lab evidence to finish processing.');
+        }
+
+        return json({ok:true,submissionSaved:true,submissionId:subId,taskId,attemptNo,score:result.score,passed:passedTask,feedback,runStatus,overallScore:nextState.overall,complete:nextState.complete,readiness,issuedCredentials,nextTask:nextState.current?v2PublicLabTask(nextState.current):null,postProcessingPending,postProcessingWarnings},200,env);
       }
 
       // ==================================================
@@ -2289,8 +2398,25 @@ export default {
         const answers=body.answers&&typeof body.answers==='object'&&!Array.isArray(body.answers)?body.answers:{};
         const result=await v2GradeAssessment(env,{user,assessment,answers,assignmentId,orgId:access.orgId,cohortId:access.cohortId,curriculumVersion:access.curriculumVersion,dynamicQuestions:dynamic?.questions||null});
         const pathway=getPathway(assessment.pathway_id);
-        const refreshed=result.passed?await v2RefreshCredentials(env,{user,pathway,orgId:access.orgId,assignmentId}):[];
-        return json({ok:true,assessmentKey:key,version:assessment.version,passScore:Number(assessment.pass_score),...result,issuedCredentials:refreshed.filter(x=>x.issued).map(x=>x.credential),credentialRefresh:refreshed.map(x=>({level:x.level,issued:x.issued===true,eligible:x.eligible===true,missing:x.missing||x.eligibility?.missing||[]}))},200,env);
+        let refreshed=[];
+        let credentialRefreshPending=result.evidenceRefreshPending===true;
+        let credentialRefreshWarning=result.evidenceRefreshWarning||null;
+        if(result.passed && !result.evidenceRefreshPending){
+          let lastRefreshError=null;
+          for(const delay of [0,250,900]){
+            if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+            try{
+              refreshed=await v2RefreshCredentials(env,{user,pathway,orgId:access.orgId,assignmentId});
+              lastRefreshError=null;
+              break;
+            }catch(error){ lastRefreshError=error; }
+          }
+          if(lastRefreshError){
+            credentialRefreshPending=true;
+            credentialRefreshWarning='Your assessment attempt is saved, but credential issuance could not finish yet.';
+          }
+        }
+        return json({ok:true,assessmentSaved:true,pathwayId:pathway.id,assignmentId,assessmentKey:key,version:assessment.version,passScore:Number(assessment.pass_score),...result,credentialRefreshPending,credentialRefreshWarning,issuedCredentials:refreshed.filter(x=>x.issued).map(x=>x.credential),credentialRefresh:refreshed.map(x=>({level:x.level,issued:x.issued===true,eligible:x.eligible===true,missing:x.missing||x.eligibility?.missing||[]}))},200,env);
       }
 
       if (request.method === 'POST' && url.pathname === '/enterprise/credentials/refresh') {
@@ -6496,7 +6622,13 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
     .bind(attemptId,user.sub,orgId,cohortId,assignmentId,assessment.pathway_id,assessment.assessment_key,assessment.version,score,passed?1:0,JSON.stringify(answers||{}),JSON.stringify({correct,total:qs.length,competencyScores:compScores,details})).run();
 
   let readiness=null;
+  let evidenceRefreshPending=false;
+  let evidenceRefreshWarning=null;
   if(passed){
+    let lastEvidenceError=null;
+    for(const delay of [0,250,900]){
+      if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+      try{
     const sourceType=assessment.stage==='final'?'final':'assessment';
     const scope=assignmentId||'public';
     const statements=[];
@@ -6515,8 +6647,18 @@ async function v2GradeAssessment(env, { user, assessment, answers, assignmentId 
     if(statements.length) await env.DB.batch(statements);
     for(const competencyId of Object.keys(compScores)) await v2RecomputeCompetency(env,{uid:user.sub,orgId,assignmentId,pathwayId:assessment.pathway_id,competencyId});
     readiness=await v2CreateReadinessSnapshot(env,{uid:user.sub,orgId,cohortId,assignmentId,pathwayId:assessment.pathway_id,curriculumVersion});
+        lastEvidenceError=null;
+        break;
+      }catch(error){
+        lastEvidenceError=error;
+      }
+    }
+    if(lastEvidenceError){
+      evidenceRefreshPending=true;
+      evidenceRefreshWarning='Your assessment attempt is saved, but readiness evidence could not finish updating yet.';
+    }
   }
-  return {attemptId,score,passed,correct,total:qs.length,competencyScores:compScores,details,readiness};
+  return {attemptId,score,passed,correct,total:qs.length,competencyScores:compScores,details,readiness,evidenceRefreshPending,evidenceRefreshWarning};
 }
 
 async function v2EnforceDiagnosticRate(env, uid, pathwayId, assignmentId = null) {

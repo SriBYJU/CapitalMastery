@@ -74,6 +74,21 @@
     return window.CM_AUTH?.getIdToken ? await window.CM_AUTH.getIdToken() : null;
   }
 
+  function progressReadScope(pathway) { return `progress-read:${pathway}`; }
+
+  function progressReadFailure(pathway, message) {
+    const scope = progressReadScope(pathway);
+    window.CM_RELIABILITY?.report?.(scope, message, {
+      severity:'error',
+      retry:async () => {
+        progressCache.delete(pathway);
+        await progressRows(pathway, true);
+        return !(window.CM_RELIABILITY?.issues || []).some(issue => issue.scope === scope);
+      },
+      detail:'Capital Mastery will not replace authoritative server progress with an empty result.'
+    });
+  }
+
   async function progressRows(pathway, force=false) {
     if (!pathway || !API || !window.CM_AUTH?.user) return [];
     const cached = progressCache.get(pathway);
@@ -82,19 +97,28 @@
     const request = (async () => {
       try {
         const token = await authToken();
-        if (!token) return [];
+        if (!token) {
+          progressReadFailure(pathway, 'Capital Mastery could not verify your signed-in session before reading saved course progress.');
+          return [];
+        }
         const response = await fetch(`${API}/progress/${encodeURIComponent(pathway)}`, { headers:{Authorization:`Bearer ${token}`} });
         const data = await response.json().catch(() => ({}));
-        if (!response.ok || !Array.isArray(data.progress)) return [];
+        if (!response.ok || !Array.isArray(data.progress)) {
+          progressReadFailure(pathway, `Saved course progress could not be verified from the server (${response.status}).`);
+          return [];
+        }
         progressCache.set(pathway,{at:Date.now(),rows:data.progress});
+        window.CM_RELIABILITY?.clear?.(progressReadScope(pathway));
         return data.progress;
-      } catch (_) { return []; }
+      } catch (error) {
+        progressReadFailure(pathway, `Saved course progress could not be verified: ${String(error?.message || error)}`);
+        return [];
+      }
       finally { progressInflight.delete(pathway); }
     })();
     progressInflight.set(pathway, request);
     return request;
   }
-
   function rowBest(rows,itemId) {
     const row = (rows || []).find(x => String(x.item_id || '') === itemId);
     if (!row || Number(row.completed) !== 1) return 0;
