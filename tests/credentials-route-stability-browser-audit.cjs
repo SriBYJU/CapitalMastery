@@ -85,22 +85,25 @@ async function runViewport(browser, viewport) {
   await page.evaluate(() => {
     window.__cmCredentialSyntheticHashchanges = 0;
     window.__cmCredentialHashchanges = 0;
-    window.__cmCredentialMainMutations = 0;
+    window.__cmCredentialAppMutations = 0;
     window.addEventListener('hashchange', event => {
       const root = String(location.hash || '').replace(/^#\/?/,'').split(/[/?]/,1)[0];
       if (root !== 'credentials') return;
       window.__cmCredentialHashchanges += 1;
       if (event.isTrusted === false) window.__cmCredentialSyntheticHashchanges += 1;
     });
-    const main = document.querySelector('main#main');
-    if (main) {
+    const app = document.getElementById('app');
+    if (app) {
       new MutationObserver(records => {
-        window.__cmCredentialMainMutations += records.reduce((sum, record) => sum + record.addedNodes.length + record.removedNodes.length, 0);
-      }).observe(main, {childList:true,subtree:false});
+        window.__cmCredentialAppMutations += records.reduce((sum, record) => sum + record.addedNodes.length + record.removedNodes.length, 0);
+      }).observe(app, {childList:true,subtree:true});
     }
   });
 
-  await page.locator('a[href="#/credentials"]').first().click();
+  // Open the route itself rather than a particular nav presentation. At 320px
+  // the desktop nav link is intentionally hidden inside the mobile menu.
+  await page.evaluate(() => { location.hash = '#/credentials'; });
+  await page.waitForFunction(() => location.hash === '#/credentials', null, {timeout:5000});
   await page.waitForSelector('.cm-credential-card', {timeout:15000});
   await page.waitForFunction(() => /VERIFIED CREDENTIALS/i.test(document.querySelector('main#main')?.textContent || ''), null, {timeout:15000});
 
@@ -108,9 +111,8 @@ async function runViewport(browser, viewport) {
   const baseline = await page.evaluate(() => ({
     synthetic:window.__cmCredentialSyntheticHashchanges || 0,
     hashes:window.__cmCredentialHashchanges || 0,
-    mutations:window.__cmCredentialMainMutations || 0,
-    y:window.scrollY,
-    html:document.querySelector('main#main')?.innerHTML || ''
+    mutations:window.__cmCredentialAppMutations || 0,
+    y:window.scrollY
   }));
 
   const samples = [];
@@ -120,7 +122,7 @@ async function runViewport(browser, viewport) {
       y:window.scrollY,
       synthetic:window.__cmCredentialSyntheticHashchanges || 0,
       hashes:window.__cmCredentialHashchanges || 0,
-      mutations:window.__cmCredentialMainMutations || 0,
+      mutations:window.__cmCredentialAppMutations || 0,
       title:document.querySelector('main#main h1')?.textContent || '',
       cards:document.querySelectorAll('.cm-credential-card').length
     })));
@@ -129,7 +131,7 @@ async function runViewport(browser, viewport) {
   const final = samples.at(-1);
   assert.equal(final.synthetic, baseline.synthetic, `Credentials route generated synthetic hashchange(s) after settling at ${viewport.width}px.`);
   assert.equal(final.hashes, baseline.hashes, `Credentials route changed route after settling at ${viewport.width}px.`);
-  assert.equal(final.mutations, baseline.mutations, `Credentials main content rebuilt after settling at ${viewport.width}px.`);
+  assert.equal(final.mutations, baseline.mutations, `Credentials page rebuilt after settling at ${viewport.width}px.`);
   assert.equal(counters.credentialsRequests, 1, `Credentials endpoint was fetched ${counters.credentialsRequests} times instead of once at ${viewport.width}px.`);
   assert.equal(final.cards, 1, `Expected one authoritative credential card at ${viewport.width}px.`);
   assert.match(final.title, /Capital Mastery records/i);
