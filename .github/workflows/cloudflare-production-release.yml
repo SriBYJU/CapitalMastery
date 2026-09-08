@@ -48,6 +48,7 @@ jobs:
           node --check v2/platform-admin-overlay.js
           node --check tools/prepare-production-d1.mjs
           node --check tests/platform-admin-employer-usage-browser-audit.cjs
+          node --check tests/credentials-route-stability-browser-audit.cjs
           node tests/platform-admin-employer-usage-logic-audit.mjs
           node tests/platform-admin-employer-usage-source-audit.mjs
           node tests/admin-route-boundary-audit.mjs
@@ -81,6 +82,7 @@ jobs:
           trap 'kill $SERVER_PID || true' EXIT
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/platform-admin-employer-usage-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/credentials-route-stability-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
@@ -127,7 +129,7 @@ jobs:
           ready=false
           for i in {1..30}; do
             curl -fsS "${PRIMARY_URL}/" -o /tmp/cm-index || true
-            if grep -q 'founder-admin-employer-usage.js?v=20260908-founderadmin1' /tmp/cm-index 2>/dev/null; then ready=true; break; fi
+            if grep -q 'founder-admin-employer-usage.js?v=20260908-founderadmin2' /tmp/cm-index 2>/dev/null && grep -q 'ux-stability.js?v=20260908-credentials-stability1' /tmp/cm-index 2>/dev/null; then ready=true; break; fi
             sleep 5
           done
           [ "$ready" = true ] || { echo 'Canonical GitHub Pages has not published this release'; exit 1; }
@@ -139,6 +141,7 @@ jobs:
         run: |
           set -euo pipefail
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/platform-admin-employer-usage-browser-audit.cjs
+          CM_AUDIT_URL="${PRIMARY_URL}" node tests/credentials-route-stability-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/employer-role-matrix-browser-audit.cjs
@@ -151,6 +154,7 @@ jobs:
           - GitHub Pages is the only canonical frontend deployment target.
           - No Cloudflare Pages deployment or mirror verification occurs in this workflow.
           - Exact-email platform-admin source/logic/browser tests passed.
+          - Credentials route stability passed at mobile, tablet, and desktop widths.
           - Employer role and invitation regressions passed.
           - Production D1 compatibility gate passed before Worker deployment.
           - Worker auth/origin/admin boundaries passed after deployment.
