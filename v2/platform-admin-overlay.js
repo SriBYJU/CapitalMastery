@@ -1,3 +1,4 @@
+// Cloudflare Workers Builds deployment marker: 2026-09-08. No behavior change.
 import coreWorker from './worker-v2-phase1-release.js';
 
 const PLATFORM_ADMIN_EMAIL = 'awsomecoolsri2@gmail.com';
