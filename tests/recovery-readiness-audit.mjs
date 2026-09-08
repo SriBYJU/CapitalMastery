@@ -10,7 +10,8 @@ const gitignore = fs.readFileSync('.gitignore', 'utf8');
 const failures = [];
 const ok = (value, message) => { if (!value) failures.push(message); };
 
-ok(config.main === 'v2/worker-v2-phase1-release.js', 'Recovery record must identify the deployable Worker entrypoint');
+ok(config.main === 'v2/platform-admin-overlay.js', 'Recovery record must identify the deployable Worker entrypoint');
+ok(recovery.includes('v2/platform-admin-overlay.js') && recovery.includes('v2/worker-v2-phase1-release.js'), 'Recovery runbook must document the overlay and core Worker relationship');
 ok(config.d1_databases?.some(binding => binding.binding === 'DB' && binding.database_name === 'capital-mastery-prod'), 'Recovery record must remain bound to the intended D1 database');
 ok(config.observability?.enabled === true, 'Worker observability must stay enabled');
 ok(recovery.includes('D1 Time Travel') && recovery.includes('Seven-day point-in-time recovery window'), 'Free D1 recovery source/window is not documented');
