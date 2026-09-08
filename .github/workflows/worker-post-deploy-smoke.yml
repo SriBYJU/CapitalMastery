@@ -1,0 +1,42 @@
+name: Worker post-deploy smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/worker-post-deploy-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      WORKER_URL: https://capital-mastery-api.avadhanula-shriyan.workers.dev
+      ORIGIN: https://sribyju.github.io
+    steps:
+      - name: Verify live Worker generation and boundaries
+        run: |
+          set -euo pipefail
+          health=$(curl -sS -o /tmp/health -w '%{http_code}' -H "Origin: ${ORIGIN}" "${WORKER_URL}/health" || true)
+          echo "HEALTH=$health"
+          [ "$health" = "200" ]
+
+          bad=$(curl -sS -o /tmp/bad -w '%{http_code}' -H 'Origin: https://not-approved.example.invalid' "${WORKER_URL}/health" || true)
+          echo "BAD_ORIGIN=$bad"
+          [ "$bad" = "403" ]
+
+          auth=$(curl -sS -o /tmp/auth -w '%{http_code}' -X POST -H "Origin: ${ORIGIN}" -H 'Content-Type: application/json' --data '{}' "${WORKER_URL}/auth-check" || true)
+          echo "AUTH_UNAUTH=$auth"
+          case "$auth" in 401|403) ;; *) exit 1;; esac
+
+          usage=$(curl -sS -o /tmp/usage -w '%{http_code}' -H "Origin: ${ORIGIN}" "${WORKER_URL}/enterprise/admin/organizations" || true)
+          echo "EMPLOYER_USAGE_UNAUTH=$usage"
+          case "$usage" in
+            401|403) echo 'EMPLOYER_USAGE_ROUTE_PRESENT_AND_PROTECTED=PASS' ;;
+            404) echo 'EMPLOYER_USAGE_ROUTE_STILL_STALE=FAIL'; exit 1 ;;
+            *) cat /tmp/usage 2>/dev/null || true; exit 1 ;;
+          esac
