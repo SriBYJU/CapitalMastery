@@ -1,4 +1,4 @@
-# Retriggered after GitHub repository secrets were verified in the UI.
+# Fresh run after production environment secrets were configured.
 name: One-time founder admin production release
 
 on:
