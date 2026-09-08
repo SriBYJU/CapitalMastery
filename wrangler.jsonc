@@ -1,3 +1,4 @@
+// Cloudflare Workers Builds deployment trigger: 2026-09-08. No behavior change.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "capital-mastery-api",
