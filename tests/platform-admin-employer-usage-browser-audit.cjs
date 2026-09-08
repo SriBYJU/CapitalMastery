@@ -32,6 +32,24 @@ async function contained(page, label) {
   assert(Math.max(m.doc,m.body) <= m.inner + 2, `${label}: horizontal body overflow ${Math.max(m.doc,m.body)} > ${m.inner}`);
 }
 
+async function waitForUsage(page, width) {
+  try {
+    await page.waitForSelector('.cm-founder-metric-grid',{timeout:15000});
+  } catch (error) {
+    const state = await page.evaluate(() => ({
+      hash: location.hash,
+      auth: window.CM_AUTH ? {ready:window.CM_AUTH.ready,isAdmin:window.CM_AUTH.isAdmin,backendVerified:window.CM_AUTH.backendVerified,user:window.CM_AUTH.user?.email || null} : null,
+      reliability: window.CM_RELIABILITY?.issues || [],
+      appText: (document.getElementById('app')?.textContent || '').replace(/\s+/g,' ').trim().slice(0,2000),
+      founderPage: !!document.querySelector('.cm-founder-admin-page'),
+      loading: !!document.querySelector('.cm-founder-admin-loading'),
+      denied: !!document.querySelector('.cm-founder-admin-denied')
+    }));
+    console.error(`EMPLOYER_USAGE_DEBUG @ ${width}: ${JSON.stringify(state)}`);
+    throw error;
+  }
+}
+
 (async () => {
   const browser = await chromium.launch({headless:true});
   try {
@@ -56,11 +74,15 @@ async function contained(page, label) {
       const context = await browser.newContext({viewport});
       await installCommonRoutes(context, true);
       const page = await context.newPage();
+      const browserErrors = [];
+      page.on('pageerror', error => browserErrors.push(String(error?.stack || error)));
+      page.on('console', msg => { if (['error','warning','warn'].includes(msg.type())) browserErrors.push(`${msg.type()}: ${msg.text()}`); });
       await page.goto(`${BASE}/#/admin-preview`,{waitUntil:'domcontentloaded',timeout:30000});
       await page.waitForSelector('[data-cm-employer-usage-card]',{timeout:15000});
       assert(/Employer Usage/.test(await page.textContent('[data-cm-employer-usage-card]')||''),`Admin card missing @ ${viewport.width}`);
       await page.locator('[data-cm-employer-usage-card] a').click();
-      await page.waitForSelector('.cm-founder-metric-grid',{timeout:15000});
+      try { await waitForUsage(page, viewport.width); }
+      catch (error) { if (browserErrors.length) console.error(`EMPLOYER_USAGE_BROWSER_ERRORS @ ${viewport.width}: ${browserErrors.join(' | ')}`); throw error; }
       const text = await page.textContent('#app');
       assert(/Real Employers/.test(text||'') && /Total Learners/.test(text||'') && /Total Cohorts/.test(text||'') && /Total Assignments/.test(text||''),`Summary cards missing @ ${viewport.width}`);
       assert(/Test/.test(text||'') && /Example Partners/.test(text||''),`Aggregate organization rows missing @ ${viewport.width}`);
