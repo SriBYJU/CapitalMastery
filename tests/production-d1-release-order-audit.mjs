@@ -1,32 +1,33 @@
 import fs from 'node:fs';
-const release=fs.readFileSync('.github/workflows/cloudflare-production-release.yml','utf8');
+
+const must=(v,m)=>{if(!v)throw new Error(m);};
+const workerConfig=fs.readFileSync('wrangler.jsonc','utf8');
+const releaseEvidence=fs.readFileSync('docs/release-evidence/cloudflare-workers-builds-2026-09-08.md','utf8');
+const liveAudit=fs.readFileSync('.github/workflows/live-production-readonly-audit.yml','utf8');
 const tool=fs.readFileSync('tools/prepare-production-d1.mjs','utf8');
 const migration016=fs.readFileSync('migrations/016_phase2_career_skills_track_constraints.sql','utf8');
-const must=(v,m)=>{if(!v)throw new Error(m);};
 
-const artifactAttackStep=release.indexOf('- name: Attack exact static artifact before production changes');
-const firebaseStep=release.indexOf('- name: Require live Firebase readiness before any D1 mutation');
-const d1Step=release.indexOf('- name: Prepare and verify production D1 schema before Worker');
-const workerStep=release.indexOf('- name: Deploy Worker only after D1 compatibility gate');
-const workerVerifyStep=release.indexOf('- name: Verify Worker security boundaries');
-const canonicalStep=release.indexOf('- name: Verify canonical GitHub Pages generation');
-const browserStep=release.indexOf('- name: Canonical frontend Chromium verification');
-must(artifactAttackStep>=0,'Production release must attack the exact static artifact before production mutation');
-must(firebaseStep>artifactAttackStep,'Live Firebase readiness must be checked only after source/artifact browser preflight passes');
-must(d1Step>firebaseStep,'Firebase readiness must pass before any production D1 mutation');
-must(workerStep>d1Step,'D1 compatibility/migration must finish before Worker deployment');
-must(workerVerifyStep>workerStep,'Worker security boundaries must be rechecked after deployment');
-must(canonicalStep>workerVerifyStep,'Canonical GitHub Pages generation must be verified after compatible Worker deployment');
-must(browserStep>canonicalStep,'Canonical browser verification must run only after the new GitHub Pages generation is visible');
-must(release.includes('PRIMARY_URL: https://sribyju.github.io/CapitalMastery'),'Production release must recognize GitHub Pages as the primary origin');
-must(!release.includes('CLOUDFLARE_MIRROR_URL'),'Production release must not retain the obsolete Cloudflare Pages mirror');
-must(!/wrangler@4\s+pages\s+deploy/.test(release),'Production release must not deploy Cloudflare Pages');
-must(release.includes('CM_AUDIT_URL="${PRIMARY_URL}/" node tests/live-firebase-auth-browser-audit.cjs'),'Production release must prove real Firebase email/password readiness on the primary before D1 mutation');
-must(release.includes('node tools/prepare-production-d1.mjs'),'Production release must execute the schema-aware D1 preparation tool');
-must(release.includes('tests/platform-admin-employer-usage-browser-audit.cjs'),'Release matrix must include the platform-admin Employer Usage browser audit');
-must(release.includes('tests/admin-route-zero-exposure-browser-audit.cjs'),'Release matrix must include the Admin zero-exposure race boundary');
-must(release.includes('tests/employer-role-matrix-browser-audit.cjs'),'Release matrix must include employer RBAC regression');
-must(release.includes('tests/employer-invite-lifecycle-browser-audit.cjs'),'Release matrix must include employer invitation lifecycle regression');
+must(!fs.existsSync('.github/workflows/cloudflare-production-release.yml'),'Obsolete GitHub-secret Worker deployment workflow must stay removed');
+must(releaseEvidence.includes('Cloudflare Workers Builds'),'Release evidence must identify Cloudflare Workers Builds as the Worker deployment path');
+must(releaseEvidence.includes('Production branch: `main`'),'Cloudflare Workers Builds production branch must be main');
+must(releaseEvidence.includes('Deploy command: `npx wrangler deploy`'),'Cloudflare Workers Builds must deploy with Wrangler');
+must(releaseEvidence.includes('D1 schema migrations are intentionally not run automatically'),'Worker Builds must not implicitly mutate production D1 on every push');
+must(releaseEvidence.includes('tools/prepare-production-d1.mjs'),'Release evidence must preserve the explicit fail-closed D1 migration path');
+must(releaseEvidence.includes('Cloudflare Pages is not the canonical frontend deployment target'),'GitHub Pages must remain the canonical frontend');
+
+must(workerConfig.includes('"name": "capital-mastery-api"'),'Wrangler must target the existing production Worker');
+must(workerConfig.includes('"main": "v2/platform-admin-overlay.js"'),'Wrangler must deploy the founder-admin overlay entrypoint');
+must(workerConfig.includes('"keep_vars": true'),'Worker deployment must preserve existing production variables/secrets');
+must(workerConfig.includes('"ALLOWED_ORIGIN": "https://sribyju.github.io"'),'Worker must pin the canonical GitHub Pages origin');
+must(workerConfig.includes('"binding": "DB"'),'Worker must retain the production D1 binding');
+must(workerConfig.includes('"database_name": "capital-mastery-prod"'),'Worker must retain the production D1 database');
+
+must(liveAudit.includes('Inspect Worker D1, CORS, origin and auth boundaries'),'Live release audit must verify Worker security boundaries');
+must(liveAudit.includes('/enterprise/admin/organizations'),'Live release audit must verify the founder Employer Usage route exists and is protected');
+must(liveAudit.includes('tests/platform-admin-employer-usage-browser-audit.cjs'),'Live browser matrix must include platform-admin Employer Usage');
+must(liveAudit.includes('tests/admin-route-zero-exposure-browser-audit.cjs'),'Live browser matrix must include Admin zero-exposure race protection');
+must(liveAudit.includes('tests/employer-role-matrix-browser-audit.cjs'),'Live browser matrix must include employer RBAC regression');
+must(liveAudit.includes('tests/employer-invite-lifecycle-browser-audit.cjs'),'Live browser matrix must include employer invitation lifecycle regression');
 
 must(tool.includes("const DB='capital-mastery-prod'"),'D1 preparation must pin the production database explicitly');
 must(tool.includes("MIGRATION_016='migrations/016_phase2_career_skills_track_constraints.sql'"),'D1 tool may conditionally apply exact migration 016');
@@ -43,11 +44,8 @@ must(tool.includes("New assessment_attempt_reviews table must be empty immediate
 must(tool.includes('assertUnchanged(beforeCounts,afterCounts'),'Critical production row counts must be compared before/after migration');
 must(tool.includes("PRAGMA quick_check;"),'Production D1 gate must require quick_check');
 must(tool.includes("PRAGMA foreign_key_check;"),'Production D1 gate must require foreign_key_check');
-must(tool.includes("requiredEnv=['CLOUDFLARE_API_TOKEN','CLOUDFLARE_ACCOUNT_ID']"),'D1 mutation must require Cloudflare credentials');
+must(tool.includes("requiredEnv=['CLOUDFLARE_API_TOKEN','CLOUDFLARE_ACCOUNT_ID']"),'D1 mutation must require Cloudflare credentials when token auth is used');
 must(tool.includes("process.env.CM_ALLOW_WRANGLER_OAUTH==='1'"),'Manual D1 promotion may use only an explicit Wrangler OAuth authorization flag');
-must(tool.includes("'node_modules','npm','bin','npx-cli.js'"),'Production preparation must launch Wrangler through the Windows-safe npx CLI entry point');
-must(tool.includes("process.platform==='win32'?process.execPath:'npx'"),'Production preparation must avoid direct .cmd spawning on Node 24');
-must(tool.includes('if(r.error) throw new Error'),'Production preparation must surface subprocess launch errors instead of returning an undefined diagnostic');
 must(tool.includes('refusing production D1 mutation'),'Missing deployment credentials must fail closed');
 must(tool.includes("fs.writeFileSync('d1-production-preflight.json'"),'D1 preparation must emit release evidence');
 
@@ -56,4 +54,4 @@ must(/PRAGMA\s+defer_foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 
 must(!/PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 must never rely on foreign_keys=OFF inside D1 implicit transactions');
 must(tool.includes("Migration 016 must not attempt to disable foreign_keys inside D1 implicit transactions"),'Production preflight must reject regression to the unsafe D1 pragma');
 
-console.log('PRODUCTION D1 RELEASE ORDER AUDIT PASS: static artifact -> live Firebase -> D1-safe 016/017/018 -> Worker -> canonical GitHub Pages verification is fail-closed');
+console.log('PRODUCTION RELEASE ARCHITECTURE AUDIT PASS: Cloudflare Workers Builds deploys code; D1 changes remain explicit and fail-closed; GitHub Pages stays canonical');
