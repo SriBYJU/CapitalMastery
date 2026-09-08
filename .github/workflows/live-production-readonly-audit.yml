@@ -37,9 +37,10 @@ jobs:
           for attempt in {1..60}; do
             curl -fsSL --retry 2 --retry-all-errors "$LIVE_URL/?sha=${GITHUB_SHA}&attempt=${attempt}" -o /tmp/live-index.html || true
             if grep -Fq 'capital-mastery-live.js?v=20260901-courseintegrity2' /tmp/live-index.html 2>/dev/null \
-              && grep -Fq 'firebase-sync.js?v=20260831-phase2rc7' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'firebase-sync.js?v=20260908-reliability1' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'certificate-name.js?v=20260902-a11ysecurity1' /tmp/live-index.html 2>/dev/null \
-              && grep -Fq 'ux-stability.js?v=20260901-courseintegrity1' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'ux-stability.js?v=20260908-credentials-stability1' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'founder-admin-employer-usage.js?v=20260908-founderadmin2' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'admin-route-guard.js?v=20260830-phase2rc1' /tmp/live-index.html 2>/dev/null \
               && grep -Fq '<link rel="canonical" href="https://sribyju.github.io/CapitalMastery/"' /tmp/live-index.html 2>/dev/null; then
               stale=0
@@ -118,6 +119,15 @@ jobs:
             *) echo 'WORKER_D1_INTEGRITY_ROUTE_BAD_STATUS'; cat /tmp/worker-integrity-unauth-body.txt 2>/dev/null || true; ok=0 ;;
           esac
 
+          usage_status=$(curl -sS --retry 3 --retry-all-errors -o /tmp/worker-usage-unauth-body.txt -w '%{http_code}' \
+            "$WORKER_URL/enterprise/admin/organizations" -H 'Origin: https://sribyju.github.io' || echo 000)
+          echo "WORKER_EMPLOYER_USAGE_UNAUTH_STATUS=$usage_status"
+          case "$usage_status" in
+            401|403) echo 'WORKER_EMPLOYER_USAGE_ROUTE_PRESENT_AND_PROTECTED' ;;
+            404) echo 'WORKER_GENERATION_STALE: /enterprise/admin/organizations not deployed'; ok=0 ;;
+            *) echo 'WORKER_EMPLOYER_USAGE_ROUTE_BAD_STATUS'; cat /tmp/worker-usage-unauth-body.txt 2>/dev/null || true; ok=0 ;;
+          esac
+
           echo "WORKER_OK=$ok" >> "$GITHUB_ENV"
           echo "WORKER_PUBLIC_BOUNDARY=$([ "$ok" -eq 1 ] && echo PASS || echo FAIL)"
 
@@ -135,6 +145,8 @@ jobs:
             tests/failure-seeking-browser-audit.mjs \
             tests/adversarial-chaos-browser-audit.cjs \
             tests/admin-route-zero-exposure-browser-audit.cjs \
+            tests/platform-admin-employer-usage-browser-audit.cjs \
+            tests/credentials-route-stability-browser-audit.cjs \
             tests/learner-guide-mobile-browser-audit.cjs \
             tests/ib-workbench-navigation-guide-browser-audit.cjs \
             tests/all-career-browser-sweep.cjs \
