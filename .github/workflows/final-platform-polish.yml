@@ -1,0 +1,160 @@
+name: Final platform polish gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/patch-final-platform-polish.mjs'
+      - 'tests/credentials-route-stability-browser-audit.cjs'
+      - '.github/workflows/final-platform-polish.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: final-platform-polish
+  cancel-in-progress: false
+
+jobs:
+  verify-and-commit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate patch and new browser audit syntax
+        run: |
+          set -euo pipefail
+          node --check tools/patch-final-platform-polish.mjs
+          node --check tests/credentials-route-stability-browser-audit.cjs
+
+      - name: Apply reliability hardening and final polish
+        run: |
+          set -euo pipefail
+          node tools/patch-functional-reliability-v4.mjs
+          node tools/patch-final-platform-polish.mjs
+
+      - name: Validate production JavaScript and Worker package
+        run: |
+          set -euo pipefail
+          node --check app.js
+          node --check firebase-auth.js
+          node --check firebase-sync.js
+          node --check functional-reliability.js
+          node --check course-continuity.js
+          node --check ux-stability.js
+          node --check enterprise-v2.js
+          node --check founder-admin-employer-usage.js
+          node --check admin-route-guard.js
+          node --check capital-mastery-live.js
+          node --check v2/v2-credential-assessment-helpers.js
+          node --check v2/worker-v2-phase1-release.js
+          node --check v2/platform-admin-overlay.js
+          node --check tests/platform-admin-employer-usage-browser-audit.cjs
+          node --check tests/credentials-route-stability-browser-audit.cjs
+          npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+      - name: Run complete static audit suite
+        run: |
+          set -euo pipefail
+          count=0
+          for test_file in tests/*.mjs; do
+            if [ "$test_file" = "tests/failure-seeking-browser-audit.mjs" ]; then
+              continue
+            fi
+            echo "=== $test_file ==="
+            node "$test_file"
+            count=$((count+1))
+          done
+          echo "TOTAL_STATIC_TEST_FILES=$count"
+
+      - name: Build canonical GitHub Pages bundle
+        run: |
+          set -euo pipefail
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Install Chromium and serve exact canonical bundle
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory dist-pages >/tmp/cm-final-polish-http.log 2>&1 &
+          echo $! >/tmp/cm-final-polish-http.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/cm-final-polish-http.log
+          exit 1
+
+      - name: Prove persistence and course continuity under failure
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          node tests/functional-persistence-reliability-browser-audit.cjs
+          node tests/state-resilience-browser-audit.cjs
+          node tests/course-pass-continuity-browser-audit.cjs
+          node tests/course-no-skip-resume-browser-audit.cjs
+
+      - name: Prove Credentials route is stable at mobile tablet and desktop widths
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: node tests/credentials-route-stability-browser-audit.cjs
+
+      - name: Prove founder admin and employer boundaries
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          node tests/platform-admin-employer-usage-browser-audit.cjs
+          node tests/admin-route-zero-exposure-browser-audit.cjs
+          node tests/employer-role-matrix-browser-audit.cjs
+          node tests/employer-invite-lifecycle-browser-audit.cjs
+          node tests/employer-public-browser-audit.cjs
+
+      - name: Final accessibility and visual containment smoke
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          node tests/accessibility-keyboard-browser-audit.cjs
+          node tests/visual-contrast-browser-audit.cjs
+
+      - name: Commit only after every final gate passes
+        run: |
+          set -euo pipefail
+          git add \
+            index.html \
+            app.js \
+            firebase-sync.js \
+            functional-reliability.js \
+            course-continuity.js \
+            enterprise-v2.js \
+            ux-stability.js \
+            founder-admin-employer-usage.js \
+            founder-admin-employer-usage.css \
+            v2/assessment-lab-routes.js \
+            v2/v2-credential-assessment-helpers.js \
+            v2/v2-credential-assessment-routes.js \
+            v2/worker-v2-phase1-release.js \
+            tools/build-pages.mjs \
+            tests/platform-admin-employer-usage-source-audit.mjs \
+            tests/platform-admin-employer-usage-browser-audit.cjs \
+            .github/workflows/functional-persistence-reliability.yml \
+            .github/workflows/failure-seeking-round2.yml \
+            .github/workflows/github-pages-live-readonly-audit.yml \
+            .github/workflows/cloudflare-production-release.yml
+          if git diff --cached --quiet; then
+            echo 'Final platform polish already converged; nothing to commit.'
+            exit 0
+          fi
+          git diff --cached --check
+          git config user.name 'capital-mastery-release-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Finalize platform reliability and onboarding proof'
+          git push origin HEAD:main
