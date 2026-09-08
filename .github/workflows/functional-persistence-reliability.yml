@@ -1,0 +1,143 @@
+name: Functional persistence reliability gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'functional-reliability.js'
+      - 'tools/patch-functional-reliability.mjs'
+      - 'tools/patch-functional-reliability-v2.mjs'
+      - 'tests/functional-persistence-reliability-audit.mjs'
+      - 'tests/functional-persistence-reliability-browser-audit.cjs'
+      - 'firebase-sync.js'
+      - 'course-continuity.js'
+      - 'app.js'
+      - 'enterprise-v2.js'
+      - 'index.html'
+      - 'v2/assessment-lab-routes.js'
+      - 'v2/v2-credential-assessment-helpers.js'
+      - 'v2/v2-credential-assessment-routes.js'
+      - 'v2/worker-v2-phase1-release.js'
+      - '.github/workflows/functional-persistence-reliability.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: functional-persistence-reliability
+  cancel-in-progress: false
+
+jobs:
+  harden-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply idempotent reliability hardening
+        run: |
+          set -euo pipefail
+          node tools/patch-functional-reliability-v2.mjs
+
+      - name: Syntax and production package validation
+        run: |
+          set -euo pipefail
+          node --check functional-reliability.js
+          node --check firebase-sync.js
+          node --check course-continuity.js
+          node --check app.js
+          node --check enterprise-v2.js
+          node --check v2/assessment-lab-routes.js
+          node --check v2/v2-credential-assessment-helpers.js
+          node --check v2/v2-credential-assessment-routes.js
+          node --check v2/worker-v2-phase1-release.js
+          node --check v2/platform-admin-overlay.js
+          npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
+
+      - name: Run persistence, credential, tenant and security contracts
+        run: |
+          set -euo pipefail
+          node tests/functional-persistence-reliability-audit.mjs
+          node tests/state-resilience-audit.mjs
+          node tests/course-pass-continuity-audit.mjs
+          node tests/course-assessment-state-audit.mjs
+          node tests/credential-name-root-persistence-audit.mjs
+          node tests/account-isolation-course-continuity-audit.mjs
+          node tests/d1-integrity-endpoint-audit.mjs
+          node tests/enterprise-v2-audit.mjs
+          node tests/enterprise-v2-runtime-smoke.mjs
+          node tests/enterprise-least-privilege-audit.mjs
+          node tests/assessment-review-security-audit.mjs
+          node tests/release-security-abuse-audit.mjs
+          node tests/platform-admin-employer-usage-source-audit.mjs
+          node tests/platform-admin-employer-usage-logic-audit.mjs
+
+      - name: Build canonical GitHub Pages bundle
+        run: |
+          set -euo pipefail
+          node tools/build-pages.mjs
+          node tests/pages-production-bundle-audit.mjs
+
+      - name: Install Chromium and start canonical bundle
+        run: |
+          set -euo pipefail
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+          python3 -m http.server 4173 --directory dist-pages >/tmp/cm-functional-reliability-http.log 2>&1 &
+          echo $! > /tmp/cm-functional-reliability-http.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/cm-functional-reliability-http.log
+          exit 1
+
+      - name: Prove visible failure handling and mobile containment
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: node tests/functional-persistence-reliability-browser-audit.cjs
+
+      - name: Prove durable course resume and passed-state continuity
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          node tests/state-resilience-browser-audit.cjs
+          node tests/course-pass-continuity-browser-audit.cjs
+          node tests/course-no-skip-resume-browser-audit.cjs
+
+      - name: Recheck employer and founder-admin browser boundaries
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
+        run: |
+          set -euo pipefail
+          node tests/employer-role-matrix-browser-audit.cjs
+          node tests/employer-invite-lifecycle-browser-audit.cjs
+          node tests/platform-admin-employer-usage-browser-audit.cjs
+          node tests/admin-route-zero-exposure-browser-audit.cjs
+
+      - name: Commit verified hardening only after every gate passes
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'Reliability hardening already converged; nothing to commit.'
+            exit 0
+          fi
+          git config user.name 'capital-mastery-release-bot'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            index.html \
+            app.js \
+            firebase-sync.js \
+            functional-reliability.js \
+            course-continuity.js \
+            enterprise-v2.js \
+            v2/assessment-lab-routes.js \
+            v2/v2-credential-assessment-helpers.js \
+            v2/v2-credential-assessment-routes.js \
+            v2/worker-v2-phase1-release.js
+          git diff --cached --check
+          git commit -m 'Harden progress and credential persistence'
+          git push origin HEAD:main
