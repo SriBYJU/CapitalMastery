@@ -38,7 +38,7 @@ jobs:
             curl -fsSL --retry 2 --retry-all-errors "$LIVE_URL/?sha=${GITHUB_SHA}&attempt=${attempt}" -o /tmp/live-index.html || true
             if grep -Fq 'capital-mastery-live.js?v=20260901-courseintegrity2' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'firebase-sync.js?v=20260908-reliability1' /tmp/live-index.html 2>/dev/null \
-              && grep -Fq 'certificate-name.js?v=20260902-a11ysecurity1' /tmp/live-index.html 2>/dev/null \
+              && grep -Fq 'certificate-name.js?v=20260908-adminboundary1' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'ux-stability.js?v=20260908-credentials-stability1' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'founder-admin-employer-usage.js?v=20260908-founderadmin2' /tmp/live-index.html 2>/dev/null \
               && grep -Fq 'admin-route-guard.js?v=20260830-phase2rc1' /tmp/live-index.html 2>/dev/null \
