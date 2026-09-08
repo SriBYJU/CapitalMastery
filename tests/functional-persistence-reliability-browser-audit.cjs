@@ -18,11 +18,25 @@ const WORKER = 'https://capital-mastery-api.avadhanula-shriyan.workers.dev';
       page.on('pageerror', error => pageErrors.push(String(error)));
       await page.goto(BASE, { waitUntil:'domcontentloaded' });
       await page.waitForFunction(() => !!window.CM_RELIABILITY, null, { timeout:10000 });
+      // The synthetic runtime failures below are tested after Firebase resolves its
+      // normal boot lifecycle. Startup storage denial is exercised separately below.
+      await page.waitForFunction(() => !window.CM_AUTH || window.CM_AUTH.ready === true, null, { timeout:15000 }).catch(() => {});
+      await page.waitForTimeout(120);
 
       // Explicit errors must be visible, readable and contained on every target viewport.
       await page.evaluate(() => window.CM_RELIABILITY.report('audit-visible', 'Synthetic save failure for browser reliability audit.', { severity:'error', detail:'No user data was changed.' }));
       const banner = page.locator('#cm-functional-reliability');
-      await banner.waitFor({ state:'visible' });
+      try {
+        await banner.waitFor({ state:'visible', timeout:10000 });
+      } catch (error) {
+        const state = await page.evaluate(() => ({
+          auth: window.CM_AUTH ? {ready:window.CM_AUTH.ready,user:window.CM_AUTH.user?.uid || null} : null,
+          issues: window.CM_RELIABILITY?.issues || [],
+          banner: document.getElementById('cm-functional-reliability')?.outerHTML || null
+        }));
+        console.error(`FUNCTIONAL_RELIABILITY_DEBUG @ ${viewport.width}: ${JSON.stringify(state)}`);
+        throw error;
+      }
       assert.match(await banner.innerText(), /Save \/ sync needs attention/);
       assert.match(await banner.innerText(), /Synthetic save failure/);
       const box = await banner.boundingBox();
