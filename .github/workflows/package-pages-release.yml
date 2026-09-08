@@ -9,6 +9,7 @@ on:
       - '*.css'
       - 'assets/**'
       - 'tools/build-pages.mjs'
+      - 'docs/operations/zero-cost-recovery-runbook.md'
       - 'tests/pages-production-bundle-audit.mjs'
       - 'tests/career-skills-five-level-boundary-audit.mjs'
       - 'tests/zero-cost-security-hardening-audit.mjs'
@@ -30,10 +31,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build and audit exact frontend release directory
+      - name: Build and audit exact GitHub Pages frontend release directory
         run: |
           set -euo pipefail
           node --check enterprise-v2.js
+          node --check founder-admin-employer-usage.js
           node tests/csv-export-security-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
           node tests/zero-cost-security-hardening-audit.mjs
@@ -45,7 +47,7 @@ jobs:
           echo "PAGES_RELEASE_FILE_COUNT=$(find dist-pages -type f | wc -l)"
           sha256sum pages-release-sha256.txt
 
-      - name: Upload exact audited release candidate
+      - name: Upload exact audited GitHub Pages release candidate
         uses: actions/upload-artifact@v4
         with:
           name: capitalmastery-pages-${{ github.sha }}
