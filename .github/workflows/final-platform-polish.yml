@@ -6,6 +6,7 @@ on:
     paths:
       - 'tools/patch-final-platform-polish.mjs'
       - 'tools/patch-final-platform-polish-v2.mjs'
+      - 'tools/patch-final-platform-polish-v3.mjs'
       - 'tests/credentials-route-stability-browser-audit.cjs'
       - '.github/workflows/final-platform-polish.yml'
   workflow_dispatch:
@@ -31,13 +32,14 @@ jobs:
           set -euo pipefail
           node --check tools/patch-final-platform-polish.mjs
           node --check tools/patch-final-platform-polish-v2.mjs
+          node --check tools/patch-final-platform-polish-v3.mjs
           node --check tests/credentials-route-stability-browser-audit.cjs
 
       - name: Apply reliability hardening and final polish
         run: |
           set -euo pipefail
           node tools/patch-functional-reliability-v4.mjs
-          node tools/patch-final-platform-polish-v2.mjs
+          node tools/patch-final-platform-polish-v3.mjs
 
       - name: Validate production JavaScript and Worker package
         run: |
