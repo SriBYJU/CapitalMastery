@@ -11,7 +11,7 @@ This runbook protects the current Capital Mastery product without requiring a re
 | Firestore learner synchronization | Firestore plus the learner's UID-bound local state | Existing free project allowance | Non-authoritative convenience state; D1 remains authoritative for official evidence and credentials. |
 | Release evidence | GitHub Actions logs and committed release reports | $0 for this public repository on standard runners | Never store tokens or personal-data exports in Actions artifacts. |
 
-The deployable Worker entrypoint is `v2/platform-admin-overlay.js`. It enforces the platform-wide founder/admin identity boundary and delegates normal product behavior to the reviewed core Worker in `v2/worker-v2-phase1-release.js`. Recovery or rollback must keep those two files compatible; do not bypass the overlay by pointing Wrangler directly at the core Worker unless the exact-email platform-admin boundary has first been restored in an equivalent reviewed entrypoint.
+The deployable Worker entrypoint is `v2/production-experience-overlay.js`. It provides the production browser/preflight, employer-assignment activity and assigned-track safety layer, then delegates to `v2/platform-admin-overlay.js`. The admin overlay preserves the exact founder/admin identity boundary and delegates the rest of the product to the reviewed core Worker in `v2/worker-v2-phase1-release.js`. Recovery or rollback must keep all three files compatible; do not bypass either overlay by pointing Wrangler directly at the core Worker unless the equivalent protections have first been restored in another reviewed entrypoint.
 
 Cloudflare states that D1 Time Travel is always enabled, history and restore have no additional cost, and the Free plan retains seven days. Source: <https://developers.cloudflare.com/d1/reference/time-travel/>.
 
@@ -30,10 +30,10 @@ The bookmark value is deliberately not committed. Anyone with production recover
 1. Stop deployments and determine whether the problem is frontend code, Worker code, D1 data, or non-authoritative Firestore sync.
 2. Preserve the failing commit SHA, timestamps, screenshots/logs and the current D1 bookmark.
 3. For a frontend regression, redeploy the last known-good Git commit and rerun the live read-only audits.
-4. For a Worker regression, redeploy the last known-good reviewed Worker version through `v2/platform-admin-overlay.js` and verify `/health`, bad-origin rejection, unauthenticated rejection, and platform-admin rejection for non-admin identities.
+4. For a Worker regression, redeploy the last known-good reviewed Worker version through `v2/production-experience-overlay.js` and verify `/health`, bad-origin rejection, unauthenticated rejection, platform-admin rejection for non-admin identities, authenticated admin CORS preflight, and employer-assignment activity/report boundaries.
 5. For suspected D1 corruption, run read-only integrity checks first. Do not restore if `quick_check` and foreign keys are healthy unless a confirmed logical-data incident exists.
 6. If D1 restoration is genuinely required, retrieve bookmarks for both the current state and intended timestamp, record both, and use Cloudflare's documented Time Travel restore procedure.
-7. After any restoration, rerun D1 integrity, tenant-boundary, learner-progress, credential-verification, employer-role, and platform-admin checks.
+7. After any restoration, rerun D1 integrity, tenant-boundary, learner-progress, credential-verification, employer-role, assignment-track, and platform-admin checks.
 
 ## Destructive-operation guard
 
