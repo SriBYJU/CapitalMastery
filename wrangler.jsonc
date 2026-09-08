@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "capital-mastery-api",
-  "main": "v2/platform-admin-overlay.js",
+  "main": "v2/production-experience-overlay.js",
   "compatibility_date": "2026-08-28",
   "keep_vars": true,
   "workers_dev": true,
