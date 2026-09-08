@@ -13,9 +13,7 @@ on:
       - 'v2/platform-admin-overlay.js'
       - 'v2/worker-v2-phase1-release.js'
       - 'wrangler.jsonc'
-      - 'tests/platform-admin-employer-usage-logic-audit.mjs'
-      - 'tests/platform-admin-employer-usage-source-audit.mjs'
-      - 'tests/platform-admin-employer-usage-browser-audit.cjs'
+      - 'tests/**'
   workflow_dispatch:
 
 permissions:
