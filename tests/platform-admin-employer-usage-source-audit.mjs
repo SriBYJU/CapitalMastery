@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [overlay, frontend, index, wrangler, guard, helpers] = await Promise.all([
+const [overlay, productionOverlay, frontend, index, wrangler, guard, helpers] = await Promise.all([
   readFile(new URL('../v2/platform-admin-overlay.js', import.meta.url), 'utf8'),
+  readFile(new URL('../v2/production-experience-overlay.js', import.meta.url), 'utf8'),
   readFile(new URL('../founder-admin-employer-usage.js', import.meta.url), 'utf8'),
   readFile(new URL('../index.html', import.meta.url), 'utf8'),
   readFile(new URL('../wrangler.jsonc', import.meta.url), 'utf8'),
@@ -26,6 +27,12 @@ for (const role of ['owner','training_admin','content_manager','manager','viewer
   assert.doesNotMatch(overlay, new RegExp(`isPlatformAdmin[^\\n]{0,120}${role}`), `Employer role ${role} must not become a platform-admin criterion`);
 }
 
+assert.match(productionOverlay, /import coreWorker from ['"]\.\/platform-admin-overlay\.js['"]/);
+assert.match(productionOverlay, /request\.method === ['"]OPTIONS['"]/);
+assert.match(productionOverlay, /enterprise\/admin/);
+assert.match(productionOverlay, /learner\.assignment_opened/);
+assert.match(productionOverlay, /requireAssignmentTrack/);
+
 assert.match(helpers, /async function requireOrgMember|function requireOrgMember/);
 assert.match(helpers, /async function requireOrgRole|function requireOrgRole/);
 assert.match(helpers, /WHERE m\.org_id = \? AND m\.uid = \?/);
@@ -48,7 +55,7 @@ assert.doesNotMatch(frontend, /localStorage[^\n]*(?:isAdmin|admin)/i);
 assert.match(index, /founder-admin-employer-usage\.css\?v=20260908-founderadmin2/);
 assert.match(index, /founder-admin-employer-usage\.js\?v=20260908-founderadmin2/);
 const config = JSON.parse(wrangler);
-assert.equal(config.main, 'v2/platform-admin-overlay.js');
+assert.equal(config.main, 'v2/production-experience-overlay.js');
 assert.equal(config.vars.ALLOWED_ORIGIN, 'https://sribyju.github.io');
 assert.equal(String(config.vars.ALLOWED_ORIGIN).includes('capitalmastery.pages.dev'), false);
 
