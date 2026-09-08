@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 
+// This regression is also the safe trigger for live read-only admin-boundary revalidation.
 const certificateName = fs.readFileSync(new URL('../certificate-name.js', import.meta.url), 'utf8');
 const adminGuard = fs.readFileSync(new URL('../admin-route-guard.js', import.meta.url), 'utf8');
 
