@@ -1,3 +1,4 @@
+# Retriggered after Cloudflare production credentials were configured.
 name: One-time founder admin production release
 
 on:
