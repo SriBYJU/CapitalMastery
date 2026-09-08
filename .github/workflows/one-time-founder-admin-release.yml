@@ -40,6 +40,7 @@ jobs:
           node --check founder-admin-employer-usage.js
           node --check v2/platform-admin-overlay.js
           node --check v2/worker-v2-phase1-release.js
+          node --check tests/credentials-route-stability-browser-audit.cjs
           node tests/platform-admin-employer-usage-logic-audit.mjs
           node tests/platform-admin-employer-usage-source-audit.mjs
           node tests/admin-route-boundary-audit.mjs
@@ -69,6 +70,7 @@ jobs:
           trap 'kill $SERVER_PID || true' EXIT
           for i in {1..30}; do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/platform-admin-employer-usage-browser-audit.cjs
+          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/credentials-route-stability-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
@@ -121,10 +123,10 @@ jobs:
           ready=false
           for i in {1..30}; do
             curl -fsS "${PRIMARY_URL}/" -o /tmp/cm-live-index || true
-            if grep -q 'founder-admin-employer-usage.js?v=20260908-founderadmin1' /tmp/cm-live-index 2>/dev/null; then ready=true; break; fi
+            if grep -q 'founder-admin-employer-usage.js?v=20260908-founderadmin2' /tmp/cm-live-index 2>/dev/null && grep -q 'ux-stability.js?v=20260908-credentials-stability1' /tmp/cm-live-index 2>/dev/null; then ready=true; break; fi
             sleep 5
           done
-          [ "$ready" = true ] || { echo 'GitHub Pages has not published founder admin release markers'; exit 1; }
+          [ "$ready" = true ] || { echo 'GitHub Pages has not published founder admin + credentials stability release markers'; exit 1; }
           curl -fsS "${PRIMARY_URL}/assets/sterling-point-logo.svg" -o /tmp/cm-live-sterling
           grep -q 'Sterling Point Advisors' /tmp/cm-live-sterling
           echo 'CANONICAL_GITHUB_PAGES_MARKERS=PASS'
@@ -133,6 +135,7 @@ jobs:
         run: |
           set -euo pipefail
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/platform-admin-employer-usage-browser-audit.cjs
+          CM_AUDIT_URL="${PRIMARY_URL}" node tests/credentials-route-stability-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/admin-route-zero-exposure-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/employer-public-browser-audit.cjs
           CM_AUDIT_URL="${PRIMARY_URL}" node tests/employer-role-matrix-browser-audit.cjs
@@ -145,6 +148,7 @@ jobs:
           ONE_TIME_FOUNDER_ADMIN_RELEASE=PASS
           - exact-email platform admin gates passed
           - aggregate Employer Usage browser E2E passed
+          - Credentials route stability passed at mobile, tablet, and desktop widths
           - employer RBAC/invite regressions passed
           - production D1 compatibility was read-only and passed
           - Worker deployed through v2/platform-admin-overlay.js
