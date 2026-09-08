@@ -9,7 +9,7 @@
 
   const GATED_ROOTS = new Set([
     'careers','career','learn','quiz','official-simulation','simulation','final',
-    'passport','credentials','credential','certificate','achievement','compare','admin-preview'
+    'passport','credentials','credential','certificate','achievement','compare'
   ]);
 
   let gateOpen = false;
@@ -493,6 +493,9 @@
 
   async function maybePromptForName(user) {
     if (!user) return;
+    // Credential-name onboarding is a learner concern. Admin routes are owned by
+    // admin-route-guard.js and must never be covered by a learner onboarding modal.
+    if (routeRoot() === 'admin-preview') { closeNameModal(false); return; }
     const confirmed = await isNameOnboarded(user);
     if (confirmed) { enhanceAccountCard(true); return; }
     openNameOnboarding();
@@ -501,6 +504,7 @@
   async function enforceCurrentRoute() {
     if (!authReady() || routeGuardBusy) return;
     const hash = location.hash || '#/';
+    if (routeRoot(hash) === 'admin-preview') { closeNameModal(false); return; }
     if (!isGatedHash(hash)) return;
     if (!currentUser()) {
       routeGuardBusy = true;
