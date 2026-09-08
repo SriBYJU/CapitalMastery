@@ -268,22 +268,22 @@ const worker = {
 
     try {
       if (request.method === 'POST' && url.pathname === '/auth-check') {
-        return authCheckWithExactAdmin(request, env);
+        return await authCheckWithExactAdmin(request, env);
       }
 
       if (request.method === 'GET' && url.pathname === '/enterprise/admin/organizations') {
-        return employerUsage(request, env);
+        return await employerUsage(request, env);
       }
 
       if (platformAdminNamespace(url.pathname)) {
         await requirePlatformAdmin(request, env);
-        return coreWorker.fetch(request, env);
+        return await coreWorker.fetch(request, env);
       }
 
       // Normal learner and employer routes keep their existing role and tenant
       // checks. Non-admin tokens get a core env where legacy UID-admin fallbacks
       // are disabled, so an employer role can never become platform admin.
-      return coreWorker.fetch(request, coreEnvForRequest(request, env));
+      return await coreWorker.fetch(request, coreEnvForRequest(request, env));
     } catch (error) {
       if (error instanceof PlatformHttpError) {
         return json({ ok: false, error: error.message }, error.status, request, env);
