@@ -11,6 +11,7 @@ on:
       - 'tools/patch-functional-reliability-v4.mjs'
       - 'tests/functional-persistence-reliability-audit.mjs'
       - 'tests/functional-persistence-reliability-browser-audit.cjs'
+      - 'tests/platform-admin-employer-usage-browser-audit.cjs'
       - 'firebase-sync.js'
       - 'course-continuity.js'
       - 'app.js'
