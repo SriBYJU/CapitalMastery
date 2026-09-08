@@ -131,7 +131,7 @@ jobs:
           node tests/accessibility-keyboard-browser-audit.cjs
           node tests/visual-contrast-browser-audit.cjs
 
-      - name: Commit only after every final gate passes
+      - name: Commit verified product changes only after every final gate passes
         run: |
           set -euo pipefail
           git add \
@@ -151,11 +151,7 @@ jobs:
             tools/build-pages.mjs \
             tests/experience-polish-audit.mjs \
             tests/platform-admin-employer-usage-source-audit.mjs \
-            tests/platform-admin-employer-usage-browser-audit.cjs \
-            .github/workflows/functional-persistence-reliability.yml \
-            .github/workflows/failure-seeking-round2.yml \
-            .github/workflows/github-pages-live-readonly-audit.yml \
-            .github/workflows/cloudflare-production-release.yml
+            tests/platform-admin-employer-usage-browser-audit.cjs
           if git diff --cached --quiet; then
             echo 'Final platform polish already converged; nothing to commit.'
             exit 0
