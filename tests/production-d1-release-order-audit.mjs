@@ -2,6 +2,8 @@ import fs from 'node:fs';
 
 const must=(v,m)=>{if(!v)throw new Error(m);};
 const workerConfig=fs.readFileSync('wrangler.jsonc','utf8');
+const productionOverlay=fs.readFileSync('v2/production-experience-overlay.js','utf8');
+const adminOverlay=fs.readFileSync('v2/platform-admin-overlay.js','utf8');
 const releaseEvidence=fs.readFileSync('docs/release-evidence/cloudflare-workers-builds-2026-09-08.md','utf8');
 const liveAudit=fs.readFileSync('.github/workflows/live-production-readonly-audit.yml','utf8');
 const tool=fs.readFileSync('tools/prepare-production-d1.mjs','utf8');
@@ -16,7 +18,9 @@ must(releaseEvidence.includes('tools/prepare-production-d1.mjs'),'Release eviden
 must(releaseEvidence.includes('Cloudflare Pages is not the canonical frontend deployment target'),'GitHub Pages must remain the canonical frontend');
 
 must(workerConfig.includes('"name": "capital-mastery-api"'),'Wrangler must target the existing production Worker');
-must(workerConfig.includes('"main": "v2/platform-admin-overlay.js"'),'Wrangler must deploy the founder-admin overlay entrypoint');
+must(workerConfig.includes('"main": "v2/production-experience-overlay.js"'),'Wrangler must deploy the production experience entrypoint');
+must(productionOverlay.includes("import coreWorker from './platform-admin-overlay.js'"),'Production experience overlay must delegate through the founder-admin overlay');
+must(adminOverlay.includes("import coreWorker from './worker-v2-phase1-release.js'"),'Founder-admin overlay must delegate to the reviewed core Worker');
 must(workerConfig.includes('"keep_vars": true'),'Worker deployment must preserve existing production variables/secrets');
 must(workerConfig.includes('"ALLOWED_ORIGIN": "https://sribyju.github.io"'),'Worker must pin the canonical GitHub Pages origin');
 must(workerConfig.includes('"binding": "DB"'),'Worker must retain the production D1 binding');
@@ -54,4 +58,4 @@ must(/PRAGMA\s+defer_foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 
 must(!/PRAGMA\s+foreign_keys\s*=\s*OFF/i.test(migration016),'Migration 016 must never rely on foreign_keys=OFF inside D1 implicit transactions');
 must(tool.includes("Migration 016 must not attempt to disable foreign_keys inside D1 implicit transactions"),'Production preflight must reject regression to the unsafe D1 pragma');
 
-console.log('PRODUCTION RELEASE ARCHITECTURE AUDIT PASS: Cloudflare Workers Builds deploys code; D1 changes remain explicit and fail-closed; GitHub Pages stays canonical');
+console.log('PRODUCTION RELEASE ARCHITECTURE AUDIT PASS: Cloudflare Workers Builds deploys the production/admin/core Worker chain; D1 changes remain explicit and fail-closed; GitHub Pages stays canonical');
