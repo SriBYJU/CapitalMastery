@@ -6,6 +6,7 @@ on:
     paths:
       - '.github/workflows/phase2-current-source-audit.yml'
       - '.github/workflows/cloudflare-production-release.yml'
+      - 'docs/operations/zero-cost-recovery-runbook.md'
       - 'index.html'
       - 'founder-admin-employer-usage.js'
       - 'founder-admin-employer-usage.css'
