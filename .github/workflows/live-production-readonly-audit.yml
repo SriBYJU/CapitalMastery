@@ -1,5 +1,5 @@
 name: Live production read-only audit
-# Revalidate the live frontend after the admin credential-name boundary rollout.
+# Revalidate the live frontend and Worker after Cloudflare Workers Builds deployment.
 
 on:
   push:
