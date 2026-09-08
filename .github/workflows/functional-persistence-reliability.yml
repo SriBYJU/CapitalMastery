@@ -8,6 +8,7 @@ on:
       - 'tools/patch-functional-reliability.mjs'
       - 'tools/patch-functional-reliability-v2.mjs'
       - 'tools/patch-functional-reliability-v3.mjs'
+      - 'tools/patch-functional-reliability-v4.mjs'
       - 'tests/functional-persistence-reliability-audit.mjs'
       - 'tests/functional-persistence-reliability-browser-audit.cjs'
       - 'firebase-sync.js'
@@ -40,7 +41,7 @@ jobs:
       - name: Apply idempotent reliability hardening
         run: |
           set -euo pipefail
-          node tools/patch-functional-reliability-v3.mjs
+          node tools/patch-functional-reliability-v4.mjs
 
       - name: Syntax and production package validation
         run: |
