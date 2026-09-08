@@ -5,6 +5,7 @@
   const ADMIN_ROUTE = '#/admin-preview/employer-usage';
   let renderSerial = 0;
   let observerQueued = false;
+  let usageLoading = false;
 
   function esc(value = '') {
     return String(value ?? '').replace(/[&<>"']/g, (char) => ({
@@ -191,6 +192,8 @@
 
   async function loadUsage(force = false) {
     if (String(location.hash || '').split('?', 1)[0] !== ADMIN_ROUTE) return;
+    if (usageLoading && !force) return;
+
     const serial = ++renderSerial;
     const auth = window.CM_AUTH;
 
@@ -205,6 +208,7 @@
       return;
     }
 
+    usageLoading = true;
     if (force || !document.querySelector('.cm-founder-metric-grid')) renderLoading();
 
     try {
@@ -227,16 +231,21 @@
       if (serial !== renderSerial) return;
       if (error?.status === 401 || error?.status === 403) renderDenied(error.message);
       else renderError(error?.message || 'Employer usage is temporarily unavailable.');
+    } finally {
+      usageLoading = false;
     }
   }
 
   function syncRoute() {
     const normalized = String(location.hash || '').split('?', 1)[0];
     if (normalized === ADMIN_ROUTE) {
-      loadUsage();
+      const page = document.querySelector('.cm-founder-admin-page');
+      const settled = page?.querySelector('.cm-founder-metric-grid, .cm-founder-admin-loading, .cm-founder-admin-denied');
+      if (!page || !settled) loadUsage();
       return;
     }
     renderSerial += 1;
+    usageLoading = false;
     decoratePublicProof();
     decorateAdminCard();
   }
