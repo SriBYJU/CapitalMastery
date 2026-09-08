@@ -1,4 +1,5 @@
 name: Live production read-only audit
+# Revalidate the live frontend after the admin credential-name boundary rollout.
 
 on:
   push:
