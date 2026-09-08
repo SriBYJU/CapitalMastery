@@ -5,6 +5,17 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/phase2-current-source-audit.yml'
+      - '.github/workflows/cloudflare-production-release.yml'
+      - 'index.html'
+      - 'founder-admin-employer-usage.js'
+      - 'founder-admin-employer-usage.css'
+      - 'assets/sterling-point-logo.svg'
+      - 'v2/platform-admin-overlay.js'
+      - 'v2/worker-v2-phase1-release.js'
+      - 'wrangler.jsonc'
+      - 'tests/platform-admin-employer-usage-logic-audit.mjs'
+      - 'tests/platform-admin-employer-usage-source-audit.mjs'
+      - 'tests/platform-admin-employer-usage-browser-audit.cjs'
   workflow_dispatch:
 
 permissions:
@@ -20,11 +31,18 @@ jobs:
           node --check app.js
           node --check training-tracks.js
           node --check enterprise-v2.js
+          node --check founder-admin-employer-usage.js
           node --check capital-mastery-live.js
           node --check public-certificate-verify.js
           node --check v2/worker-v2-phase1-release.js
+          node --check v2/platform-admin-overlay.js
+          node --check tests/platform-admin-employer-usage-browser-audit.cjs
           node --check tests/live-firestore-rules-probe.cjs
           node --check tests/live-admin-closure-probe.cjs
+      - name: Platform admin and employer usage contract
+        run: |
+          node tests/platform-admin-employer-usage-logic-audit.mjs
+          node tests/platform-admin-employer-usage-source-audit.mjs
       - name: D1 integrity route contract
         run: node tests/d1-integrity-endpoint-audit.mjs
       - name: Validate Cloudflare Worker package without deploying
@@ -34,7 +52,7 @@ jobs:
           npx --yes wrangler@4 deploy --config wrangler.jsonc --dry-run --outdir /tmp/capital-mastery-worker-dryrun
           test -d /tmp/capital-mastery-worker-dryrun
           echo 'WRANGLER_WORKER_DRY_RUN=PASS'
-      - name: Build production Pages artifact
+      - name: Build canonical GitHub Pages artifact
         run: node tools/build-pages.mjs
       - name: Run every static automated audit
         run: |
@@ -49,5 +67,5 @@ jobs:
             count=$((count+1))
           done
           echo "TOTAL_STATIC_TEST_FILES=$count"
-      - name: Verify production bundle after full static audit
+      - name: Verify canonical production bundle after full static audit
         run: node tests/pages-production-bundle-audit.mjs
