@@ -49,9 +49,7 @@ jobs:
           node --check course-continuity.js
           node --check app.js
           node --check enterprise-v2.js
-          node --check v2/assessment-lab-routes.js
           node --check v2/v2-credential-assessment-helpers.js
-          node --check v2/v2-credential-assessment-routes.js
           node --check v2/worker-v2-phase1-release.js
           node --check v2/platform-admin-overlay.js
           npx --yes wrangler@4 deploy --dry-run --config wrangler.jsonc
