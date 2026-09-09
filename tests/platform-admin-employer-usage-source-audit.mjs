@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [overlay, productionOverlay, frontend, index, wrangler, guard, helpers] = await Promise.all([
+const [inviteOverlay, overlay, productionOverlay, frontend, index, wrangler, guard, helpers] = await Promise.all([
+  readFile(new URL('../v2/invite-revoke-overlay.js', import.meta.url), 'utf8'),
   readFile(new URL('../v2/platform-admin-overlay.js', import.meta.url), 'utf8'),
   readFile(new URL('../v2/production-experience-overlay.js', import.meta.url), 'utf8'),
   readFile(new URL('../founder-admin-employer-usage.js', import.meta.url), 'utf8'),
@@ -10,6 +11,10 @@ const [overlay, productionOverlay, frontend, index, wrangler, guard, helpers] = 
   readFile(new URL('../admin-route-guard.js', import.meta.url), 'utf8'),
   readFile(new URL('../v2/enterprise-helpers.js', import.meta.url), 'utf8')
 ]);
+
+assert.match(inviteOverlay, /import coreWorker from ['"]\.\/production-experience-overlay\.js['"]/);
+assert.match(inviteOverlay, /request\.method === ['"]DELETE['"]/);
+assert.match(inviteOverlay, /return await coreWorker\.fetch\(request, env\)/);
 
 assert.match(overlay, /PLATFORM_ADMIN_EMAIL\s*=\s*['"]awsomecoolsri2@gmail\.com['"]/);
 assert.doesNotMatch(overlay, /avadhanula\.shriyan@gmail\.com/);
@@ -55,7 +60,7 @@ assert.doesNotMatch(frontend, /localStorage[^\n]*(?:isAdmin|admin)/i);
 assert.match(index, /founder-admin-employer-usage\.css\?v=20260908-founderadmin2/);
 assert.match(index, /founder-admin-employer-usage\.js\?v=20260908-founderadmin2/);
 const config = JSON.parse(wrangler);
-assert.equal(config.main, 'v2/production-experience-overlay.js');
+assert.equal(config.main, 'v2/invite-revoke-overlay.js');
 assert.equal(config.vars.ALLOWED_ORIGIN, 'https://sribyju.github.io');
 assert.equal(String(config.vars.ALLOWED_ORIGIN).includes('capitalmastery.pages.dev'), false);
 
