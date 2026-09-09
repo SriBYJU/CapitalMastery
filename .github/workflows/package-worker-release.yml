@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
     paths:
+      - 'v2/invite-revoke-overlay.js'
+      - 'v2/production-experience-overlay.js'
       - 'v2/platform-admin-overlay.js'
       - 'v2/worker-v2-phase1-release.js'
       - 'wrangler.jsonc'
@@ -19,6 +21,7 @@ on:
       - 'tests/recovery-readiness-audit.mjs'
       - 'tests/platform-admin-employer-usage-logic-audit.mjs'
       - 'tests/platform-admin-employer-usage-source-audit.mjs'
+      - 'tests/invite-revoke-additive-audit.mjs'
       - '.github/workflows/package-worker-release.yml'
   workflow_dispatch:
 
@@ -35,8 +38,11 @@ jobs:
       - name: Audit complete Worker release source
         run: |
           set -e
+          node --check v2/invite-revoke-overlay.js
+          node --check v2/production-experience-overlay.js
           node --check v2/platform-admin-overlay.js
           node --check v2/worker-v2-phase1-release.js
+          node tests/invite-revoke-additive-audit.mjs
           node tests/platform-admin-employer-usage-logic-audit.mjs
           node tests/platform-admin-employer-usage-source-audit.mjs
           node tests/d1-integrity-endpoint-audit.mjs
@@ -49,13 +55,15 @@ jobs:
           node tests/zero-cost-security-hardening-audit.mjs
           node tests/recovery-readiness-audit.mjs
           npx --yes wrangler@4 deploy --config wrangler.jsonc --dry-run
-          sha256sum v2/platform-admin-overlay.js v2/worker-v2-phase1-release.js wrangler.jsonc | tee worker-release-sha256.txt
+          sha256sum v2/invite-revoke-overlay.js v2/production-experience-overlay.js v2/platform-admin-overlay.js v2/worker-v2-phase1-release.js wrangler.jsonc | tee worker-release-sha256.txt
 
       - name: Upload exact audited Worker source
         uses: actions/upload-artifact@v4
         with:
           name: capitalmastery-worker-${{ github.sha }}
           path: |
+            v2/invite-revoke-overlay.js
+            v2/production-experience-overlay.js
             v2/platform-admin-overlay.js
             v2/worker-v2-phase1-release.js
             wrangler.jsonc
