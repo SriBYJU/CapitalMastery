@@ -15,6 +15,7 @@ on:
       - 'tests/zero-cost-security-hardening-audit.mjs'
       - 'tests/recovery-readiness-audit.mjs'
       - 'tests/invite-revoke-additive-audit.mjs'
+      - 'tests/safari-loading-resilience-audit.mjs'
       - '.github/workflows/package-pages-release.yml'
   workflow_dispatch:
 
@@ -38,7 +39,9 @@ jobs:
           node --check enterprise-v2.js
           node --check founder-admin-employer-usage.js
           node --check invite-revoke-controls.js
+          node --check safari-loading-resilience.js
           node tests/invite-revoke-additive-audit.mjs
+          node tests/safari-loading-resilience-audit.mjs
           node tests/csv-export-security-audit.mjs
           node tests/career-skills-five-level-boundary-audit.mjs
           node tests/zero-cost-security-hardening-audit.mjs
