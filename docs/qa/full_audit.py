@@ -18,8 +18,8 @@ r=subprocess.run(['node','-e',node_script],capture_output=True,text=True)
 D=json.loads(r.stdout)
 careers=D['careers']
 ok('career_count_16',len(careers)==16,f"{len(careers)} careers")
-ok('credential_claim_48',len(careers)*3==48,'16 pathways × 3 certificates = 48')
-ok('marketing_claim_45plus',D['stats']['marketingCredentials']=='45+','Homepage claim 45+ is below actual 48')
+ok('career_credential_definitions_80',D['stats'].get('careerCredentialDefinitions')=='80',f"{D['stats'].get('careerCredentialDefinitions')} career credential definitions")
+ok('marketing_claim_80plus',D['stats'].get('marketingCredentials')=='80+',f"Homepage credential claim is {D['stats'].get('marketingCredentials')}")
 ids=[c['id'] for c in careers]
 ok('career_ids_unique',len(ids)==len(set(ids)))
 ok('career_content_depth',all(len(c['vocab'])>=10 and len(c['concepts'])>=5 and len(c['toolkit'])>=6 and len(c['applied'])>=5 and len(c['sources'])>=5 for c in careers),'Each career: ≥10 vocab, ≥5 concepts, ≥6 toolkit labs, ≥5 applied tasks, ≥5 sources')
@@ -35,7 +35,7 @@ ok('source_urls_https',all(s['url'].startswith('https://') for s in D['researchS
 required=['index.html','app.js','data.js','styles.css','manifest.webmanifest','robots.txt','sitemap.xml','assets/logo-mark.svg','assets/logo-horizontal.svg','assets/seal.svg','assets/founder-shriyan.jpg','assets/founder-signature.png']
 ok('required_files_present',all((ROOT/x).exists() for x in required),', '.join(x for x in required if not (ROOT/x).exists()))
 idx=(ROOT/'index.html').read_text()
-ok('seo_title', '45+ Free Finance Credentials' in idx and 'Made by Shriyan Avadhanula' in idx)
+ok('seo_title', f"{D['stats'].get('marketingCredentials')} Free Finance Credentials" in idx and 'Made by Shriyan Avadhanula' in idx)
 ok('meta_description', '<meta name="description"' in idx)
 ok('manifest_linked','manifest.webmanifest' in idx)
 
@@ -87,7 +87,7 @@ with sync_playwright() as p:
     # Credential date/id and one-per-type behavior
     page.evaluate('CM.qaScores(100)'); st100=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     ibcreds=[x for x in st100['credentials'] if x['careerId']=='investment-banking']
-    ok('three_credentials_per_completed_path',len(ibcreds)==3,f"{len(ibcreds)}")
+    ok('three_legacy_qa_credentials_per_completed_path',len(ibcreds)==3,f"{len(ibcreds)}")
     ok('unique_credential_ids',len({x['credentialId'] for x in ibcreds})==3)
     ok('credential_issue_dates_present',all(x.get('issuedAt') for x in ibcreds))
     # Simulation workspace and score display
