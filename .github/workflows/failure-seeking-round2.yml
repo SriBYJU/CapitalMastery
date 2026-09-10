@@ -9,10 +9,35 @@ on:
       - 'index.html'
       - '_config.yml'
       - 'firestore.rules'
+      - 'package.json'
+      - 'package-lock.json'
       - 'assets/**'
       - 'v2/**'
       - 'tests/**'
+      - 'docs/qa/**'
       - 'tools/build-pages.mjs'
+      - 'tools/run-browser-audits-local.mjs'
+      - 'tools/prepare-production-d1.mjs'
+      - '.github/workflows/cloudflare-production-release.yml'
+      - '.github/workflows/github-pages-live-readonly-audit.yml'
+      - '.github/workflows/zero-cost-production-monitor.yml'
+      - '.github/workflows/zero-cost-resilience-audit.yml'
+      - '.github/workflows/failure-seeking-round2.yml'
+  pull_request:
+    paths:
+      - '*.js'
+      - '*.css'
+      - 'index.html'
+      - '_config.yml'
+      - 'firestore.rules'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'assets/**'
+      - 'v2/**'
+      - 'tests/**'
+      - 'docs/qa/**'
+      - 'tools/build-pages.mjs'
+      - 'tools/run-browser-audits-local.mjs'
       - 'tools/prepare-production-d1.mjs'
       - '.github/workflows/cloudflare-production-release.yml'
       - '.github/workflows/github-pages-live-readonly-audit.yml'
@@ -54,6 +79,7 @@ jobs:
           node --check enterprise-v2.js
           node --check v2/worker-v2-phase1-release.js
           node --check tools/prepare-production-d1.mjs
+          node --check tools/run-browser-audits-local.mjs
           node --check ux-stability.js
           node --check course-continuity.js
           node --check runtime-audit-fixes.js
@@ -72,6 +98,9 @@ jobs:
           node --check tests/employer-role-matrix-browser-audit.cjs
           node --check tests/employer-invite-lifecycle-browser-audit.cjs
           node --check tests/state-resilience-browser-audit.cjs
+          node --check tests/course-assessment-state-browser-audit.cjs
+          node --check tests/functional-persistence-reliability-browser-audit.cjs
+          node --check tests/platform-admin-employer-usage-browser-audit.cjs
           node --check tests/course-pass-continuity-browser-audit.cjs
           node --check tests/course-no-skip-resume-browser-audit.cjs
           node --check tests/accessibility-keyboard-browser-audit.cjs
@@ -126,30 +155,41 @@ jobs:
         run: |
           npm install --no-save playwright@1.55.0
           npx playwright install --with-deps chromium
+          python3 -m pip install "playwright==1.55.0"
+
+      - name: Isolated full QA audit
+        run: |
+          python3 docs/qa/full_audit.py
 
       - name: Browser torture audits
+        env:
+          CM_AUDIT_URL: http://127.0.0.1:4173
         run: |
-          python3 -m http.server 4173 --directory dist-pages > /tmp/capital-mastery-http.log 2>&1 &
+          node -e "const u=new URL(process.env.CM_AUDIT_URL); if(!['127.0.0.1','localhost','::1'].includes(u.hostname)) throw new Error('Browser QA must stay on loopback; refusing remote or production URL.');"
+          python3 -m http.server 4173 --bind 127.0.0.1 --directory dist-pages > /tmp/capital-mastery-http.log 2>&1 &
           SERVER_PID=$!
           trap 'kill $SERVER_PID || true' EXIT
           for i in {1..30}; do
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 1
           done
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-pass-continuity-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/course-no-skip-resume-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/state-resilience-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/account-switch-app-state-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/failure-seeking-browser-audit.mjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/adversarial-chaos-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-route-zero-exposure-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/admin-simulation-route-stability-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/program-completion-public-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/learner-guide-mobile-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/ib-workbench-navigation-guide-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/all-career-browser-sweep.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-public-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-role-matrix-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/employer-invite-lifecycle-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/accessibility-keyboard-browser-audit.cjs
-          CM_AUDIT_URL=http://127.0.0.1:4173 node tests/firebase-direct-google-browser-audit.cjs
+          node tests/course-pass-continuity-browser-audit.cjs
+          node tests/course-no-skip-resume-browser-audit.cjs
+          node tests/course-assessment-state-browser-audit.cjs
+          node tests/state-resilience-browser-audit.cjs
+          node tests/functional-persistence-reliability-browser-audit.cjs
+          node tests/account-switch-app-state-browser-audit.cjs
+          node tests/failure-seeking-browser-audit.mjs
+          node tests/adversarial-chaos-browser-audit.cjs
+          node tests/admin-route-zero-exposure-browser-audit.cjs
+          node tests/admin-simulation-route-stability-browser-audit.cjs
+          node tests/program-completion-public-browser-audit.cjs
+          node tests/learner-guide-mobile-browser-audit.cjs
+          node tests/ib-workbench-navigation-guide-browser-audit.cjs
+          node tests/all-career-browser-sweep.cjs
+          node tests/employer-public-browser-audit.cjs
+          node tests/employer-role-matrix-browser-audit.cjs
+          node tests/employer-invite-lifecycle-browser-audit.cjs
+          node tests/platform-admin-employer-usage-browser-audit.cjs
+          node tests/accessibility-keyboard-browser-audit.cjs
+          node tests/firebase-direct-google-browser-audit.cjs

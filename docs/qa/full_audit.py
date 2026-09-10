@@ -18,8 +18,8 @@ r=subprocess.run(['node','-e',node_script],capture_output=True,text=True)
 D=json.loads(r.stdout)
 careers=D['careers']
 ok('career_count_16',len(careers)==16,f"{len(careers)} careers")
-ok('credential_claim_48',len(careers)*3==48,'16 pathways × 3 certificates = 48')
-ok('marketing_claim_45plus',D['stats']['marketingCredentials']=='45+','Homepage claim 45+ is below actual 48')
+ok('career_credential_definitions_80',D['stats'].get('careerCredentialDefinitions')=='80',f"{D['stats'].get('careerCredentialDefinitions')} career credential definitions")
+ok('marketing_claim_80plus',D['stats'].get('marketingCredentials')=='80+',f"Homepage credential claim is {D['stats'].get('marketingCredentials')}")
 ids=[c['id'] for c in careers]
 ok('career_ids_unique',len(ids)==len(set(ids)))
 ok('career_content_depth',all(len(c['vocab'])>=10 and len(c['concepts'])>=5 and len(c['toolkit'])>=6 and len(c['applied'])>=5 and len(c['sources'])>=5 for c in careers),'Each career: ≥10 vocab, ≥5 concepts, ≥6 toolkit labs, ≥5 applied tasks, ≥5 sources')
@@ -35,13 +35,16 @@ ok('source_urls_https',all(s['url'].startswith('https://') for s in D['researchS
 required=['index.html','app.js','data.js','styles.css','manifest.webmanifest','robots.txt','sitemap.xml','assets/logo-mark.svg','assets/logo-horizontal.svg','assets/seal.svg','assets/founder-shriyan.jpg','assets/founder-signature.png']
 ok('required_files_present',all((ROOT/x).exists() for x in required),', '.join(x for x in required if not (ROOT/x).exists()))
 idx=(ROOT/'index.html').read_text()
-ok('seo_title', '45+ Free Finance Credentials' in idx and 'Made by Shriyan Avadhanula' in idx)
+ok('seo_title', f"{D['stats'].get('marketingCredentials')} Free Finance Credentials" in idx and 'Made by Shriyan Avadhanula' in idx)
 ok('meta_description', '<meta name="description"' in idx)
 ok('manifest_linked','manifest.webmanifest' in idx)
 
-# Browser-based UI route + logic checks with in-memory storage
+# Browser-based UI route + logic checks with in-memory storage.
+# The auth object below exists only inside this synthetic page. It restores the
+# post-hardening Admin/QA boundary expected by CM.toggleQa() without authenticating
+# to Firebase, calling D1, or reading/writing any real learner/employer state.
 CSS=(ROOT/'styles.css').read_text(); DATA=(ROOT/'data.js').read_text(); APP=(ROOT/'app.js').read_text()
-MOCK="""const CM_STORAGE={_d:{},getItem(k){return this._d[k]??null},setItem(k,v){this._d[k]=String(v)},removeItem(k){delete this._d[k]}}; const CM_SESSION={_d:{},getItem(k){return this._d[k]??null},setItem(k,v){this._d[k]=String(v)},removeItem(k){delete this._d[k]}};"""
+MOCK="""const CM_STORAGE={_d:{},getItem(k){return this._d[k]??null},setItem(k,v){this._d[k]=String(v)},removeItem(k){delete this._d[k]}}; const CM_SESSION={_d:{},getItem(k){return this._d[k]??null},setItem(k,v){this._d[k]=String(v)},removeItem(k){delete this._d[k]}}; window.CM_AUTH={ready:true,backendVerified:true,isAdmin:true};"""
 APP=MOCK+APP.replace('localStorage','CM_STORAGE').replace('sessionStorage','CM_SESSION')
 def uri(rel):
     p=ROOT/rel; mime=mimetypes.guess_type(p.name)[0] or 'application/octet-stream'; return f'data:{mime};base64,'+base64.b64encode(p.read_bytes()).decode()
@@ -50,12 +53,14 @@ for rel in ['assets/logo-mark.svg','assets/founder-shriyan.jpg','assets/founder-
 HTML=f'<html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>{CSS}</style></head><body><a class="skip-link" href="#main">Skip</a><div id="app"></div><script>{DATA}</script><script>{APP}</script></body></html>'
 errors=[]; bad_routes=[]
 with sync_playwright() as p:
-    browser=p.chromium.launch(headless=True,executable_path='/usr/bin/chromium',args=['--no-sandbox','--disable-gpu','--disable-dev-shm-usage'])
+    browser=p.chromium.launch(headless=True,args=['--no-sandbox','--disable-gpu','--disable-dev-shm-usage'])
     page=browser.new_page(viewport={'width':1280,'height':900})
     page.on('pageerror',lambda e: errors.append(str(e)))
     page.on('console',lambda m: errors.append(m.text) if m.type=='error' else None)
     page.set_content(HTML,wait_until='load',timeout=30000); page.wait_for_timeout(50)
     page.evaluate('CM.toggleQa()')
+    qa_boundary=page.evaluate("() => window.CM_AUTH?.ready === true && window.CM_AUTH?.backendVerified === true && window.CM_AUTH?.isAdmin === true && CM_STORAGE.getItem('capitalMasteryQaPreviewV1') === 'true'")
+    ok('qa_mode_admin_boundary_active',qa_boundary,'Synthetic Admin auth + QA storage flag must both be active')
     routes=['#/','#/careers','#/compare','#/about','#/methodology','#/credentials','#/passport','#/privacy','#/terms','#/disclaimer','#/credential-policy','#/login','#/admin-preview']
     for cid in ids:
         routes += [f'#/career/{cid}',*[f'#/learn/{cid}/{n}' for n in range(1,6)],f'#/quiz/{cid}/1',f'#/quiz/{cid}/5',f'#/simulation/{cid}',f'#/final/{cid}']
@@ -72,21 +77,23 @@ with sync_playwright() as p:
     ok('part_quiz_10_questions',page.locator('fieldset.question').count()==10,f"{page.locator('fieldset.question').count()}")
     page.evaluate("location.hash='#/final/investment-banking'"); page.wait_for_timeout(30)
     ok('final_exam_20_questions',page.locator('fieldset.question').count()==20,f"{page.locator('fieldset.question').count()}")
-    # Threshold boundary: 79 should not issue final career, 80 should.
-    page.evaluate('CM.qaScores(79)'); st79=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryLocalStateV1')"))
+    # Threshold boundary: QA mode deliberately writes only to the isolated QA state key.
+    page.evaluate('CM.qaScores(79)'); st79=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     career79=[x for x in st79['credentials'] if x['careerId']=='investment-banking' and x['type']=='career']
     ok('threshold_79_fails',len(career79)==0,f"career credentials={len(career79)}")
-    page.evaluate('CM.qaScores(80)'); st80=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryLocalStateV1')"))
+    page.evaluate('CM.qaScores(80)'); st80=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     career80=[x for x in st80['credentials'] if x['careerId']=='investment-banking' and x['type']=='career']
     ok('threshold_80_passes',len(career80)==1,f"career credentials={len(career80)}")
     # Credential date/id and one-per-type behavior
-    page.evaluate('CM.qaScores(100)'); st100=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryLocalStateV1')"))
+    page.evaluate('CM.qaScores(100)'); st100=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     ibcreds=[x for x in st100['credentials'] if x['careerId']=='investment-banking']
-    ok('three_credentials_per_completed_path',len(ibcreds)==3,f"{len(ibcreds)}")
+    ok('three_legacy_qa_credentials_per_completed_path',len(ibcreds)==3,f"{len(ibcreds)}")
     ok('unique_credential_ids',len({x['credentialId'] for x in ibcreds})==3)
     ok('credential_issue_dates_present',all(x.get('issuedAt') for x in ibcreds))
     # Simulation workspace and score display
     page.evaluate("location.hash='#/simulation/investment-banking'"); page.wait_for_timeout(30)
+    simulation_hash=page.evaluate('location.hash')
+    ok('simulation_qa_route_not_redirected',simulation_hash=='#/simulation/investment-banking',simulation_hash)
     page.locator('[data-sim-tab="workspace"]').click(); page.wait_for_timeout(20)
     ok('simulation_workspace_has_tasks',page.locator('.work-task').count()>=6,f"{page.locator('.work-task').count()} tasks")
     # Sharing modals
