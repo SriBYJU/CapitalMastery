@@ -2,6 +2,10 @@
   "name": "capital-mastery",
   "version": "1.0.0",
   "private": true,
+  "scripts": {
+    "qa:full": "python3 docs/qa/full_audit.py",
+    "qa:browser": "npm install --no-save --package-lock=false playwright@1.55.0 && npx playwright install chromium && node tools/build-pages.mjs && node tools/run-browser-audits-local.mjs"
+  },
   "dependencies": {
     "framer-motion": "13.2.0"
   }
