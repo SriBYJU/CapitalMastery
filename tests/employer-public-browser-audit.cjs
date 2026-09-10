@@ -53,6 +53,23 @@ async function assertContained(page,label){
       page.on('requestfailed',request=>{if(request.url().startsWith(BASE))runtimeErrors.push(`same-origin request failed: ${request.url()}`);});
       page.on('console',msg=>{if(msg.type()==='error'&&!/Firebase|auth-check|Failed to fetch|favicon/i.test(msg.text()))runtimeErrors.push(msg.text());});
 
+      // Regression: the homepage Employer Workspace CTA used to be appended once and then
+      // disappear when cm-auth-changed caused app.js to replace the #app DOM without a hash change.
+      await page.goto(`${BASE}/#/`,{waitUntil:'domcontentloaded',timeout:30000});
+      await page.waitForSelector('[data-cm-employer-workspace-entry]',{state:'visible',timeout:15000});
+      let homeEntry=page.locator('[data-cm-employer-workspace-entry]');
+      assert(await homeEntry.count()===1,`Homepage employer workspace CTA missing/duplicated before auth rerender @ ${width}`);
+      assert(await homeEntry.getAttribute('href')==='#/employer',`Homepage employer workspace CTA has wrong target @ ${width}`);
+      assert(/Employer Workspace/i.test(await homeEntry.textContent()||''),`Homepage employer workspace CTA label missing @ ${width}`);
+
+      await page.evaluate(()=>document.dispatchEvent(new CustomEvent('cm-auth-changed',{detail:{user:null,isAdmin:false,backendVerified:true}})));
+      await page.waitForTimeout(250);
+      homeEntry=page.locator('[data-cm-employer-workspace-entry]');
+      assert(await homeEntry.count()===1,`Homepage employer workspace CTA disappeared or duplicated after auth rerender @ ${width}`);
+      assert(await homeEntry.isVisible(),`Homepage employer workspace CTA is not visible after auth rerender @ ${width}`);
+      assert(await homeEntry.getAttribute('href')==='#/employer',`Homepage employer workspace CTA target changed after auth rerender @ ${width}`);
+      await assertContained(page,`Homepage employer CTA after auth rerender @ ${width}`);
+
       await page.goto(`${BASE}/#/employers`,{waitUntil:'domcontentloaded',timeout:30000});
       await page.waitForSelector('[data-employer-tour-tab]',{timeout:15000});
       const pageText=await page.textContent('#app');
@@ -88,6 +105,6 @@ async function assertContained(page,label){
       assert(runtimeErrors.length===0,`Employer public browser runtime errors @ ${width}: ${[...new Set(runtimeErrors)].join(' | ')}`);
       await context.close();
     }
-    console.log('EMPLOYER PUBLIC WALKTHROUGH/CALCULATOR BROWSER AUDIT PASS');
+    console.log('EMPLOYER PUBLIC + HOMEPAGE ENTRY BROWSER AUDIT PASS');
   }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exit(1);});
