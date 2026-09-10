@@ -77,15 +77,15 @@ with sync_playwright() as p:
     ok('part_quiz_10_questions',page.locator('fieldset.question').count()==10,f"{page.locator('fieldset.question').count()}")
     page.evaluate("location.hash='#/final/investment-banking'"); page.wait_for_timeout(30)
     ok('final_exam_20_questions',page.locator('fieldset.question').count()==20,f"{page.locator('fieldset.question').count()}")
-    # Threshold boundary: 79 should not issue final career, 80 should.
-    page.evaluate('CM.qaScores(79)'); st79=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryLocalStateV1')"))
+    # Threshold boundary: QA mode deliberately writes only to the isolated QA state key.
+    page.evaluate('CM.qaScores(79)'); st79=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     career79=[x for x in st79['credentials'] if x['careerId']=='investment-banking' and x['type']=='career']
     ok('threshold_79_fails',len(career79)==0,f"career credentials={len(career79)}")
-    page.evaluate('CM.qaScores(80)'); st80=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryLocalStateV1')"))
+    page.evaluate('CM.qaScores(80)'); st80=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     career80=[x for x in st80['credentials'] if x['careerId']=='investment-banking' and x['type']=='career']
     ok('threshold_80_passes',len(career80)==1,f"career credentials={len(career80)}")
     # Credential date/id and one-per-type behavior
-    page.evaluate('CM.qaScores(100)'); st100=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryLocalStateV1')"))
+    page.evaluate('CM.qaScores(100)'); st100=json.loads(page.evaluate("CM_STORAGE.getItem('capitalMasteryQaStateV2')"))
     ibcreds=[x for x in st100['credentials'] if x['careerId']=='investment-banking']
     ok('three_credentials_per_completed_path',len(ibcreds)==3,f"{len(ibcreds)}")
     ok('unique_credential_ids',len({x['credentialId'] for x in ibcreds})==3)
