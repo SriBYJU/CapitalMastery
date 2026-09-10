@@ -8,13 +8,13 @@
       "pass": true,
       "detail": "16 careers"
     },
-    "credential_claim_48": {
+    "career_credential_definitions_80": {
       "pass": true,
-      "detail": "16 pathways \u00d7 3 certificates = 48"
+      "detail": "80 career credential definitions"
     },
-    "marketing_claim_45plus": {
+    "marketing_claim_80plus": {
       "pass": true,
-      "detail": "Homepage claim 45+ is below actual 48"
+      "detail": "Homepage credential claim is 80+"
     },
     "career_ids_unique": {
       "pass": true,
@@ -22,7 +22,7 @@
     },
     "career_content_depth": {
       "pass": true,
-      "detail": "Each career: \u226510 vocab, \u22655 concepts, \u22656 toolkit labs, \u22655 applied tasks, \u22655 sources"
+      "detail": "Each career: ≥10 vocab, ≥5 concepts, ≥6 toolkit labs, ≥5 applied tasks, ≥5 sources"
     },
     "all_vocab_defined": {
       "pass": true,
@@ -56,6 +56,10 @@
       "pass": true,
       "detail": ""
     },
+    "qa_mode_admin_boundary_active": {
+      "pass": true,
+      "detail": "Synthetic Admin auth + QA storage flag must both be active"
+    },
     "ui_route_sweep": {
       "pass": true,
       "detail": "180 routes checked; bad=[]"
@@ -80,7 +84,7 @@
       "pass": true,
       "detail": "career credentials=1"
     },
-    "three_credentials_per_completed_path": {
+    "three_legacy_qa_credentials_per_completed_path": {
       "pass": true,
       "detail": "3"
     },
@@ -91,6 +95,10 @@
     "credential_issue_dates_present": {
       "pass": true,
       "detail": ""
+    },
+    "simulation_qa_route_not_redirected": {
+      "pass": true,
+      "detail": "#/simulation/investment-banking"
     },
     "simulation_workspace_has_tasks": {
       "pass": true,
