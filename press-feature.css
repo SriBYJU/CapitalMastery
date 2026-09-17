@@ -1,0 +1,20 @@
+.cm-press-section{position:relative;overflow:hidden;color:#fff;background:#08182f}
+.cm-press-section::before{content:"";position:absolute;inset:0;background:linear-gradient(115deg,rgba(230,184,74,.1),transparent 36%),radial-gradient(circle at 92% 5%,rgba(255,255,255,.09),transparent 24%);pointer-events:none}
+.cm-press-shell{position:relative;z-index:1}
+.cm-press-heading{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(240px,.7fr);align-items:end;gap:40px;margin-bottom:30px}
+.cm-press-heading .eyebrow{color:#e6b84a}
+.cm-press-heading h2{max-width:720px;margin:9px 0 0;color:#fff;font-size:clamp(38px,5vw,64px);letter-spacing:-.04em;line-height:1}
+.cm-press-heading>p{margin:0;color:#b9c6d8;line-height:1.7}
+.cm-press-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.cm-press-card{display:grid;grid-template-columns:132px minmax(0,1fr);align-items:center;gap:24px;padding:18px;color:#fff;text-decoration:none;background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.13);border-radius:16px;box-shadow:0 22px 60px rgba(0,0,0,.22);transition:transform .2s ease,border-color .2s ease,background .2s ease}
+.cm-press-card:hover,.cm-press-card:focus-visible{transform:translateY(-4px);border-color:rgba(230,184,74,.7);background:rgba(255,255,255,.085)}
+.cm-press-card:focus-visible{outline:3px solid rgba(230,184,74,.4);outline-offset:3px}
+.cm-press-logo{display:grid;place-items:center;overflow:hidden;aspect-ratio:1;background:#fff;border-radius:11px}
+.cm-press-logo img{display:block;width:100%;height:100%;object-fit:contain}
+.cm-press-copy{display:flex;min-width:0;flex-direction:column;gap:24px}
+.cm-press-copy strong{font-size:22px;line-height:1.15}
+.cm-press-copy>span{display:flex;align-items:center;justify-content:space-between;gap:12px;color:#e6b84a;font-size:12px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.cm-press-copy b{font-size:18px;transition:transform .2s ease}
+.cm-press-card:hover .cm-press-copy b{transform:translate(3px,-3px)}
+@media(max-width:720px){.cm-press-heading{grid-template-columns:1fr;gap:14px}.cm-press-grid{grid-template-columns:1fr}.cm-press-card{grid-template-columns:96px minmax(0,1fr);gap:18px;padding:14px}.cm-press-copy{gap:17px}.cm-press-copy strong{font-size:19px}}
+@media(prefers-reduced-motion:reduce){.cm-press-card,.cm-press-copy b{transition:none}.cm-press-card:hover,.cm-press-card:focus-visible{transform:none}}
